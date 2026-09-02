@@ -5,7 +5,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace FocusLens.Infrastructure.Dependency
+namespace FocusLens.Infrastructure.Identity
 {
     public class ApplicationUser : IdentityUser
     {

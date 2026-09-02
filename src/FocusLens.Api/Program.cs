@@ -1,15 +1,11 @@
 using FocusLens.Application;
-using FocusLens.Domain.Entities;
-using FocusLens.Domain.Interfaces;
 using FocusLens.Infrastructure;
-using FocusLens.Infrastructure.Dependency;
-using FocusLens.Infrastructure.Repositories;
-using FocusLens.Infrastructure.UnitOfWork;
+using FocusLens.Infrastructure.Data;
+using FocusLens.Infrastructure.Identity;
 using Microsoft.AspNetCore.Identity;
-using Microsoft.EntityFrameworkCore;
 using Serilog;
 
-namespace FocusLens.WebAPI
+namespace FocusLens.API
 {
     public class Program
     {
@@ -33,14 +29,12 @@ namespace FocusLens.WebAPI
                 .AddEntityFrameworkStores<ApplicationDBContext>()
                 .AddDefaultTokenProviders();
 
-            // layers
-            builder.Services.AddApplication().AddInfrastructure(builder.Configuration);
+            // Layers
+            builder.Services
+                .AddApplication()
+                .AddInfrastructure(builder.Configuration);
 
-            // add services
-            builder.Services.AddScoped(typeof(IBaseRepository<>), typeof(BaseRepository<>));
-            builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
-
-            // serilog
+            // Serilog
             builder.Host.UseSerilog(
                 (context, configuration) =>
                     configuration.ReadFrom.Configuration(context.Configuration)
@@ -51,9 +45,11 @@ namespace FocusLens.WebAPI
             {
                 options.AddPolicy(
                     "AllowAll",
-                    builder =>
+                    policy =>
                     {
-                        builder.AllowAnyOrigin().AllowAnyMethod().AllowAnyHeader();
+                        policy.AllowAnyOrigin()
+                            .AllowAnyMethod()
+                            .AllowAnyHeader();
                     }
                 );
             });
@@ -71,6 +67,7 @@ namespace FocusLens.WebAPI
             app.UseCors("AllowAll");
 
             app.UseAuthorization();
+
             app.Run();
         }
     }

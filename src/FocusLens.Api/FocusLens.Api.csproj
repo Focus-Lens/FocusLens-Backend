@@ -21,6 +21,7 @@
   <ItemGroup>
     <ProjectReference Include="..\FocusLens.Application\FocusLens.Application.csproj" />
     <ProjectReference Include="..\FocusLens.Infrastructure\FocusLens.Infrastructure.csproj" />
+    <ProjectReference Include="..\FocusLens.Contracts\FocusLens.Contracts.csproj" />
   </ItemGroup>
 
   <ItemGroup>

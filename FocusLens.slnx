@@ -1,6 +1,14 @@
 <Solution>
-  <Project Path="FocusLens.Application/FocusLens.Application.csproj" />
-  <Project Path="FocusLens.Domain/FocusLens.Domain.csproj" />
-  <Project Path="FocusLens.Infrastructure/FocusLens.Infrastructure.csproj" />
-  <Project Path="FocusLens.WebAPI/FocusLens.WebAPI.csproj" />
+  <Folder Name="/src/">
+    <Project Path="src/FocusLens.Contracts/FocusLens.Contracts.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/FocusLens.Application.Tests/FocusLens.Application.Tests.csproj" />
+    <Project Path="tests/FocusLens.Domain.Tests/FocusLens.Domain.Tests.csproj" />
+    <Project Path="tests/FocusLens.WebAPI.Tests/FocusLens.WebAPI.Tests.csproj" />
+  </Folder>
+  <Project Path="src/FocusLens.Application/FocusLens.Application.csproj" />
+  <Project Path="src/FocusLens.Domain/FocusLens.Domain.csproj" />
+  <Project Path="src/FocusLens.Infrastructure/FocusLens.Infrastructure.csproj" />
+  <Project Path="src/FocusLens.Api/FocusLens.Api.csproj" />
 </Solution>
