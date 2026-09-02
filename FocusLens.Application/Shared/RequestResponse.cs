@@ -4,7 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace Application.Shared
+namespace FocusLens.Application.Shared
 {
     public record RequestResponse<T>(
          T? Data,

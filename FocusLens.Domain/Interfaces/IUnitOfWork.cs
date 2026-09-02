@@ -4,7 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace Domain.Interfaces
+namespace FocusLens.Domain.Interfaces
 {
     public interface IUnitOfWork : IDisposable
     {

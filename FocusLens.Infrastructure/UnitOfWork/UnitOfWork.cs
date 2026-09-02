@@ -1,22 +1,18 @@
-﻿using Domain.Interfaces;
-using Microsoft.EntityFrameworkCore;
+﻿using FocusLens.Domain.Interfaces;
 using Microsoft.EntityFrameworkCore.Storage;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
-namespace Infrastructure.UnitOfWork
+namespace FocusLens.Infrastructure.UnitOfWork
 {
     public class UnitOfWork : IUnitOfWork
     {
         private readonly ApplicationDBContext db;
-        private IDbContextTransaction transaction;
+        private IDbContextTransaction? transaction;
+
         public UnitOfWork(ApplicationDBContext db)
         {
             this.db = db;
         }
+
         public async Task BeginTransactionAsync()
         {
             transaction = await db.Database.BeginTransactionAsync();
@@ -24,6 +20,9 @@ namespace Infrastructure.UnitOfWork
 
         public async Task CommitTransactionAsync()
         {
+            if (transaction is null)
+                return;
+
             try
             {
                 await transaction.CommitAsync();
@@ -38,11 +37,13 @@ namespace Infrastructure.UnitOfWork
         public void Dispose()
         {
             transaction?.Dispose();
-            db?.Dispose();
+            db.Dispose();
         }
 
         public async Task RollbackTransactionAsync()
         {
+            if (transaction is null)
+                return;
 
             try
             {
@@ -57,7 +58,7 @@ namespace Infrastructure.UnitOfWork
 
         public async Task<int> SaveChangesAsync()
         {
-            return await db.SaveChangesAsync(); 
+            return await db.SaveChangesAsync();
         }
     }
 }

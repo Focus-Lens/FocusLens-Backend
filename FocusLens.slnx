@@ -1,0 +1,6 @@
+<Solution>
+  <Project Path="FocusLens.Application/FocusLens.Application.csproj" />
+  <Project Path="FocusLens.Domain/FocusLens.Domain.csproj" />
+  <Project Path="FocusLens.Infrastructure/FocusLens.Infrastructure.csproj" />
+  <Project Path="FocusLens.WebAPI/FocusLens.WebAPI.csproj" />
+</Solution>
