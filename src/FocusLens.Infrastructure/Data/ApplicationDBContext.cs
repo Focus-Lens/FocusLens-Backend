@@ -1,4 +1,5 @@
 ﻿using FocusLens.Domain.Identity;
+using FocusLens.Infrastructure.Identity.Verification;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 
@@ -13,6 +14,9 @@ namespace FocusLens.Infrastructure.Data
         }
 
         public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
+
+        public DbSet<EmailVerificationCode> EmailVerificationCodes
+            => Set<EmailVerificationCode>();
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
