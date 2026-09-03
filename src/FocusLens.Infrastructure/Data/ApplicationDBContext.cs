@@ -1,10 +1,10 @@
-﻿using FocusLens.Infrastructure.Identity;
+﻿using FocusLens.Domain.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 
 namespace FocusLens.Infrastructure.Data
 {
-    public class ApplicationDBContext : IdentityDbContext<ApplicationUser>
+    public class ApplicationDBContext : IdentityDbContext<ApplicationUser, ApplicationRole, Guid>
     {
         public ApplicationDBContext(
             DbContextOptions<ApplicationDBContext> options
@@ -12,9 +12,13 @@ namespace FocusLens.Infrastructure.Data
         {
         }
 
-        protected override void OnModelCreating(ModelBuilder builder)
+        public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
+
+        protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
-            base.OnModelCreating(builder);
+            base.OnModelCreating(modelBuilder);
+
+            modelBuilder.ApplyConfigurationsFromAssembly(typeof(ApplicationDBContext).Assembly);
         }
     }
 }

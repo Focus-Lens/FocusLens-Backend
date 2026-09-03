@@ -1,0 +1,33 @@
+using FocusLens.Infrastructure.Identity.Seed;
+using Microsoft.EntityFrameworkCore;
+
+namespace FocusLens.Infrastructure.Data;
+
+public sealed class ApplicationDbContextInitialiser
+{
+    private readonly ApplicationDBContext _dbContext;
+    private readonly RoleSeeder _roleSeeder;
+    private readonly UserSeeder _userSeeder;
+    private readonly UserRoleSeeder _userRoleSeeder;
+
+    public ApplicationDbContextInitialiser(
+        ApplicationDBContext dbContext,
+        RoleSeeder roleSeeder,
+        UserSeeder userSeeder,
+        UserRoleSeeder userRoleSeeder)
+    {
+        _dbContext = dbContext;
+        _roleSeeder = roleSeeder;
+        _userSeeder = userSeeder;
+        _userRoleSeeder = userRoleSeeder;
+    }
+
+    public async Task SeedAsync(CancellationToken cancellationToken = default)
+    {
+        await _dbContext.Database.MigrateAsync(cancellationToken);
+
+        await _roleSeeder.SeedAsync(cancellationToken);
+        await _userSeeder.SeedAsync(cancellationToken);
+        await _userRoleSeeder.SeedAsync(cancellationToken);
+    }
+}

@@ -1,7 +1,20 @@
-﻿using FocusLens.Infrastructure.Data;
+﻿using System.Text;
+
+using FocusLens.Domain.Identity;
+using FocusLens.Domain.Interfaces;
+using FocusLens.Infrastructure.Authentication;
+using FocusLens.Infrastructure.Data;
+using FocusLens.Infrastructure.Data.Interceptors;
+using FocusLens.Infrastructure.Identity;
+using FocusLens.Infrastructure.Identity.Seed;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
+using Microsoft.IdentityModel.Tokens;
 
 namespace FocusLens.Infrastructure
 {
@@ -12,12 +25,91 @@ namespace FocusLens.Infrastructure
             IConfiguration configuration
         )
         {
-            services.AddDbContext<ApplicationDBContext>(options =>
+            string connectionString = configuration.GetConnectionString("DefaultConnection")
+                ?? throw new InvalidOperationException(
+                    "Connection string 'DefaultConnection' was not found.");
+
+            services.AddSingleton(TimeProvider.System);
+            services.AddScoped<ISaveChangesInterceptor, AuditableEntityInterceptor>();
+            services.AddScoped<ApplicationDbContextInitialiser>();
+            services.AddScoped<RoleSeeder>();
+            services.AddScoped<UserSeeder>();
+            services.AddScoped<UserRoleSeeder>();
+            services.AddScoped<IIdentityService, IdentityService>();
+            services.AddScoped<ITokenProvider, TokenProvider>();
+
+            services.AddDbContext<ApplicationDBContext>((serviceProvider, options) =>
             {
-                options.UseSqlServer(
-                    configuration.GetConnectionString("DefaultConnection")
-                );
+                options.AddInterceptors(serviceProvider.GetServices<ISaveChangesInterceptor>());
+                options.UseSqlServer(connectionString);
             });
+
+            services
+                .AddIdentity<ApplicationUser, ApplicationRole>(options =>
+                {
+                    options.User.RequireUniqueEmail = true;
+
+                    options.Password.RequiredLength = 8;
+                    options.Password.RequireDigit = true;
+                    options.Password.RequireUppercase = true;
+                    options.Password.RequireLowercase = true;
+                    options.Password.RequireNonAlphanumeric = false;
+
+                    options.SignIn.RequireConfirmedEmail = false;
+                    options.Lockout.AllowedForNewUsers = true;
+                    options.Lockout.MaxFailedAccessAttempts = 5;
+                    options.Lockout.DefaultLockoutTimeSpan = TimeSpan.FromMinutes(15);
+                })
+                .AddEntityFrameworkStores<ApplicationDBContext>()
+                .AddDefaultTokenProviders();
+
+            services.Configure<JwtOptions>(
+                configuration.GetRequiredSection(JwtOptions.SectionName));
+            services.AddSingleton<IValidateOptions<JwtOptions>, JwtOptionsValidator>();
+
+            JwtOptions jwtOptions = configuration
+                .GetRequiredSection(JwtOptions.SectionName)
+                .Get<JwtOptions>()
+                ?? throw new InvalidOperationException(
+                    $"Configuration section '{JwtOptions.SectionName}' was not found.");
+
+            ValidateOptionsResult validationResult = new JwtOptionsValidator()
+                .Validate(null, jwtOptions);
+
+            if (validationResult.Failed)
+            {
+                throw new OptionsValidationException(
+                    nameof(JwtOptions),
+                    typeof(JwtOptions),
+                    validationResult.Failures);
+            }
+
+            services
+                .AddAuthentication(options =>
+                {
+                    options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+                    options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+                    options.DefaultScheme = JwtBearerDefaults.AuthenticationScheme;
+                })
+                .AddJwtBearer(options =>
+                {
+                    options.RequireHttpsMetadata = true;
+                    options.SaveToken = false;
+                    options.TokenValidationParameters = new TokenValidationParameters
+                    {
+                        ValidateIssuer = true,
+                        ValidIssuer = jwtOptions.Issuer,
+                        ValidateAudience = true,
+                        ValidAudience = jwtOptions.Audience,
+                        ValidateIssuerSigningKey = true,
+                        IssuerSigningKey = new SymmetricSecurityKey(
+                            Encoding.UTF8.GetBytes(jwtOptions.Secret)),
+                        ValidateLifetime = true,
+                        ClockSkew = TimeSpan.Zero
+                    };
+                });
+
+            services.AddAuthorization();
 
             return services;
         }

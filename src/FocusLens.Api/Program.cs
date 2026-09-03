@@ -1,74 +1,85 @@
 using FocusLens.Application;
 using FocusLens.Infrastructure;
 using FocusLens.Infrastructure.Data;
-using FocusLens.Infrastructure.Identity;
-using Microsoft.AspNetCore.Identity;
 using Serilog;
 
-namespace FocusLens.API
+namespace FocusLens.API;
+
+public class Program
 {
-    public class Program
+    public static async Task Main(string[] args)
     {
-        public static void Main(string[] args)
+        var builder = WebApplication.CreateBuilder(args);
+
+        // Controllers
+        builder.Services.AddControllers();
+
+        // OpenAPI
+        builder.Services.AddOpenApi();
+
+        // Application + Infrastructure
+        builder.Services
+            .AddApplication()
+            .AddInfrastructure(builder.Configuration);
+
+        // Serilog
+        builder.Host.UseSerilog(
+            (context, configuration) =>
+                configuration.ReadFrom.Configuration(context.Configuration)
+        );
+
+        // CORS
+        builder.Services.AddCors(options =>
         {
-            var builder = WebApplication.CreateBuilder(args);
-
-            builder.Services.AddAuthorization();
-            builder.Services.AddOpenApi();
-
-            // Identity
-            builder
-                .Services.AddIdentity<ApplicationUser, IdentityRole>(options =>
+            options.AddPolicy(
+                "AllowAll",
+                policy =>
                 {
-                    options.Password.RequiredLength = 4;
-                    options.Password.RequireDigit = false;
-                    options.Password.RequireUppercase = false;
-                    options.Password.RequireLowercase = false;
-                    options.Password.RequireNonAlphanumeric = false;
-                })
-                .AddEntityFrameworkStores<ApplicationDBContext>()
-                .AddDefaultTokenProviders();
-
-            // Layers
-            builder.Services
-                .AddApplication()
-                .AddInfrastructure(builder.Configuration);
-
-            // Serilog
-            builder.Host.UseSerilog(
-                (context, configuration) =>
-                    configuration.ReadFrom.Configuration(context.Configuration)
+                    policy
+                        .AllowAnyOrigin()
+                        .AllowAnyMethod()
+                        .AllowAnyHeader();
+                }
             );
+        });
 
-            // CORS
-            builder.Services.AddCors(options =>
-            {
-                options.AddPolicy(
-                    "AllowAll",
-                    policy =>
-                    {
-                        policy.AllowAnyOrigin()
-                            .AllowAnyMethod()
-                            .AllowAnyHeader();
-                    }
-                );
-            });
+        var app = builder.Build();
 
-            var app = builder.Build();
+        // Development
+        if (app.Environment.IsDevelopment())
+        {
+            app.MapOpenApi();
 
-            if (app.Environment.IsDevelopment())
-            {
-                app.MapOpenApi();
-            }
+            // Seed database
+            using IServiceScope scope = app.Services.CreateScope();
 
-            // Middleware
-            app.UseHttpsRedirection();
-            app.UseSerilogRequestLogging();
-            app.UseCors("AllowAll");
+            ApplicationDbContextInitialiser initialiser =
+                scope.ServiceProvider
+                    .GetRequiredService<ApplicationDbContextInitialiser>();
 
-            app.UseAuthorization();
-
-            app.Run();
+            await initialiser.SeedAsync();
         }
+
+        // Middleware
+        app.UseHttpsRedirection();
+
+        app.UseSerilogRequestLogging();
+
+        app.UseCors("AllowAll");
+
+        app.UseAuthentication();
+        app.UseAuthorization();
+
+        // Controllers
+        app.MapControllers();
+
+        // Simple health check
+        app.MapGet("/health", () => Results.Ok(new
+        {
+            status = "Healthy",
+            application = "FocusLens.Api"
+        }));
+
+        app.Run();
     }
 }

@@ -3,7 +3,6 @@
     <Project Path="src/FocusLens.Api/FocusLens.Api.csproj" />
     <Project Path="src/FocusLens.Application/FocusLens.Application.csproj" />
     <Project Path="src/FocusLens.Contracts/FocusLens.Contracts.csproj" />
-    <Project Path="src/FocusLens.Domain/FocusLens.Domain.csproj" />
     <Project Path="src/FocusLens.Infrastructure/FocusLens.Infrastructure.csproj" />
   </Folder>
   <Folder Name="/tests/">
