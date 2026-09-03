@@ -11,6 +11,8 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="Google.Apis.Auth" />
+    <PackageReference Include="MailKit" />
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design">
       <PrivateAssets>all</PrivateAssets>
@@ -21,13 +23,20 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\FocusLens.Application\FocusLens.Application.csproj" />
-    <ProjectReference Include="..\FocusLens.Infrastructure\FocusLens.Infrastructure.csproj" />
-    <ProjectReference Include="..\FocusLens.Contracts\FocusLens.Contracts.csproj" />
+    <ProjectReference Include="../FocusLens.Application/FocusLens.Application.csproj" />
+    <ProjectReference Include="../FocusLens.Infrastructure/FocusLens.Infrastructure.csproj" />
+    <ProjectReference Include="../FocusLens.Contracts/FocusLens.Contracts.csproj" />
   </ItemGroup>
 
   <ItemGroup>
     <Folder Include="Minimal_APIs\" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="Templates/*.html">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </Content>
   </ItemGroup>
 
 </Project>

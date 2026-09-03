@@ -1,3 +1,5 @@
+using FluentValidation;
+using FocusLens.Application.Common.Behaviours;
 using MediatR;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -9,6 +11,11 @@ namespace FocusLens.Application
         {
             services.AddMediatR(config =>
                 config.RegisterServicesFromAssembly(typeof(DependencyInjection).Assembly));
+
+            services.AddValidatorsFromAssembly(typeof(DependencyInjection).Assembly);
+
+            services.AddTransient(typeof(IPipelineBehavior<,>), typeof(UnhandledExceptionBehavior<,>));
+            services.AddTransient(typeof(IPipelineBehavior<,>), typeof(ValidationBehavior<,>));
 
             return services;
         }

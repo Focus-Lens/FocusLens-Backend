@@ -32,7 +32,6 @@ namespace FocusLens.Infrastructure
 
             services.AddSingleton(TimeProvider.System);
             services.AddHttpContextAccessor();
-            services.AddScoped<ICurrentUser, CurrentUser>();
             services.AddScoped<ISaveChangesInterceptor, AuditableEntityInterceptor>();
             services.AddScoped<ApplicationDbContextInitialiser>();
             services.AddScoped<RoleSeeder>();

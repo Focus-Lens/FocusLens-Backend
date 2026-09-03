@@ -11,8 +11,8 @@ public class Program
     {
         var builder = WebApplication.CreateBuilder(args);
 
-        // Controllers
-        builder.Services.AddControllers();
+        // API services
+        builder.Services.AddApiServices(builder.Configuration);
 
         // OpenAPI
         builder.Services.AddOpenApi();

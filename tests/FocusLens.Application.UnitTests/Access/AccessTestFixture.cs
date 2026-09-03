@@ -1,11 +1,12 @@
 using System.Linq.Expressions;
 using System.Reflection;
 
-using FocusLens.Domain.Common.Interfaces;
+using FocusLens.Application.Common.Interfaces;
+using DomainInterfaces = FocusLens.Domain.Common.Interfaces;
 
 namespace FocusLens.Application.UnitTests.Access;
 
-public sealed class InMemoryRepository<T> : IBaseRepository<T> where T : class
+public sealed class InMemoryRepository<T> : DomainInterfaces.IBaseRepository<T> where T : class
 {
     private readonly List<T> _entities = [];
 
@@ -68,10 +69,12 @@ public sealed class InMemoryRepository<T> : IBaseRepository<T> where T : class
 
 public sealed class FakeCurrentUser(Guid userId) : ICurrentUser
 {
-    public Guid UserId { get; } = userId;
+    public Guid? UserId { get; } = userId;
+
+    public string? Email { get; } = null;
 }
 
-public sealed class FakeUnitOfWork : IUnitOfWork
+public sealed class FakeUnitOfWork : DomainInterfaces.IUnitOfWork
 {
     public int SaveChangesCalls { get; private set; }
 

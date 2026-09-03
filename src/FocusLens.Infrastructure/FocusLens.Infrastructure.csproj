@@ -25,7 +25,7 @@
   </ItemGroup>
   
   <ItemGroup>
-    <ProjectReference Include="..\FocusLens.Domain\FocusLens.Domain.csproj" />
+    <ProjectReference Include="../FocusLens.Domain/FocusLens.Domain.csproj" />
   </ItemGroup>
 
 </Project>
