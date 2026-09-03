@@ -1,3 +1,4 @@
+using FocusLens.Domain.Common.Interfaces;
 using FocusLens.Domain.Identity;
 using FocusLens.Domain.Interfaces;
 using Microsoft.AspNetCore.Identity;

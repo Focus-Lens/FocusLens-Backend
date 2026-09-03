@@ -1,5 +1,6 @@
 ﻿using System.Text;
 
+using FocusLens.Domain.Common.Interfaces;
 using FocusLens.Domain.Identity;
 using FocusLens.Domain.Interfaces;
 using FocusLens.Infrastructure.Authentication;
@@ -30,6 +31,8 @@ namespace FocusLens.Infrastructure
                     "Connection string 'DefaultConnection' was not found.");
 
             services.AddSingleton(TimeProvider.System);
+            services.AddHttpContextAccessor();
+            services.AddScoped<ICurrentUser, CurrentUser>();
             services.AddScoped<ISaveChangesInterceptor, AuditableEntityInterceptor>();
             services.AddScoped<ApplicationDbContextInitialiser>();
             services.AddScoped<RoleSeeder>();
@@ -37,8 +40,10 @@ namespace FocusLens.Infrastructure
             services.AddScoped<UserRoleSeeder>();
             services.AddScoped<IIdentityService, IdentityService>();
             services.AddScoped<ITokenProvider, TokenProvider>();
+            services.AddScoped(typeof(IBaseRepository<>), typeof(BaseRepository<>));
+            services.AddScoped<IUnitOfWork, UnitOfWork>();
 
-            services.AddDbContext<ApplicationDBContext>((serviceProvider, options) =>
+            services.AddDbContext<ApplicationDbContext>((serviceProvider, options) =>
             {
                 options.AddInterceptors(serviceProvider.GetServices<ISaveChangesInterceptor>());
                 options.UseSqlServer(connectionString);
@@ -60,7 +65,7 @@ namespace FocusLens.Infrastructure
                     options.Lockout.MaxFailedAccessAttempts = 5;
                     options.Lockout.DefaultLockoutTimeSpan = TimeSpan.FromMinutes(15);
                 })
-                .AddEntityFrameworkStores<ApplicationDBContext>()
+                .AddEntityFrameworkStores<ApplicationDbContext>()
                 .AddDefaultTokenProviders();
 
             services.Configure<JwtOptions>(

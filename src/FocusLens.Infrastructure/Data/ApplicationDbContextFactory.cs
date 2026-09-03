@@ -5,9 +5,9 @@ using Microsoft.EntityFrameworkCore.Design;
 namespace FocusLens.Infrastructure.Data;
 
 public sealed class ApplicationDbContextFactory
-    : IDesignTimeDbContextFactory<ApplicationDBContext>
+    : IDesignTimeDbContextFactory<ApplicationDbContext>
 {
-    public ApplicationDBContext CreateDbContext(string[] args)
+    public ApplicationDbContext CreateDbContext(string[] args)
     {
         string? connectionString =
             Environment.GetEnvironmentVariable("ConnectionStrings__DefaultConnection");
@@ -37,10 +37,10 @@ public sealed class ApplicationDbContextFactory
                 "Connection string 'DefaultConnection' was not found.");
         }
 
-        DbContextOptionsBuilder<ApplicationDBContext> optionsBuilder = new();
+        DbContextOptionsBuilder<ApplicationDbContext> optionsBuilder = new();
         optionsBuilder.UseSqlServer(connectionString);
 
-        return new ApplicationDBContext(optionsBuilder.Options);
+        return new ApplicationDbContext(optionsBuilder.Options);
     }
 
     private static string FindAppSettings()

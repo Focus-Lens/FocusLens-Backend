@@ -1,3 +1,4 @@
+using FocusLens.Domain.Common.Interfaces;
 using FocusLens.Domain.Identity;
 
 namespace FocusLens.Domain.Interfaces;

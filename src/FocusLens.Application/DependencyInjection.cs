@@ -1,4 +1,4 @@
-﻿using MediatR;
+using MediatR;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace FocusLens.Application
@@ -7,7 +7,8 @@ namespace FocusLens.Application
     {
         public static IServiceCollection AddApplication(this IServiceCollection services)
         {
-            services.AddMediatR(typeof(DependencyInjection).Assembly);
+            services.AddMediatR(config =>
+                config.RegisterServicesFromAssembly(typeof(DependencyInjection).Assembly));
 
             return services;
         }

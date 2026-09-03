@@ -5,13 +5,13 @@ namespace FocusLens.Infrastructure.Data;
 
 public sealed class ApplicationDbContextInitialiser
 {
-    private readonly ApplicationDBContext _dbContext;
+    private readonly ApplicationDbContext _dbContext;
     private readonly RoleSeeder _roleSeeder;
     private readonly UserSeeder _userSeeder;
     private readonly UserRoleSeeder _userRoleSeeder;
 
     public ApplicationDbContextInitialiser(
-        ApplicationDBContext dbContext,
+        ApplicationDbContext dbContext,
         RoleSeeder roleSeeder,
         UserSeeder userSeeder,
         UserRoleSeeder userRoleSeeder)

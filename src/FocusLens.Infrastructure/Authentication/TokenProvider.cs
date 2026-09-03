@@ -3,6 +3,7 @@ using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text;
 
+using FocusLens.Domain.Common.Interfaces;
 using FocusLens.Domain.Common.Results;
 using FocusLens.Domain.Identity;
 using FocusLens.Domain.Interfaces;
@@ -18,13 +19,13 @@ public sealed class TokenProvider : ITokenProvider
 {
     private static readonly TimeSpan ClockSkew = TimeSpan.Zero;
 
-    private readonly ApplicationDBContext _dbContext;
+    private readonly ApplicationDbContext _dbContext;
     private readonly UserManager<ApplicationUser> _userManager;
     private readonly JwtOptions _jwtOptions;
     private readonly TimeProvider _timeProvider;
 
     public TokenProvider(
-        ApplicationDBContext dbContext,
+        ApplicationDbContext dbContext,
         UserManager<ApplicationUser> userManager,
         IOptions<JwtOptions> jwtOptions,
         TimeProvider timeProvider)

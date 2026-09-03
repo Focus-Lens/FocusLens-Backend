@@ -1,4 +1,4 @@
-namespace FocusLens.Domain.Interfaces;
+namespace FocusLens.Domain.Common.Interfaces;
 
 public sealed record IdentityResultSummary(
     bool Succeeded,

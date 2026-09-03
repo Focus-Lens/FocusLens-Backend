@@ -1,11 +1,11 @@
 ﻿using System.Linq.Expressions;
 
-namespace FocusLens.Domain.Interfaces
+namespace FocusLens.Domain.Common.Interfaces
 {
     public interface IBaseRepository<T> where T : class
     {
         Task<T?> GetByIdAsync(
-            int id,
+            Guid id,
             params Expression<Func<T, object>>[] includes
         );
 
