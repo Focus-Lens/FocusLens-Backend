@@ -1,7 +1,7 @@
 using FocusLens.Domain.Common.Results;
 using FocusLens.Domain.Identity;
 
-namespace FocusLens.Domain.Tests.Identity;
+namespace FocusLens.Domain.UnitTests.Identity;
 
 public class RefreshTokenTests
 {
