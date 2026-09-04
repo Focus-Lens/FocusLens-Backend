@@ -10,6 +10,8 @@ public sealed class EmailVerificationCode
 
     public string CodeHash { get; set; } = string.Empty;
 
+    public int Purpose { get; set; }
+
     public DateTimeOffset ExpiresOnUtc { get; set; }
 
     public DateTimeOffset? UsedOnUtc { get; set; }

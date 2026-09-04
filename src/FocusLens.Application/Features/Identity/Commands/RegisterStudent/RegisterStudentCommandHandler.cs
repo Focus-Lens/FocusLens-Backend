@@ -1,0 +1,125 @@
+using System.Security.Cryptography;
+
+using FocusLens.Application.Common.Errors;
+using FocusLens.Application.Common.Interfaces;
+using FocusLens.Application.Features.Identity.Options;
+using FocusLens.Domain;
+using FocusLens.Domain.Common.Constants;
+using FocusLens.Domain.Common.Interfaces;
+using FocusLens.Domain.Common.Results;
+using FocusLens.Domain.Identity;
+using FocusLens.Domain.Interfaces;
+using MediatR;
+
+namespace FocusLens.Application.Features.Identity.Commands.RegisterStudent;
+
+public sealed class RegisterStudentCommandHandler
+    : IRequestHandler<RegisterStudentCommand, Result<Success>>
+{
+    private readonly IIdentityService _identityService;
+    private readonly IBaseRepository<Student> _studentRepository;
+    private readonly IUnitOfWork _unitOfWork;
+    private readonly IEmailVerificationCodeStore _codeStore;
+    private readonly IEmailSender _emailSender;
+    private readonly TimeProvider _timeProvider;
+    private readonly RegistrationOptions _registrationOptions;
+
+    public RegisterStudentCommandHandler(
+        IIdentityService identityService,
+        IBaseRepository<Student> studentRepository,
+        IUnitOfWork unitOfWork,
+        IEmailVerificationCodeStore codeStore,
+        IEmailSender emailSender,
+        TimeProvider timeProvider,
+        RegistrationOptions registrationOptions)
+    {
+        _identityService = identityService;
+        _studentRepository = studentRepository;
+        _unitOfWork = unitOfWork;
+        _codeStore = codeStore;
+        _emailSender = emailSender;
+        _timeProvider = timeProvider;
+        _registrationOptions = registrationOptions;
+    }
+
+    public async Task<Result<Success>> Handle(
+        RegisterStudentCommand request,
+        CancellationToken cancellationToken)
+    {
+        string email = request.Email.Trim();
+
+        if (await _identityService.FindByEmailAsync(email) is not null)
+        {
+            return ApplicationErrors.Identity.EmailAlreadyRegistered;
+        }
+
+        DateTimeOffset utcNow = _timeProvider.GetUtcNow();
+
+        TimeSpan codeLifetime = TimeSpan.FromMinutes(
+    _registrationOptions.EmailVerificationCodeLifetimeMinutes);
+
+        ApplicationUser user = new()
+        {
+            Email = email,
+            UserName = email,
+            FirstName = request.FirstName.Trim(),
+            LastName = request.LastName.Trim(),
+            EmailConfirmed = false
+        };
+        user.AcceptTerms(_registrationOptions.TermsVersion, utcNow);
+
+        string code = GenerateCode();
+
+        await _unitOfWork.BeginTransactionAsync();
+        try
+        {
+            IdentityResultSummary createResult = await _identityService.CreateAsync(
+                user,
+                request.Password);
+
+            if (!createResult.Succeeded)
+            {
+                await _unitOfWork.RollbackTransactionAsync();
+                return createResult.ToApplicationErrors();
+            }
+
+            IdentityResultSummary roleResult = await _identityService.AddToRoleAsync(
+                user,
+                ApplicationRoles.Student);
+
+            if (!roleResult.Succeeded)
+            {
+                await _unitOfWork.RollbackTransactionAsync();
+                return roleResult.ToApplicationErrors();
+            }
+
+            _studentRepository.Add(new Student(user.Id));
+            await _unitOfWork.SaveChangesAsync();
+
+            await _codeStore.SaveAsync(
+                user.Id,
+                email,
+                code,
+                utcNow.Add(codeLifetime),
+                cancellationToken);
+
+            await _unitOfWork.CommitTransactionAsync();
+        }
+        catch
+        {
+            await _unitOfWork.RollbackTransactionAsync();
+            throw;
+        }
+
+        await _emailSender.SendEmailVerificationCodeAsync(
+            email,
+            code,
+            codeLifetime,
+            cancellationToken);
+
+        return Result.Success;
+    }
+
+    private static string GenerateCode()
+        => RandomNumberGenerator.GetInt32(0, 1_000_000).ToString("D6");
+}

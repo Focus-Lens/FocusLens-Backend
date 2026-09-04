@@ -27,14 +27,17 @@ public sealed class EmailVerificationCodeStore : IEmailVerificationCodeStore
         string email,
         string code,
         DateTimeOffset expiresOnUtc,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        OtpCodePurpose purpose = OtpCodePurpose.EmailVerification)
     {
         string normalizedEmail = NormalizeEmail(email);
         DateTimeOffset utcNow = _timeProvider.GetUtcNow();
+        int purposeValue = (int)purpose;
 
         List<EmailVerificationCode> activeCodes = await _dbContext
             .EmailVerificationCodes
             .Where(storedCode => storedCode.Email == normalizedEmail
+                && storedCode.Purpose == purposeValue
                 && storedCode.UsedOnUtc == null
                 && storedCode.ExpiresOnUtc > utcNow)
             .ToListAsync(cancellationToken);
@@ -49,6 +52,7 @@ public sealed class EmailVerificationCodeStore : IEmailVerificationCodeStore
             UserId = userId,
             Email = normalizedEmail,
             CodeHash = HashCode(normalizedEmail, code),
+            Purpose = purposeValue,
             ExpiresOnUtc = expiresOnUtc,
             CreatedOnUtc = utcNow
         });
@@ -60,14 +64,18 @@ public sealed class EmailVerificationCodeStore : IEmailVerificationCodeStore
         string email,
         string code,
         DateTimeOffset utcNow,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        OtpCodePurpose purpose = OtpCodePurpose.EmailVerification,
+        bool consume = true)
     {
         string normalizedEmail = NormalizeEmail(email);
         string hash = HashCode(normalizedEmail, code);
+        int purposeValue = (int)purpose;
 
         EmailVerificationCode? persistedCode = await _dbContext
             .EmailVerificationCodes
             .Where(storedCode => storedCode.Email == normalizedEmail
+                && storedCode.Purpose == purposeValue
                 && storedCode.CodeHash == hash)
             .OrderByDescending(storedCode => storedCode.CreatedOnUtc)
             .FirstOrDefaultAsync(cancellationToken);
@@ -92,13 +100,47 @@ public sealed class EmailVerificationCodeStore : IEmailVerificationCodeStore
                 persistedCode.UserId);
         }
 
-        persistedCode.UsedOnUtc = utcNow;
+        if (consume)
+        {
+            persistedCode.UsedOnUtc = utcNow;
 
-        await _dbContext.SaveChangesAsync(cancellationToken);
+            await _dbContext.SaveChangesAsync(cancellationToken);
+        }
 
         return new EmailVerificationCodeValidationResult(
             EmailVerificationCodeValidationStatus.Valid,
             persistedCode.UserId);
+    }
+
+    public async Task ConsumeAsync(
+        string email,
+        string code,
+        DateTimeOffset utcNow,
+        CancellationToken cancellationToken = default,
+        OtpCodePurpose purpose = OtpCodePurpose.EmailVerification)
+    {
+        string normalizedEmail = NormalizeEmail(email);
+        string hash = HashCode(normalizedEmail, code);
+        int purposeValue = (int)purpose;
+
+        EmailVerificationCode? persistedCode = await _dbContext
+            .EmailVerificationCodes
+            .Where(storedCode => storedCode.Email == normalizedEmail
+                && storedCode.Purpose == purposeValue
+                && storedCode.CodeHash == hash
+                && storedCode.UsedOnUtc == null
+                && storedCode.ExpiresOnUtc > utcNow)
+            .OrderByDescending(storedCode => storedCode.CreatedOnUtc)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (persistedCode is null)
+        {
+            return;
+        }
+
+        persistedCode.UsedOnUtc = utcNow;
+
+        await _dbContext.SaveChangesAsync(cancellationToken);
     }
 
     private static string NormalizeEmail(string email)

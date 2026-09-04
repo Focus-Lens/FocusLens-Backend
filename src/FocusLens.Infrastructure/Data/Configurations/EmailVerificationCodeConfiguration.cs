@@ -21,6 +21,6 @@ public sealed class EmailVerificationCodeConfiguration
             .HasMaxLength(256)
             .IsRequired();
 
-        builder.HasIndex(code => new { code.Email, code.UsedOnUtc });
+        builder.HasIndex(code => new { code.Email, code.Purpose, code.UsedOnUtc });
     }
 }

@@ -9,11 +9,21 @@ public interface IEmailVerificationCodeStore
         string email,
         string code,
         DateTimeOffset expiresOnUtc,
-        CancellationToken cancellationToken = default);
+        CancellationToken cancellationToken = default,
+        OtpCodePurpose purpose = OtpCodePurpose.EmailVerification);
 
     Task<EmailVerificationCodeValidationResult> ValidateAsync(
         string email,
         string code,
         DateTimeOffset utcNow,
-        CancellationToken cancellationToken = default);
+        CancellationToken cancellationToken = default,
+        OtpCodePurpose purpose = OtpCodePurpose.EmailVerification,
+        bool consume = true);
+
+    Task ConsumeAsync(
+        string email,
+        string code,
+        DateTimeOffset utcNow,
+        CancellationToken cancellationToken = default,
+        OtpCodePurpose purpose = OtpCodePurpose.EmailVerification);
 }

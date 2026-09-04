@@ -27,11 +27,13 @@ public interface IIdentityService
 
     Task<IdentityResultSummary> ConfirmEmailAsync(ApplicationUser user);
 
-    Task<string> GeneratePasswordResetTokenAsync(ApplicationUser user);
-
-    Task<IdentityResultSummary> ResetPasswordAsync(
+    Task<IdentityResultSummary> SetPasswordAsync(
         ApplicationUser user,
-        string token,
+        string newPassword);
+
+    Task<IdentityResultSummary> ChangePasswordAsync(
+        ApplicationUser user,
+        string currentPassword,
         string newPassword);
 
     Task<ApplicationUser?> FindByLoginAsync(string loginProvider, string providerKey);

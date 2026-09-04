@@ -1,5 +1,4 @@
 ﻿using System.Text;
-
 using FocusLens.Domain.Common.Interfaces;
 using FocusLens.Domain.Identity;
 using FocusLens.Domain.Interfaces;
@@ -26,9 +25,11 @@ namespace FocusLens.Infrastructure
             IConfiguration configuration
         )
         {
-            string connectionString = configuration.GetConnectionString("DefaultConnection")
+            string connectionString =
+                configuration.GetConnectionString("DefaultConnection")
                 ?? throw new InvalidOperationException(
-                    "Connection string 'DefaultConnection' was not found.");
+                    "Connection string 'DefaultConnection' was not found."
+                );
 
             services.AddSingleton(TimeProvider.System);
             services.AddHttpContextAccessor();
@@ -42,11 +43,13 @@ namespace FocusLens.Infrastructure
             services.AddScoped(typeof(IBaseRepository<>), typeof(BaseRepository<>));
             services.AddScoped<IUnitOfWork, UnitOfWork>();
 
-            services.AddDbContext<ApplicationDbContext>((serviceProvider, options) =>
-            {
-                options.AddInterceptors(serviceProvider.GetServices<ISaveChangesInterceptor>());
-                options.UseSqlServer(connectionString);
-            });
+            services.AddDbContext<ApplicationDbContext>(
+                (serviceProvider, options) =>
+                {
+                    options.AddInterceptors(serviceProvider.GetServices<ISaveChangesInterceptor>());
+                    options.UseSqlServer(connectionString);
+                }
+            );
 
             services
                 .AddIdentity<ApplicationUser, ApplicationRole>(options =>
@@ -68,24 +71,31 @@ namespace FocusLens.Infrastructure
                 .AddDefaultTokenProviders();
 
             services.Configure<JwtOptions>(
-                configuration.GetRequiredSection(JwtOptions.SectionName));
+                configuration.GetRequiredSection(JwtOptions.SectionName)
+            );
+            services.Configure<GoogleAuthOptions>(
+                configuration.GetRequiredSection(GoogleAuthOptions.SectionName)
+            );
             services.AddSingleton<IValidateOptions<JwtOptions>, JwtOptionsValidator>();
 
-            JwtOptions jwtOptions = configuration
-                .GetRequiredSection(JwtOptions.SectionName)
-                .Get<JwtOptions>()
+            JwtOptions jwtOptions =
+                configuration.GetRequiredSection(JwtOptions.SectionName).Get<JwtOptions>()
                 ?? throw new InvalidOperationException(
-                    $"Configuration section '{JwtOptions.SectionName}' was not found.");
+                    $"Configuration section '{JwtOptions.SectionName}' was not found."
+                );
 
-            ValidateOptionsResult validationResult = new JwtOptionsValidator()
-                .Validate(null, jwtOptions);
+            ValidateOptionsResult validationResult = new JwtOptionsValidator().Validate(
+                null,
+                jwtOptions
+            );
 
             if (validationResult.Failed)
             {
                 throw new OptionsValidationException(
                     nameof(JwtOptions),
                     typeof(JwtOptions),
-                    validationResult.Failures);
+                    validationResult.Failures
+                );
             }
 
             services
@@ -107,9 +117,10 @@ namespace FocusLens.Infrastructure
                         ValidAudience = jwtOptions.Audience,
                         ValidateIssuerSigningKey = true,
                         IssuerSigningKey = new SymmetricSecurityKey(
-                            Encoding.UTF8.GetBytes(jwtOptions.Secret)),
+                            Encoding.UTF8.GetBytes(jwtOptions.Secret)
+                        ),
                         ValidateLifetime = true,
-                        ClockSkew = TimeSpan.Zero
+                        ClockSkew = TimeSpan.Zero,
                     };
                 });
 

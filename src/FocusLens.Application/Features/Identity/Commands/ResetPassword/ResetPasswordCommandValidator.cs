@@ -11,7 +11,7 @@ public sealed class ResetPasswordCommandValidator
             .NotEmpty()
             .EmailAddress();
 
-        RuleFor(command => command.Token)
+        RuleFor(command => command.Otp)
             .NotEmpty();
 
         RuleFor(command => command.NewPassword)

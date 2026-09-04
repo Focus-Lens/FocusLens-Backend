@@ -1,5 +1,6 @@
 using FocusLens.API.Infrastructure;
 using FocusLens.Application.Common.Interfaces;
+using FocusLens.Application.Features.Identity.Options;
 using FocusLens.Infrastructure.Authentication;
 using FocusLens.Settings;
 
@@ -15,14 +16,28 @@ public static class DependencyInjection
         services.AddHttpContextAccessor();
         services.AddScoped<ICurrentUser, CurrentUser>();
         services.AddScoped<IEmailVerificationCodeStore, EmailVerificationCodeStore>();
-        services.AddScoped<IEmailSender, LoggingEmailSender>();
+        services.AddScoped<IEmailSender, SmtpEmailSender>();
         services.AddScoped<IGoogleTokenValidator, GoogleTokenValidator>();
         services.AddSingleton<EmailTemplateRenderer>();
         services.Configure<GoogleAuthOptions>(
             configuration.GetSection(GoogleAuthOptions.SectionName));
         services.AddOptions<MailSettings>()
             .Bind(configuration.GetRequiredSection(MailSettings.SectionName));
+        RegistrationOptions registrationOptions = configuration
+            .GetRequiredSection(RegistrationOptions.SectionName)
+            .Get<RegistrationOptions>()
+            ?? throw new InvalidOperationException(
+                $"Configuration section '{RegistrationOptions.SectionName}' was not found.");
+
+        if (string.IsNullOrWhiteSpace(registrationOptions.TermsVersion))
+        {
+            throw new InvalidOperationException(
+                "Registration terms version must be configured.");
+        }
+
+        services.AddSingleton(registrationOptions);
 
         return services;
     }
 }
+

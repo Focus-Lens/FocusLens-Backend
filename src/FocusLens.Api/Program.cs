@@ -1,6 +1,9 @@
 using FocusLens.Application;
 using FocusLens.Infrastructure;
 using FocusLens.Infrastructure.Data;
+
+using Scalar.AspNetCore;
+
 using Serilog;
 
 namespace FocusLens.API;
@@ -49,6 +52,8 @@ public class Program
         if (app.Environment.IsDevelopment())
         {
             app.MapOpenApi();
+
+            app.MapScalarApiReference();
 
             // Seed database
             using IServiceScope scope = app.Services.CreateScope();

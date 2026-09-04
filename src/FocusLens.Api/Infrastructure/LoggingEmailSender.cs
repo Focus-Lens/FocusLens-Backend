@@ -14,25 +14,27 @@ public sealed class LoggingEmailSender : IEmailSender
     public Task SendEmailVerificationCodeAsync(
         string email,
         string code,
+        TimeSpan codeLifetime,
         CancellationToken cancellationToken = default)
     {
         _logger.LogInformation(
-            "Email verification code for {Email}: {Code}",
+            "Email verification code sent to {Email} (expires in {CodeLifetime})",
             email,
-            code);
+            codeLifetime);
 
         return Task.CompletedTask;
     }
 
     public Task SendPasswordResetAsync(
         string email,
-        string resetToken,
+        string code,
+        TimeSpan codeLifetime,
         CancellationToken cancellationToken = default)
     {
         _logger.LogInformation(
-            "Password reset token for {Email}: {ResetToken}",
+            "Password reset code sent to {Email} (expires in {CodeLifetime})",
             email,
-            resetToken);
+            codeLifetime);
 
         return Task.CompletedTask;
     }

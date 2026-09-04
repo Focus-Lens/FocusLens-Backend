@@ -66,14 +66,37 @@ public sealed class IdentityService : IIdentityService
         return ToSummary(await _userManager.ConfirmEmailAsync(user, token));
     }
 
-    public async Task<string> GeneratePasswordResetTokenAsync(ApplicationUser user)
-        => await _userManager.GeneratePasswordResetTokenAsync(user);
-
-    public async Task<IdentityResultSummary> ResetPasswordAsync(
+    public async Task<IdentityResultSummary> SetPasswordAsync(
         ApplicationUser user,
-        string token,
         string newPassword)
-        => ToSummary(await _userManager.ResetPasswordAsync(user, token, newPassword));
+    {
+        foreach (IPasswordValidator<ApplicationUser> validator in _userManager.PasswordValidators)
+        {
+            IdentityResult validationResult = await validator.ValidateAsync(
+                _userManager,
+                user,
+                newPassword);
+
+            if (!validationResult.Succeeded)
+            {
+                return ToSummary(validationResult);
+            }
+        }
+
+        user.PasswordHash = _userManager.PasswordHasher.HashPassword(user, newPassword);
+        user.SecurityStamp = Guid.CreateVersion7().ToString();
+
+        return ToSummary(await _userManager.UpdateAsync(user));
+    }
+
+    public async Task<IdentityResultSummary> ChangePasswordAsync(
+        ApplicationUser user,
+        string currentPassword,
+        string newPassword)
+        => ToSummary(await _userManager.ChangePasswordAsync(
+            user,
+            currentPassword,
+            newPassword));
 
     public async Task<ApplicationUser?> FindByLoginAsync(
         string loginProvider,

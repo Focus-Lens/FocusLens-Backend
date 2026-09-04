@@ -26,6 +26,7 @@ public sealed class SmtpEmailSender : IEmailSender
     public async Task SendEmailVerificationCodeAsync(
         string email,
         string code,
+        TimeSpan codeLifetime,
         CancellationToken cancellationToken = default)
     {
         string htmlBody = await _templateRenderer.RenderAsync(
@@ -33,7 +34,8 @@ public sealed class SmtpEmailSender : IEmailSender
             new Dictionary<string, string>
             {
                 ["{{Email}}"] = email,
-                ["{{Otp}}"] = code
+                ["{{Otp}}"] = code,
+                ["{{ExpiryMinutes}}"] = ((int)codeLifetime.TotalMinutes).ToString()
             },
             cancellationToken);
 
@@ -46,7 +48,8 @@ public sealed class SmtpEmailSender : IEmailSender
 
     public async Task SendPasswordResetAsync(
         string email,
-        string resetToken,
+        string code,
+        TimeSpan codeLifetime,
         CancellationToken cancellationToken = default)
     {
         string htmlBody = await _templateRenderer.RenderAsync(
@@ -54,7 +57,8 @@ public sealed class SmtpEmailSender : IEmailSender
             new Dictionary<string, string>
             {
                 ["{{Email}}"] = email,
-                ["{{ResetToken}}"] = resetToken
+                ["{{Otp}}"] = code,
+                ["{{ExpiryMinutes}}"] = ((int)codeLifetime.TotalMinutes).ToString()
             },
             cancellationToken);
 
@@ -72,15 +76,44 @@ public sealed class SmtpEmailSender : IEmailSender
         CancellationToken cancellationToken)
     {
         MimeMessage message = new();
+
         message.From.Add(new MailboxAddress(
             _settings.DisplayName,
             _settings.Mail));
+
         message.To.Add(MailboxAddress.Parse(email));
         message.Subject = subject;
-        message.Body = new BodyBuilder
+
+        var bodyBuilder = new BodyBuilder
         {
             HtmlBody = htmlBody
-        }.ToMessageBody();
+        };
+
+        var logoPath = Path.Combine(
+            Directory.GetCurrentDirectory(),
+            "wwwroot",
+            "images",
+            "focuslens-logo.png"
+        );
+
+        var mascotPath = Path.Combine(
+            Directory.GetCurrentDirectory(),
+            "wwwroot",
+            "images",
+            "focuslens-mascot.png"
+        );
+
+        var logo = bodyBuilder.LinkedResources.Add(logoPath);
+        logo.ContentId = "focuslens-logo";
+        logo.ContentDisposition =
+            new ContentDisposition(ContentDisposition.Inline);
+
+        var mascot = bodyBuilder.LinkedResources.Add(mascotPath);
+        mascot.ContentId = "focuslens-mascot";
+        mascot.ContentDisposition =
+            new ContentDisposition(ContentDisposition.Inline);
+
+        message.Body = bodyBuilder.ToMessageBody();
 
         using SmtpClient smtpClient = new();
 
@@ -95,8 +128,12 @@ public sealed class SmtpEmailSender : IEmailSender
             _settings.Password,
             cancellationToken);
 
-        await smtpClient.SendAsync(message, cancellationToken);
+        await smtpClient.SendAsync(
+            message,
+            cancellationToken);
 
-        await smtpClient.DisconnectAsync(true, cancellationToken);
+        await smtpClient.DisconnectAsync(
+            true,
+            cancellationToken);
     }
 }

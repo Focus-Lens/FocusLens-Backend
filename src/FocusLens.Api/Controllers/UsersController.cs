@@ -1,3 +1,4 @@
+using FocusLens.Application.Features.Users.Commands.ChangePassword;
 using FocusLens.Application.Features.Users.Commands.UpdateCurrentUser;
 using FocusLens.Application.Features.Users.Queries.GetCurrentUser;
 using MediatR;
@@ -39,6 +40,18 @@ public sealed class UsersController : ApiController
 
         return result.Match(
             Ok,
+            Problem);
+    }
+
+    [HttpPost("change-password")]
+    public async Task<IActionResult> ChangePassword(
+        ChangePasswordCommand command,
+        CancellationToken cancellationToken)
+    {
+        var result = await _sender.Send(command, cancellationToken);
+
+        return result.Match(
+            _ => NoContent(),
             Problem);
     }
 }

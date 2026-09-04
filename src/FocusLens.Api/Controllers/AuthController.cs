@@ -2,7 +2,8 @@ using FocusLens.Application.Features.Identity.Commands.ForgotPassword;
 using FocusLens.Application.Features.Identity.Commands.GoogleLogin;
 using FocusLens.Application.Features.Identity.Commands.Login;
 using FocusLens.Application.Features.Identity.Commands.RefreshToken;
-using FocusLens.Application.Features.Identity.Commands.Register;
+using FocusLens.Application.Features.Identity.Commands.RegisterParent;
+using FocusLens.Application.Features.Identity.Commands.RegisterStudent;
 using FocusLens.Application.Features.Identity.Commands.ResendVerificationCode;
 using FocusLens.Application.Features.Identity.Commands.ResetPassword;
 using FocusLens.Application.Features.Identity.Commands.RevokeRefreshToken;
@@ -24,9 +25,22 @@ public sealed class AuthController : ApiController
     }
 
     [AllowAnonymous]
-    [HttpPost("register")]
-    public async Task<IActionResult> Register(
-        RegisterCommand command,
+    [HttpPost("register/student")]
+    public async Task<IActionResult> RegisterStudent(
+        RegisterStudentCommand command,
+        CancellationToken cancellationToken)
+    {
+        var result = await _sender.Send(command, cancellationToken);
+
+        return result.Match(
+            _ => NoContent(),
+            Problem);
+    }
+
+    [AllowAnonymous]
+    [HttpPost("register/parent")]
+    public async Task<IActionResult> RegisterParent(
+        RegisterParentCommand command,
         CancellationToken cancellationToken)
     {
         var result = await _sender.Send(command, cancellationToken);
@@ -75,7 +89,7 @@ public sealed class AuthController : ApiController
             Problem);
     }
 
-    [Authorize]
+  
     [HttpPost("logout")]
     public async Task<IActionResult> RevokeRefreshToken(
         RevokeRefreshTokenCommand command,

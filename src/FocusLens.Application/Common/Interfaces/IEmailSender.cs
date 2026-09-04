@@ -5,10 +5,12 @@ public interface IEmailSender
     Task SendEmailVerificationCodeAsync(
         string email,
         string code,
+        TimeSpan codeLifetime,
         CancellationToken cancellationToken = default);
 
     Task SendPasswordResetAsync(
         string email,
-        string resetToken,
+        string code,
+        TimeSpan codeLifetime,
         CancellationToken cancellationToken = default);
 }

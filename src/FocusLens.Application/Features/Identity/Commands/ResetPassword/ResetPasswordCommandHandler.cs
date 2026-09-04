@@ -1,5 +1,7 @@
 using FocusLens.Domain.Common.Interfaces;
 using FocusLens.Application.Common.Errors;
+using FocusLens.Application.Common.Interfaces;
+using FocusLens.Application.Common.Models;
 using FocusLens.Domain.Common.Results;
 using FocusLens.Domain.Identity;
 using FocusLens.Domain.Interfaces;
@@ -11,10 +13,17 @@ public sealed class ResetPasswordCommandHandler
     : IRequestHandler<ResetPasswordCommand, Result<Success>>
 {
     private readonly IIdentityService _identityService;
+    private readonly IEmailVerificationCodeStore _codeStore;
+    private readonly TimeProvider _timeProvider;
 
-    public ResetPasswordCommandHandler(IIdentityService identityService)
+    public ResetPasswordCommandHandler(
+        IIdentityService identityService,
+        IEmailVerificationCodeStore codeStore,
+        TimeProvider timeProvider)
     {
         _identityService = identityService;
+        _codeStore = codeStore;
+        _timeProvider = timeProvider;
     }
 
     public async Task<Result<Success>> Handle(
@@ -29,13 +38,47 @@ public sealed class ResetPasswordCommandHandler
             return ApplicationErrors.Identity.InvalidCredentials;
         }
 
-        IdentityResultSummary result = await _identityService.ResetPasswordAsync(
+        EmailVerificationCodeValidationResult validationResult =
+            await _codeStore.ValidateAsync(
+                request.Email,
+                request.Otp,
+                _timeProvider.GetUtcNow(),
+                cancellationToken,
+                OtpCodePurpose.PasswordReset,
+                consume: false);
+
+        if (validationResult.Status == EmailVerificationCodeValidationStatus.Expired)
+        {
+            return ApplicationErrors.Otp.Expired;
+        }
+
+        if (validationResult.Status == EmailVerificationCodeValidationStatus.Used)
+        {
+            return ApplicationErrors.Otp.AlreadyUsed;
+        }
+
+        if (validationResult.Status != EmailVerificationCodeValidationStatus.Valid
+            || validationResult.UserId != user.Id)
+        {
+            return ApplicationErrors.Otp.Invalid;
+        }
+
+        IdentityResultSummary result = await _identityService.SetPasswordAsync(
             user,
-            request.Token,
             request.NewPassword);
 
-        return result.Succeeded
-            ? Result.Success
-            : result.ToApplicationErrors();
+        if (!result.Succeeded)
+        {
+            return result.ToApplicationErrors();
+        }
+
+        await _codeStore.ConsumeAsync(
+            request.Email,
+            request.Otp,
+            _timeProvider.GetUtcNow(),
+            cancellationToken,
+            OtpCodePurpose.PasswordReset);
+
+        return Result.Success;
     }
 }

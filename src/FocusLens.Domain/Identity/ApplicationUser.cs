@@ -16,5 +16,22 @@ public sealed class ApplicationUser : IdentityUser<Guid>
 
     public bool IsDisabled { get; set; }
 
+    public DateTimeOffset? TermsAcceptedAtUtc { get; private set; }
+
+    public string? TermsVersion { get; private set; }
+
     public List<RefreshToken> RefreshTokens { get; set; } = [];
+
+    public void AcceptTerms(string termsVersion, DateTimeOffset acceptedAtUtc)
+    {
+        if (string.IsNullOrWhiteSpace(termsVersion))
+        {
+            throw new ArgumentException(
+                "Terms version is required.",
+                nameof(termsVersion));
+        }
+
+        TermsVersion = termsVersion.Trim();
+        TermsAcceptedAtUtc = acceptedAtUtc;
+    }
 }

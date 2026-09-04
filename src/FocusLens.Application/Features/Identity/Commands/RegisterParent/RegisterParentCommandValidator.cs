@@ -1,10 +1,11 @@
 using FluentValidation;
 
-namespace FocusLens.Application.Features.Identity.Commands.Register;
+namespace FocusLens.Application.Features.Identity.Commands.RegisterParent;
 
-public sealed class RegisterCommandValidator : AbstractValidator<RegisterCommand>
+public sealed class RegisterParentCommandValidator
+    : AbstractValidator<RegisterParentCommand>
 {
-    public RegisterCommandValidator()
+    public RegisterParentCommandValidator()
     {
         RuleFor(command => command.Email)
             .NotEmpty()
@@ -21,5 +22,9 @@ public sealed class RegisterCommandValidator : AbstractValidator<RegisterCommand
         RuleFor(command => command.LastName)
             .NotEmpty()
             .MaximumLength(100);
+
+        RuleFor(command => command.AcceptTerms)
+            .Equal(true)
+            .WithMessage("Terms and conditions must be accepted.");
     }
 }
