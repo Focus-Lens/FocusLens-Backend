@@ -26,15 +26,18 @@ public class CreateInvitationCommandHandlerTests
         var parentRepository = new InMemoryRepository<Parent>(parent);
         var studentRepository = new InMemoryRepository<Student>(student);
         var relationshipRepository = new InMemoryRepository<ParentStudentRelationship>();
-        var currentUser = new FakeCurrentUser(parentUserId);
+        const string parentEmail = "parent@example.com";
+        var currentUser = new FakeCurrentUser(parentUserId, parentEmail);
         var unitOfWork = new FakeUnitOfWork();
+        var emailSender = new FakeEmailSender();
 
         var handler = new CreateInvitationCommandHandler(
             parentRepository,
             studentRepository,
             relationshipRepository,
             currentUser,
-            unitOfWork);
+            unitOfWork,
+            emailSender);
 
         Result<InvitationResponse> result = await handler.Handle(
             new CreateInvitationCommand(
@@ -46,6 +49,10 @@ public class CreateInvitationCommandHandlerTests
         Assert.Equal(student.Id, result.Value.StudentId);
         Assert.Equal("Pending", result.Value.Status);
         Assert.Equal(1, unitOfWork.SaveChangesCalls);
+        Assert.Single(emailSender.Invitations);
+        Assert.Equal("student@example.com", emailSender.Invitations[0].StudentEmail);
+        Assert.Equal(parentEmail, emailSender.Invitations[0].ParentEmail);
+        Assert.Equal(result.Value.Id, emailSender.Invitations[0].InvitationId);
     }
 
     [Fact]
@@ -58,8 +65,9 @@ public class CreateInvitationCommandHandlerTests
             new InMemoryRepository<Parent>(parent),
             new InMemoryRepository<Student>(),
             new InMemoryRepository<ParentStudentRelationship>(),
-            new FakeCurrentUser(parentUserId),
-            new FakeUnitOfWork());
+            new FakeCurrentUser(parentUserId, "parent@example.com"),
+            new FakeUnitOfWork(),
+            new FakeEmailSender());
 
         Result<InvitationResponse> result = await handler.Handle(
             new CreateInvitationCommand(
@@ -72,7 +80,7 @@ public class CreateInvitationCommandHandlerTests
     }
 
     [Fact]
-    public async Task Handle_WithDuplicateRelationship_ReturnsConflict()
+    public async Task Handle_WithPendingRelationship_ResendsInvitation()
     {
         Guid parentUserId = Guid.NewGuid();
         Guid studentUserId = Guid.NewGuid();
@@ -89,23 +97,28 @@ public class CreateInvitationCommandHandlerTests
             new(parent.Id, student.Id);
 
         var unitOfWork = new FakeUnitOfWork();
+        var emailSender = new FakeEmailSender();
 
         var handler = new CreateInvitationCommandHandler(
             new InMemoryRepository<Parent>(parent),
             new InMemoryRepository<Student>(student),
             new InMemoryRepository<ParentStudentRelationship>(existingRelationship),
-            new FakeCurrentUser(parentUserId),
-            unitOfWork);
+            new FakeCurrentUser(parentUserId, "parent@example.com"),
+            unitOfWork,
+            emailSender);
 
         Result<InvitationResponse> result = await handler.Handle(
             new CreateInvitationCommand(
                 new CreateInvitationRequest("student@example.com")),
             CancellationToken.None);
 
-        Assert.False(result.IsSuccess);
-        Assert.Equal(ErrorKind.Conflict, result.TopError.Type);
-        Assert.Equal("Access.RelationshipExists", result.TopError.Code);
+        Assert.True(result.IsSuccess);
+        Assert.Equal("Pending", result.Value.Status);
         Assert.Equal(0, unitOfWork.SaveChangesCalls);
+        Assert.Single(emailSender.Invitations);
+        Assert.Equal("student@example.com", emailSender.Invitations[0].StudentEmail);
+        Assert.Equal("parent@example.com", emailSender.Invitations[0].ParentEmail);
+        Assert.Equal(existingRelationship.Id, emailSender.Invitations[0].InvitationId);
     }
 
     [Fact]
@@ -116,7 +129,8 @@ public class CreateInvitationCommandHandlerTests
             new InMemoryRepository<Student>(),
             new InMemoryRepository<ParentStudentRelationship>(),
             new FakeCurrentUser(Guid.NewGuid()),
-            new FakeUnitOfWork());
+            new FakeUnitOfWork(),
+            new FakeEmailSender());
 
         Result<InvitationResponse> result = await handler.Handle(
             new CreateInvitationCommand(
@@ -160,8 +174,9 @@ public class CreateInvitationCommandHandlerTests
             new InMemoryRepository<Parent>(parent),
             new InMemoryRepository<Student>(student),
             relationshipRepository,
-            new FakeCurrentUser(parentUserId),
-            unitOfWork);
+            new FakeCurrentUser(parentUserId, "parent@example.com"),
+            unitOfWork,
+            new FakeEmailSender());
 
         Result<InvitationResponse> result = await handler.Handle(
             new CreateInvitationCommand(

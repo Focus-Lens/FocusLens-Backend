@@ -32,4 +32,8 @@ public interface ITokenProvider
     Task<bool> RevokeRefreshTokenAsync(
         string refreshToken,
         CancellationToken cancellationToken = default);
+
+    Task RevokeAllRefreshTokensAsync(
+        Guid userId,
+        CancellationToken cancellationToken = default);
 }

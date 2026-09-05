@@ -32,6 +32,11 @@ public static class DependencyInjection
         services.AddOptions<MailSettings>()
             .Bind(configuration.GetRequiredSection(MailSettings.SectionName));
 
+        services.AddOptions<InvitationSettings>()
+            .Bind(configuration.GetRequiredSection(InvitationSettings.SectionName))
+            .ValidateDataAnnotations()
+            .ValidateOnStart();
+
         RegistrationOptions registrationOptions = configuration
             .GetRequiredSection(RegistrationOptions.SectionName)
             .Get<RegistrationOptions>()

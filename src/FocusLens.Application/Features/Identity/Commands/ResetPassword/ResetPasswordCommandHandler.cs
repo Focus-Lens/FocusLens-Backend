@@ -14,15 +14,18 @@ public sealed class ResetPasswordCommandHandler
 {
     private readonly IIdentityService _identityService;
     private readonly IEmailVerificationCodeStore _codeStore;
+    private readonly ITokenProvider _tokenProvider;
     private readonly TimeProvider _timeProvider;
 
     public ResetPasswordCommandHandler(
         IIdentityService identityService,
         IEmailVerificationCodeStore codeStore,
+        ITokenProvider tokenProvider,
         TimeProvider timeProvider)
     {
         _identityService = identityService;
         _codeStore = codeStore;
+        _tokenProvider = tokenProvider;
         _timeProvider = timeProvider;
     }
 
@@ -71,6 +74,10 @@ public sealed class ResetPasswordCommandHandler
         {
             return result.ToApplicationErrors();
         }
+
+        await _tokenProvider.RevokeAllRefreshTokensAsync(
+            user.Id,
+            cancellationToken);
 
         await _codeStore.ConsumeAsync(
             request.Email,
