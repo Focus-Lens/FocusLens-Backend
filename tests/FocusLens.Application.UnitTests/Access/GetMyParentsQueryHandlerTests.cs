@@ -1,5 +1,5 @@
 using FocusLens.Application.Access;
-using FocusLens.Contracts.Parents;
+using FocusLens.Contracts;
 using FocusLens.Domain;
 using FocusLens.Domain.Access;
 

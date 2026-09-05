@@ -2,5 +2,6 @@ namespace FocusLens.Contracts.Students;
 
 public sealed record StudentResponse(
     Guid Id,
-    Guid UserId
+    Guid UserId,
+    bool OnboardingCompleted
 );

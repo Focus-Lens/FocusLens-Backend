@@ -13,6 +13,11 @@ namespace FocusLens.Domain.Common.Interfaces
             params Expression<Func<T, object>>[] includes
         );
 
+        Task<IEnumerable<T>> GetAllAsync(
+            Expression<Func<T, bool>> criteria,
+            params Expression<Func<T, object>>[] includes
+        );
+
         IQueryable<T> GetAll();
 
         Task<T?> FirstOrDefaultAsync(

@@ -1,0 +1,81 @@
+using ICurrentUser = FocusLens.Application.Common.Interfaces.ICurrentUser;
+using FocusLens.Application.Common.Interfaces;
+using FocusLens.Application.Common.Mappings;
+using FocusLens.Contracts.Students;
+using FocusLens.Domain;
+using FocusLens.Domain.Access;
+using FocusLens.Domain.Common.Interfaces;
+using MediatR;
+
+namespace FocusLens.Application.Access;
+
+public sealed class GetStudentForParentQueryHandler(
+    IBaseRepository<Parent> parentRepository,
+    IBaseRepository<ParentStudentRelationship> relationshipRepository,
+    IBaseRepository<Student> studentRepository,
+    ICurrentUser currentUser)
+    : IRequestHandler<GetStudentForParentQuery, StudentDetailsResponse?>
+{
+    public async Task<StudentDetailsResponse?> Handle(
+        GetStudentForParentQuery request,
+        CancellationToken cancellationToken)
+    {
+        if (currentUser.UserId is not Guid userId || userId == Guid.Empty)
+        {
+            return null;
+        }
+
+        if (request.StudentId == Guid.Empty)
+        {
+            return null;
+        }
+
+        Parent? parent = await parentRepository.FirstOrDefaultAsync(
+            parent => parent.UserId == userId);
+
+        if (parent is null)
+        {
+            return null;
+        }
+
+        ParentStudentRelationship? relationship =
+            await relationshipRepository.FirstOrDefaultAsync(
+                relationship =>
+                    relationship.ParentId == parent.Id &&
+                    relationship.StudentId == request.StudentId &&
+                    relationship.Status == RelationshipStatus.Active);
+
+        if (relationship is null)
+        {
+            return null;
+        }
+
+        Student? student = await studentRepository.FirstOrDefaultAsync(
+            student => student.Id == request.StudentId,
+            student => student.Subjects);
+
+        if (student is null)
+        {
+            return null;
+        }
+
+        IReadOnlyCollection<StudentSubjectResponse> subjects =
+            student.Subjects
+                .Select(subject => new StudentSubjectResponse(
+                    StudentEnumMapper.ToContract(subject.Type),
+                    subject.CustomName))
+                .ToList();
+
+        return new StudentDetailsResponse(
+            student.Id,
+            student.UserId,
+            student.Goal is null
+                ? null
+                : StudentEnumMapper.ToContract(student.Goal.Value),
+            student.Grade is null
+                ? null
+                : StudentEnumMapper.ToContract(student.Grade.Value),
+            subjects,
+            student.IsOnboardingCompleted);
+    }
+}

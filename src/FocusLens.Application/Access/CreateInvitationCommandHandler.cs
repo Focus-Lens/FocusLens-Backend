@@ -75,6 +75,20 @@ public sealed class CreateInvitationCommandHandler(
 
         if (existingRelationship is not null)
         {
+            if (existingRelationship.Status == RelationshipStatus.Revoked)
+            {
+                existingRelationship.Reinvite();
+                relationshipRepository.Update(existingRelationship);
+                await unitOfWork.SaveChangesAsync();
+
+                return new InvitationResponse(
+                    existingRelationship.Id,
+                    existingRelationship.ParentId,
+                    existingRelationship.StudentId,
+                    existingRelationship.Status.ToString(),
+                    existingRelationship.RevokedAtUtc);
+            }
+
             return Error.Conflict(
                 "Access.RelationshipExists",
                 "A relationship already exists between this parent and student.");

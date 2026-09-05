@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 using FocusLens.API.Infrastructure;
 using FocusLens.Application.Common.Interfaces;
 using FocusLens.Application.Features.Identity.Options;
@@ -12,7 +14,13 @@ public static class DependencyInjection
         this IServiceCollection services,
         IConfiguration configuration)
     {
-        services.AddControllers();
+        services.AddControllers()
+            .AddJsonOptions(options =>
+            {
+                options.JsonSerializerOptions.Converters.Add(
+                    new JsonStringEnumConverter());
+            });
+
         services.AddHttpContextAccessor();
         services.AddScoped<ICurrentUser, CurrentUser>();
         services.AddScoped<IEmailVerificationCodeStore, EmailVerificationCodeStore>();
@@ -23,11 +31,12 @@ public static class DependencyInjection
             configuration.GetSection(GoogleAuthOptions.SectionName));
         services.AddOptions<MailSettings>()
             .Bind(configuration.GetRequiredSection(MailSettings.SectionName));
+
         RegistrationOptions registrationOptions = configuration
             .GetRequiredSection(RegistrationOptions.SectionName)
             .Get<RegistrationOptions>()
             ?? throw new InvalidOperationException(
-                $"Configuration section '{RegistrationOptions.SectionName}' was not found.");
+                $"Configuration section {RegistrationOptions.SectionName} was not found.");
 
         if (string.IsNullOrWhiteSpace(registrationOptions.TermsVersion))
         {
@@ -40,4 +49,3 @@ public static class DependencyInjection
         return services;
     }
 }
-

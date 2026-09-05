@@ -1,9 +1,9 @@
 using ICurrentUser = FocusLens.Application.Common.Interfaces.ICurrentUser;
-using FocusLens.Domain.Common.Interfaces;
+using FocusLens.Application.Common.Interfaces;
 using FocusLens.Contracts.Students;
 using FocusLens.Domain;
 using FocusLens.Domain.Access;
-using FocusLens.Application.Common.Interfaces;
+using FocusLens.Domain.Common.Interfaces;
 using MediatR;
 
 namespace FocusLens.Application.Access;
@@ -28,12 +28,12 @@ public sealed class GetMyStudentsQueryHandler(
         }
 
         IEnumerable<ParentStudentRelationship> relationships =
-            await relationshipRepository.GetAllAsync();
+            await relationshipRepository.GetAllAsync(
+                relationship =>
+                    relationship.ParentId == parent.Id &&
+                    relationship.Status == RelationshipStatus.Active);
 
         Guid[] studentIds = relationships
-            .Where(relationship =>
-                relationship.ParentId == parent.Id &&
-                relationship.Status == RelationshipStatus.Active)
             .Select(relationship => relationship.StudentId)
             .ToArray();
 
@@ -42,13 +42,15 @@ public sealed class GetMyStudentsQueryHandler(
             return [];
         }
 
-        IEnumerable<Student> students = await studentRepository.GetAllAsync();
+        IEnumerable<Student> students =
+            await studentRepository.GetAllAsync(
+                student => studentIds.Contains(student.Id));
 
         return students
-            .Where(student => studentIds.Contains(student.Id))
             .Select(student => new StudentResponse(
                 student.Id,
-                student.UserId))
+                student.UserId,
+                student.IsOnboardingCompleted))
             .ToList();
     }
 }

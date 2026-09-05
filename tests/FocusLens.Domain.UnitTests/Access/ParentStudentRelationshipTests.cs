@@ -112,4 +112,30 @@ public class ParentStudentRelationshipTests
 
         Assert.Throws<InvalidOperationException>(() => relationship.Revoke());
     }
+
+
+    [Fact]
+    public void Reinvite_WhenRevoked_MakesRelationshipPending()
+    {
+        ParentStudentRelationship relationship =
+            new(Guid.NewGuid(), Guid.NewGuid());
+
+        relationship.Accept();
+        relationship.Revoke();
+
+        relationship.Reinvite();
+
+        Assert.Equal(RelationshipStatus.Pending, relationship.Status);
+        Assert.Null(relationship.RevokedAtUtc);
+    }
+
+    [Fact]
+    public void Reinvite_WhenPending_ThrowsInvalidOperationException()
+    {
+        ParentStudentRelationship relationship =
+            new(Guid.NewGuid(), Guid.NewGuid());
+
+        Assert.Throws<InvalidOperationException>(
+            () => relationship.Reinvite());
+    }
 }

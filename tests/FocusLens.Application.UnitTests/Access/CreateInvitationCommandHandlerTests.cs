@@ -127,4 +127,52 @@ public class CreateInvitationCommandHandlerTests
         Assert.Equal(ErrorKind.Validation, result.TopError.Type);
         Assert.Equal("Access.StudentEmailRequired", result.TopError.Code);
     }
+
+
+    [Fact]
+    public async Task Handle_WhenExistingRelationshipIsRevoked_ReinvitesStudent()
+    {
+        Guid parentUserId = Guid.NewGuid();
+        Guid studentUserId = Guid.NewGuid();
+
+        Parent parent = new(parentUserId);
+        Student student = new(studentUserId);
+
+        ApplicationUser studentUser = new()
+        {
+            Email = "student@example.com"
+        };
+
+        student.SetPrivateProperty("User", studentUser);
+
+        ParentStudentRelationship existingRelationship =
+            new(parent.Id, student.Id);
+
+        existingRelationship.Reject();
+
+        var relationshipRepository =
+            new InMemoryRepository<ParentStudentRelationship>(
+                existingRelationship);
+
+        var unitOfWork = new FakeUnitOfWork();
+
+        var handler = new CreateInvitationCommandHandler(
+            new InMemoryRepository<Parent>(parent),
+            new InMemoryRepository<Student>(student),
+            relationshipRepository,
+            new FakeCurrentUser(parentUserId),
+            unitOfWork);
+
+        Result<InvitationResponse> result = await handler.Handle(
+            new CreateInvitationCommand(
+                new CreateInvitationRequest("student@example.com")),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(existingRelationship.Id, result.Value.Id);
+        Assert.Equal("Pending", result.Value.Status);
+        Assert.Null(result.Value.RevokedAtUtc);
+        Assert.Equal(RelationshipStatus.Pending, existingRelationship.Status);
+        Assert.Equal(1, unitOfWork.SaveChangesCalls);
+    }
 }

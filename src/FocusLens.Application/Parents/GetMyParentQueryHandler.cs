@@ -1,8 +1,9 @@
 using ICurrentUser = FocusLens.Application.Common.Interfaces.ICurrentUser;
 using FocusLens.Domain.Common.Interfaces;
-using FocusLens.Contracts.Parents;
 using FocusLens.Domain;
 using FocusLens.Application.Common.Interfaces;
+using FocusLens.Contracts;
+
 using MediatR;
 
 namespace FocusLens.Application.Parents;

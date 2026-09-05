@@ -35,16 +35,16 @@ public sealed class GetMyInvitationsQueryHandler(
             return [];
         }
 
-        IEnumerable<ParentStudentRelationship> relationships =
-            await relationshipRepository.GetAllAsync();
-
         Guid? parentId = parent?.Id;
         Guid? studentId = student?.Id;
 
+        IEnumerable<ParentStudentRelationship> relationships =
+            await relationshipRepository.GetAllAsync(
+                relationship =>
+                    (parentId.HasValue && relationship.ParentId == parentId.Value) ||
+                    (studentId.HasValue && relationship.StudentId == studentId.Value));
+
         return relationships
-            .Where(relationship =>
-                (parentId.HasValue && relationship.ParentId == parentId.Value) ||
-                (studentId.HasValue && relationship.StudentId == studentId.Value))
             .Select(relationship => new InvitationResponse(
                 relationship.Id,
                 relationship.ParentId,

@@ -1,4 +1,4 @@
-namespace FocusLens.Contracts.Parents;
+namespace FocusLens.Contracts;
 
 public sealed record ParentResponse(
     Guid Id,

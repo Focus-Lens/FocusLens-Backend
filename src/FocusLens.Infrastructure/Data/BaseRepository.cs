@@ -38,6 +38,20 @@ public class BaseRepository<T>(ApplicationDbContext context) : IBaseRepository<T
         return await query.ToListAsync();
     }
 
+    public async Task<IEnumerable<T>> GetAllAsync(
+        Expression<Func<T, bool>> criteria,
+        params Expression<Func<T, object>>[] includes)
+    {
+        IQueryable<T> query = _dbSet.Where(criteria);
+
+        foreach (Expression<Func<T, object>> include in includes)
+        {
+            query = query.Include(include);
+        }
+
+        return await query.ToListAsync();
+    }
+
     public IQueryable<T> GetAll() => _dbSet;
 
     public async Task<T?> FirstOrDefaultAsync(

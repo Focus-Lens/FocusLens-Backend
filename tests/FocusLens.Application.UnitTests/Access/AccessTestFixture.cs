@@ -24,6 +24,12 @@ public sealed class InMemoryRepository<T> : DomainInterfaces.IBaseRepository<T> 
         params Expression<Func<T, object>>[] includes)
         => Task.FromResult<IEnumerable<T>>(_entities.ToList());
 
+    public Task<IEnumerable<T>> GetAllAsync(
+        Expression<Func<T, bool>> criteria,
+        params Expression<Func<T, object>>[] includes)
+        => Task.FromResult<IEnumerable<T>>(
+            _entities.AsQueryable().Where(criteria).ToList());
+
     public IQueryable<T> GetAll() => _entities.AsQueryable();
 
     public Task<T?> FirstOrDefaultAsync(

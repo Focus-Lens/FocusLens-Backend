@@ -1,4 +1,5 @@
-using FocusLens.Contracts.Parents;
+using FocusLens.Contracts;
+
 using MediatR;
 
 namespace FocusLens.Application.Access;

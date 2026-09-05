@@ -1,8 +1,8 @@
 using ICurrentUser = FocusLens.Application.Common.Interfaces.ICurrentUser;
-using FocusLens.Domain.Common.Interfaces;
+using FocusLens.Application.Common.Interfaces;
 using FocusLens.Contracts.Students;
 using FocusLens.Domain;
-using FocusLens.Application.Common.Interfaces;
+using FocusLens.Domain.Common.Interfaces;
 using MediatR;
 
 namespace FocusLens.Application.Students;
@@ -21,6 +21,9 @@ public sealed class GetMyStudentQueryHandler(
 
         return student is null
             ? null
-            : new StudentResponse(student.Id, student.UserId);
+            : new StudentResponse(
+                student.Id,
+                student.UserId,
+                student.IsOnboardingCompleted);
     }
 }

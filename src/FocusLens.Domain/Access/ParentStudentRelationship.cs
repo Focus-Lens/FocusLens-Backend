@@ -71,4 +71,16 @@ public class ParentStudentRelationship : AuditableEntity
         Status = RelationshipStatus.Revoked;
         RevokedAtUtc = DateTimeOffset.UtcNow;
     }
+
+    public void Reinvite()
+    {
+        if (Status != RelationshipStatus.Revoked)
+        {
+            throw new InvalidOperationException(
+                "Only a revoked relationship can be re-invited.");
+        }
+
+        Status = RelationshipStatus.Pending;
+        RevokedAtUtc = null;
+    }
 }

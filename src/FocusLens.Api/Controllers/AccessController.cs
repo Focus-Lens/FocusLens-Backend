@@ -1,5 +1,6 @@
 using FocusLens.Application.Access;
 using FocusLens.Contracts.Access;
+using FocusLens.Contracts.Students;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -110,6 +111,21 @@ public sealed class AccessController(ISender sender) : ControllerBase
             cancellationToken);
 
         return Ok(students);
+    }
+
+    [HttpGet("students/{studentId:guid}")]
+    [Authorize(Roles = "Parent")]
+    public async Task<IActionResult> GetStudent(
+        Guid studentId,
+        CancellationToken cancellationToken)
+    {
+        StudentDetailsResponse? student = await sender.Send(
+            new GetStudentForParentQuery(studentId),
+            cancellationToken);
+
+        return student is null
+            ? NotFound()
+            : Ok(student);
     }
 
     [HttpGet("parents")]

@@ -4,6 +4,7 @@ using FocusLens.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace FocusLens.Infrastructure.Data.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDBContextModelSnapshot : ModelSnapshot
+    [Migration("20260904165954_AddStudentOnboarding")]
+    partial class AddStudentOnboarding
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -154,13 +157,6 @@ namespace FocusLens.Infrastructure.Data.Migrations
 
                     b.Property<string>("SecurityStamp")
                         .HasColumnType("nvarchar(max)");
-
-                    b.Property<DateTimeOffset?>("TermsAcceptedAtUtc")
-                        .HasColumnType("datetimeoffset");
-
-                    b.Property<string>("TermsVersion")
-                        .HasMaxLength(50)
-                        .HasColumnType("nvarchar(50)");
 
                     b.Property<bool>("TwoFactorEnabled")
                         .HasColumnType("bit");
@@ -317,9 +313,6 @@ namespace FocusLens.Infrastructure.Data.Migrations
                     b.Property<DateTimeOffset>("ExpiresOnUtc")
                         .HasColumnType("datetimeoffset");
 
-                    b.Property<int>("Purpose")
-                        .HasColumnType("int");
-
                     b.Property<DateTimeOffset?>("UsedOnUtc")
                         .HasColumnType("datetimeoffset");
 
@@ -328,7 +321,7 @@ namespace FocusLens.Infrastructure.Data.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("Email", "Purpose", "UsedOnUtc");
+                    b.HasIndex("Email", "UsedOnUtc");
 
                     b.ToTable("EmailVerificationCodes", (string)null);
                 });
