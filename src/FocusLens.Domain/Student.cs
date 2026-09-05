@@ -32,6 +32,22 @@ public class Student : AuditableEntity
 
     public bool IsOnboardingCompleted { get; private set; }
 
+    public void SetGoal(StudentGoal? goal) => Goal = goal;
+
+    public void SetGrade(StudentGrade? grade) => Grade = grade;
+
+    public void ReplaceSubjects(IEnumerable<StudentSubject> subjects)
+    {
+        ArgumentNullException.ThrowIfNull(subjects);
+
+        Subjects.Clear();
+
+        foreach (StudentSubject subject in subjects)
+        {
+            Subjects.Add(subject);
+        }
+    }
+
     public void CompleteOnboarding(
         StudentGoal goal,
         StudentGrade grade,
@@ -51,11 +67,7 @@ public class Student : AuditableEntity
         Goal = goal;
         Grade = grade;
 
-        Subjects.Clear();
-        foreach (StudentSubject subject in subjectList)
-        {
-            Subjects.Add(subject);
-        }
+        ReplaceSubjects(subjectList);
 
         IsOnboardingCompleted = true;
     }

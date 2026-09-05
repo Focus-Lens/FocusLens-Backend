@@ -21,7 +21,7 @@ public sealed class CompleteStudentOnboardingCommandHandler(
         CompleteStudentOnboardingCommand request,
         CancellationToken cancellationToken)
     {
-        if (currentUser.UserId is not Guid userId)
+        if (currentUser.UserId is not Guid userId || userId == Guid.Empty)
         {
             return Error.Unauthorized(
                 "Students.CurrentUserUnavailable",

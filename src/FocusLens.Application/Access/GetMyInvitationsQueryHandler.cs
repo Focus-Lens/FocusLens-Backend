@@ -19,16 +19,16 @@ public sealed class GetMyInvitationsQueryHandler(
         GetMyInvitationsQuery request,
         CancellationToken cancellationToken)
     {
-        if (currentUser.UserId == Guid.Empty)
+        if (currentUser.UserId is not Guid userId || userId == Guid.Empty)
         {
             return [];
         }
 
         Parent? parent = await parentRepository.FirstOrDefaultAsync(
-            parent => parent.UserId == currentUser.UserId);
+            parent => parent.UserId == userId);
 
         Student? student = await studentRepository.FirstOrDefaultAsync(
-            student => student.UserId == currentUser.UserId);
+            student => student.UserId == userId);
 
         if (parent is null && student is null)
         {
@@ -45,12 +45,7 @@ public sealed class GetMyInvitationsQueryHandler(
                     (studentId.HasValue && relationship.StudentId == studentId.Value));
 
         return relationships
-            .Select(relationship => new InvitationResponse(
-                relationship.Id,
-                relationship.ParentId,
-                relationship.StudentId,
-                relationship.Status.ToString(),
-                relationship.RevokedAtUtc))
+            .Select(relationship => relationship.ToResponse())
             .ToList();
     }
 }

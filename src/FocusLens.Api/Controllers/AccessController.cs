@@ -9,7 +9,7 @@ namespace FocusLens.API.Controllers;
 
 [ApiController]
 [Route("api/access")]
-public sealed class AccessController(ISender sender) : ControllerBase
+public sealed class AccessController(ISender sender) : ApiController
 {
     [HttpPost("invitations")]
     [Authorize(Roles = "Parent")]
@@ -26,15 +26,7 @@ public sealed class AccessController(ISender sender) : ControllerBase
             return StatusCode(StatusCodes.Status201Created, result.Value);
         }
 
-        return result.TopError.Type switch
-        {
-            FocusLens.Domain.Common.Results.ErrorKind.Validation => BadRequest(result.Errors),
-            FocusLens.Domain.Common.Results.ErrorKind.Unauthorized => Unauthorized(result.Errors),
-            FocusLens.Domain.Common.Results.ErrorKind.Forbidden => StatusCode(StatusCodes.Status403Forbidden, result.Errors),
-            FocusLens.Domain.Common.Results.ErrorKind.NotFound => NotFound(result.Errors),
-            FocusLens.Domain.Common.Results.ErrorKind.Conflict => Conflict(result.Errors),
-            _ => StatusCode(StatusCodes.Status500InternalServerError, result.Errors)
-        };
+        return Problem(result.Errors);
     }
 
     [HttpGet("invitations")]
@@ -64,15 +56,7 @@ public sealed class AccessController(ISender sender) : ControllerBase
             return Ok(result.Value);
         }
 
-        return result.TopError.Type switch
-        {
-            FocusLens.Domain.Common.Results.ErrorKind.Validation => BadRequest(result.Errors),
-            FocusLens.Domain.Common.Results.ErrorKind.Unauthorized => Unauthorized(result.Errors),
-            FocusLens.Domain.Common.Results.ErrorKind.Forbidden => StatusCode(StatusCodes.Status403Forbidden, result.Errors),
-            FocusLens.Domain.Common.Results.ErrorKind.NotFound => NotFound(result.Errors),
-            FocusLens.Domain.Common.Results.ErrorKind.Conflict => Conflict(result.Errors),
-            _ => StatusCode(StatusCodes.Status500InternalServerError, result.Errors)
-        };
+        return Problem(result.Errors);
     }
 
     [HttpPost("invitations/{invitationId:guid}/reject")]
@@ -90,15 +74,7 @@ public sealed class AccessController(ISender sender) : ControllerBase
             return Ok(result.Value);
         }
 
-        return result.TopError.Type switch
-        {
-            FocusLens.Domain.Common.Results.ErrorKind.Validation => BadRequest(result.Errors),
-            FocusLens.Domain.Common.Results.ErrorKind.Unauthorized => Unauthorized(result.Errors),
-            FocusLens.Domain.Common.Results.ErrorKind.Forbidden => StatusCode(StatusCodes.Status403Forbidden, result.Errors),
-            FocusLens.Domain.Common.Results.ErrorKind.NotFound => NotFound(result.Errors),
-            FocusLens.Domain.Common.Results.ErrorKind.Conflict => Conflict(result.Errors),
-            _ => StatusCode(StatusCodes.Status500InternalServerError, result.Errors)
-        };
+        return Problem(result.Errors);
     }
 
     [HttpGet("students")]
@@ -154,14 +130,6 @@ public sealed class AccessController(ISender sender) : ControllerBase
             return NoContent();
         }
 
-        return result.TopError.Type switch
-        {
-            FocusLens.Domain.Common.Results.ErrorKind.Validation => BadRequest(result.Errors),
-            FocusLens.Domain.Common.Results.ErrorKind.Unauthorized => Unauthorized(result.Errors),
-            FocusLens.Domain.Common.Results.ErrorKind.Forbidden => StatusCode(StatusCodes.Status403Forbidden, result.Errors),
-            FocusLens.Domain.Common.Results.ErrorKind.NotFound => NotFound(result.Errors),
-            FocusLens.Domain.Common.Results.ErrorKind.Conflict => Conflict(result.Errors),
-            _ => StatusCode(StatusCodes.Status500InternalServerError, result.Errors)
-        };
+        return Problem(result.Errors);
     }
 }

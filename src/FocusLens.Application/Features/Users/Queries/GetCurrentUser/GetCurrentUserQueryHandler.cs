@@ -26,7 +26,7 @@ public sealed class GetCurrentUserQueryHandler
         GetCurrentUserQuery request,
         CancellationToken cancellationToken)
     {
-        if (_currentUser.UserId is not Guid userId)
+        if (_currentUser.UserId is not Guid userId || userId == Guid.Empty)
         {
             return ApplicationErrors.Users.CurrentUserUnavailable;
         }

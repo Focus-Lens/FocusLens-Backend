@@ -1,5 +1,6 @@
 using ICurrentUser = FocusLens.Application.Common.Interfaces.ICurrentUser;
 using FocusLens.Application.Common.Interfaces;
+using FocusLens.Application.Common.Mappings;
 using FocusLens.Contracts.Students;
 using FocusLens.Domain;
 using FocusLens.Domain.Common.Interfaces;
@@ -10,20 +11,21 @@ namespace FocusLens.Application.Students;
 public sealed class GetMyStudentQueryHandler(
     IBaseRepository<Student> studentRepository,
     ICurrentUser currentUser)
-    : IRequestHandler<GetMyStudentQuery, StudentResponse?>
+    : IRequestHandler<GetMyStudentQuery, StudentDetailsResponse?>
 {
-    public async Task<StudentResponse?> Handle(
+    public async Task<StudentDetailsResponse?> Handle(
         GetMyStudentQuery request,
         CancellationToken cancellationToken)
     {
-        Student? student = await studentRepository.FirstOrDefaultAsync(
-            student => student.UserId == currentUser.UserId);
+        if (currentUser.UserId is not Guid userId || userId == Guid.Empty)
+        {
+            return null;
+        }
 
-        return student is null
-            ? null
-            : new StudentResponse(
-                student.Id,
-                student.UserId,
-                student.IsOnboardingCompleted);
+        Student? student = await studentRepository.FirstOrDefaultAsync(
+            student => student.UserId == userId,
+            student => student.Subjects);
+
+        return student?.ToDetailsResponse();
     }
 }

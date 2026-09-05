@@ -18,7 +18,7 @@ public sealed class AcceptInvitationCommandHandler(
         AcceptInvitationCommand request,
         CancellationToken cancellationToken)
     {
-        if (currentUser.UserId == Guid.Empty)
+        if (currentUser.UserId is not Guid userId || userId == Guid.Empty)
         {
             return Error.Unauthorized(
                 "Access.Unauthorized",
@@ -44,7 +44,7 @@ public sealed class AcceptInvitationCommandHandler(
                 "The invitation was not found.");
         }
 
-        if (relationship.Student.UserId != currentUser.UserId)
+        if (relationship.Student.UserId != userId)
         {
             return Error.Forbidden(
                 "Access.InvitationNotOwned",
@@ -62,11 +62,6 @@ public sealed class AcceptInvitationCommandHandler(
         relationshipRepository.Update(relationship);
         await unitOfWork.SaveChangesAsync();
 
-        return new InvitationResponse(
-            relationship.Id,
-            relationship.ParentId,
-            relationship.StudentId,
-            relationship.Status.ToString(),
-            relationship.RevokedAtUtc);
+        return relationship.ToResponse();
     }
 }
