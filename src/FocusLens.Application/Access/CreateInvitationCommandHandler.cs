@@ -14,7 +14,8 @@ public sealed class CreateInvitationCommandHandler(
     IBaseRepository<Student> studentRepository,
     IBaseRepository<ParentStudentRelationship> relationshipRepository,
     ICurrentUser currentUser,
-    IUnitOfWork unitOfWork)
+    IUnitOfWork unitOfWork,
+    IEmailSender emailSender)
     : IRequestHandler<CreateInvitationCommand, Result<InvitationResponse>>
 {
     public async Task<Result<InvitationResponse>> Handle(
@@ -45,6 +46,15 @@ public sealed class CreateInvitationCommandHandler(
             return Error.NotFound(
                 "Access.ParentNotFound",
                 "The current user does not have a parent profile.");
+        }
+
+        string? parentEmail = currentUser.Email?.Trim();
+
+        if (string.IsNullOrWhiteSpace(parentEmail))
+        {
+            return Error.Unauthorized(
+                "Access.ParentEmailUnavailable",
+                "The parent email address could not be identified.");
         }
 
         string normalizedEmail = studentEmail.ToUpperInvariant();
@@ -81,6 +91,28 @@ public sealed class CreateInvitationCommandHandler(
                 relationshipRepository.Update(existingRelationship);
                 await unitOfWork.SaveChangesAsync();
 
+                await emailSender.SendParentStudentInvitationAsync(
+                    student.User.Email!,
+                    parentEmail,
+                    existingRelationship.Id,
+                    cancellationToken);
+
+                return new InvitationResponse(
+                    existingRelationship.Id,
+                    existingRelationship.ParentId,
+                    existingRelationship.StudentId,
+                    existingRelationship.Status.ToString(),
+                    existingRelationship.RevokedAtUtc);
+            }
+
+            if (existingRelationship.Status == RelationshipStatus.Pending)
+            {
+                await emailSender.SendParentStudentInvitationAsync(
+                    student.User.Email!,
+                    parentEmail,
+                    existingRelationship.Id,
+                    cancellationToken);
+
                 return new InvitationResponse(
                     existingRelationship.Id,
                     existingRelationship.ParentId,
@@ -99,6 +131,12 @@ public sealed class CreateInvitationCommandHandler(
 
         relationshipRepository.Add(relationship);
         await unitOfWork.SaveChangesAsync();
+
+        await emailSender.SendParentStudentInvitationAsync(
+            student.User.Email!,
+            parentEmail,
+            relationship.Id,
+            cancellationToken);
 
         return new InvitationResponse(
             relationship.Id,

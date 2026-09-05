@@ -206,6 +206,29 @@ public sealed class TokenProvider : ITokenProvider
         return true;
     }
 
+    public async Task RevokeAllRefreshTokensAsync(
+        Guid userId,
+        CancellationToken cancellationToken = default)
+    {
+        DateTimeOffset utcNow = _timeProvider.GetUtcNow();
+
+        List<RefreshToken> activeTokens = await _dbContext.RefreshTokens
+            .Where(token => token.UserId == userId
+                && token.RevokedOnUtc == null
+                && token.ExpiresOnUtc > utcNow)
+            .ToListAsync(cancellationToken);
+
+        foreach (RefreshToken token in activeTokens)
+        {
+            token.Revoke(utcNow);
+        }
+
+        if (activeTokens.Count > 0)
+        {
+            await _dbContext.SaveChangesAsync(cancellationToken);
+        }
+    }
+
     private async Task<string> GenerateAccessTokenAsync(ApplicationUser user)
     {
         List<Claim> claims =

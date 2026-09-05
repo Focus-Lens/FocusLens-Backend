@@ -73,11 +73,11 @@ public sealed class InMemoryRepository<T> : DomainInterfaces.IBaseRepository<T> 
     }
 }
 
-public sealed class FakeCurrentUser(Guid userId) : ICurrentUser
+public sealed class FakeCurrentUser(Guid userId, string? email = null) : ICurrentUser
 {
     public Guid? UserId { get; } = userId;
 
-    public string? Email { get; } = null;
+    public string? Email { get; } = email;
 }
 
 public sealed class FakeUnitOfWork : DomainInterfaces.IUnitOfWork
@@ -94,6 +94,23 @@ public sealed class FakeUnitOfWork : DomainInterfaces.IUnitOfWork
     public Task CommitTransactionAsync() => Task.CompletedTask;
     public Task RollbackTransactionAsync() => Task.CompletedTask;
     public void Dispose() { }
+}
+
+public sealed class FakeEmailSender : IEmailSender
+{
+    public List<(string StudentEmail, string ParentEmail, Guid InvitationId)> Invitations { get; } = [];
+
+    public Task SendEmailVerificationCodeAsync(string email, string code, TimeSpan codeLifetime, CancellationToken cancellationToken = default) => Task.CompletedTask;
+    public Task SendPasswordResetAsync(string email, string code, TimeSpan codeLifetime, CancellationToken cancellationToken = default) => Task.CompletedTask;
+    public Task SendParentStudentInvitationAsync(
+        string studentEmail,
+        string parentEmail,
+        Guid invitationId,
+        CancellationToken cancellationToken = default)
+    {
+        Invitations.Add((studentEmail, parentEmail, invitationId));
+        return Task.CompletedTask;
+    }
 }
 
 public static class AccessTestObjectExtensions

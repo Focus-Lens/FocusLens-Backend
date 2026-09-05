@@ -13,4 +13,10 @@ public interface IEmailSender
         string code,
         TimeSpan codeLifetime,
         CancellationToken cancellationToken = default);
+
+    Task SendParentStudentInvitationAsync(
+        string studentEmail,
+        string parentEmail,
+        Guid invitationId,
+        CancellationToken cancellationToken = default);
 }

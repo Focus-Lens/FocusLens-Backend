@@ -11,16 +11,20 @@ public sealed class SmtpEmailSender : IEmailSender
 {
     private const string EmailVerificationTemplate = "EmailVerification.html";
     private const string PasswordResetTemplate = "PasswordReset.html";
+    private const string ParentStudentInvitationTemplate = "ParentStudentInvitation.html";
 
     private readonly MailSettings _settings;
     private readonly EmailTemplateRenderer _templateRenderer;
+    private readonly InvitationSettings _invitationSettings;
 
     public SmtpEmailSender(
         IOptions<MailSettings> settings,
-        EmailTemplateRenderer templateRenderer)
+        EmailTemplateRenderer templateRenderer,
+        IOptions<InvitationSettings> invitationSettings)
     {
         _settings = settings.Value;
         _templateRenderer = templateRenderer;
+        _invitationSettings = invitationSettings.Value;
     }
 
     public async Task SendEmailVerificationCodeAsync(
@@ -65,6 +69,30 @@ public sealed class SmtpEmailSender : IEmailSender
         await SendAsync(
             email,
             "Reset your FocusLens password",
+            htmlBody,
+            cancellationToken);
+    }
+
+    public async Task SendParentStudentInvitationAsync(
+        string studentEmail,
+        string parentEmail,
+        Guid invitationId,
+        CancellationToken cancellationToken = default)
+    {
+        string invitationUrl = $"{_invitationSettings.BaseUrl.TrimEnd('/')}/{invitationId}";
+
+        string htmlBody = await _templateRenderer.RenderAsync(
+            ParentStudentInvitationTemplate,
+            new Dictionary<string, string>
+            {
+                ["{{ParentEmail}}"] = parentEmail,
+                ["{{InvitationUrl}}"] = invitationUrl
+            },
+            cancellationToken);
+
+        await SendAsync(
+            studentEmail,
+            "You have a FocusLens invitation",
             htmlBody,
             cancellationToken);
     }
