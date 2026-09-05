@@ -9,7 +9,7 @@ namespace FocusLens.API.Controllers;
 [ApiController]
 [Route("api/students")]
 [Authorize(Roles = "Student")]
-public sealed class StudentsController(ISender sender) : ControllerBase
+public sealed class StudentsController(ISender sender) : ApiController
 {
     [HttpGet("me")]
     public async Task<IActionResult> GetMe(CancellationToken cancellationToken)
@@ -37,27 +37,23 @@ public sealed class StudentsController(ISender sender) : ControllerBase
             return NoContent();
         }
 
-        return result.TopError.Type switch
+        return Problem(result.Errors);
+    }
+
+    [HttpPatch("me/preferences")]
+    public async Task<IActionResult> UpdatePreferences(
+        [FromBody] UpdateStudentPreferencesRequest request,
+        CancellationToken cancellationToken)
+    {
+        var result = await sender.Send(
+            new UpdateStudentPreferencesCommand(request),
+            cancellationToken);
+
+        if (result.IsSuccess)
         {
-            FocusLens.Domain.Common.Results.ErrorKind.Validation =>
-                BadRequest(result.Errors),
+            return Ok(result.Value);
+        }
 
-            FocusLens.Domain.Common.Results.ErrorKind.Unauthorized =>
-                Unauthorized(result.Errors),
-
-            FocusLens.Domain.Common.Results.ErrorKind.Forbidden =>
-                StatusCode(StatusCodes.Status403Forbidden, result.Errors),
-
-            FocusLens.Domain.Common.Results.ErrorKind.NotFound =>
-                NotFound(result.Errors),
-
-            FocusLens.Domain.Common.Results.ErrorKind.Conflict =>
-                Conflict(result.Errors),
-
-            _ =>
-                StatusCode(
-                    StatusCodes.Status500InternalServerError,
-                    result.Errors)
-        };
+        return Problem(result.Errors);
     }
 }

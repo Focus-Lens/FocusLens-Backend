@@ -17,8 +17,13 @@ public sealed class GetMyParentQueryHandler(
         GetMyParentQuery request,
         CancellationToken cancellationToken)
     {
+        if (currentUser.UserId is not Guid userId || userId == Guid.Empty)
+        {
+            return null;
+        }
+
         Parent? parent = await parentRepository.FirstOrDefaultAsync(
-            parent => parent.UserId == currentUser.UserId);
+            parent => parent.UserId == userId);
 
         return parent is null
             ? null

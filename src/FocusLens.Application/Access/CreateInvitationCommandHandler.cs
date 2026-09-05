@@ -22,7 +22,7 @@ public sealed class CreateInvitationCommandHandler(
         CreateInvitationCommand request,
         CancellationToken cancellationToken)
     {
-        if (currentUser.UserId == Guid.Empty)
+        if (currentUser.UserId is not Guid userId || userId == Guid.Empty)
         {
             return Error.Unauthorized(
                 "Access.Unauthorized",
@@ -39,7 +39,7 @@ public sealed class CreateInvitationCommandHandler(
         }
 
         Parent? parent = await parentRepository.FirstOrDefaultAsync(
-            parent => parent.UserId == currentUser.UserId);
+            parent => parent.UserId == userId);
 
         if (parent is null)
         {
@@ -97,12 +97,7 @@ public sealed class CreateInvitationCommandHandler(
                     existingRelationship.Id,
                     cancellationToken);
 
-                return new InvitationResponse(
-                    existingRelationship.Id,
-                    existingRelationship.ParentId,
-                    existingRelationship.StudentId,
-                    existingRelationship.Status.ToString(),
-                    existingRelationship.RevokedAtUtc);
+                return existingRelationship.ToResponse();
             }
 
             if (existingRelationship.Status == RelationshipStatus.Pending)
@@ -113,12 +108,7 @@ public sealed class CreateInvitationCommandHandler(
                     existingRelationship.Id,
                     cancellationToken);
 
-                return new InvitationResponse(
-                    existingRelationship.Id,
-                    existingRelationship.ParentId,
-                    existingRelationship.StudentId,
-                    existingRelationship.Status.ToString(),
-                    existingRelationship.RevokedAtUtc);
+                return existingRelationship.ToResponse();
             }
 
             return Error.Conflict(
@@ -138,11 +128,6 @@ public sealed class CreateInvitationCommandHandler(
             relationship.Id,
             cancellationToken);
 
-        return new InvitationResponse(
-            relationship.Id,
-            relationship.ParentId,
-            relationship.StudentId,
-            relationship.Status.ToString(),
-            relationship.RevokedAtUtc);
+        return relationship.ToResponse();
     }
 }

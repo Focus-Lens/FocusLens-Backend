@@ -17,7 +17,7 @@ public sealed class RevokeRelationshipCommandHandler(
         RevokeRelationshipCommand request,
         CancellationToken cancellationToken)
     {
-        if (currentUser.UserId == Guid.Empty)
+        if (currentUser.UserId is not Guid userId || userId == Guid.Empty)
         {
             return Error.Unauthorized(
                 "Access.Unauthorized",
@@ -44,8 +44,8 @@ public sealed class RevokeRelationshipCommandHandler(
                 "The relationship was not found.");
         }
 
-        bool isParent = relationship.Parent.UserId == currentUser.UserId;
-        bool isStudent = relationship.Student.UserId == currentUser.UserId;
+        bool isParent = relationship.Parent.UserId == userId;
+        bool isStudent = relationship.Student.UserId == userId;
 
         if (!isParent && !isStudent)
         {

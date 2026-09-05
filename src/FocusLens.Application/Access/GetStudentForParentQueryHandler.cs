@@ -59,23 +59,6 @@ public sealed class GetStudentForParentQueryHandler(
             return null;
         }
 
-        IReadOnlyCollection<StudentSubjectResponse> subjects =
-            student.Subjects
-                .Select(subject => new StudentSubjectResponse(
-                    StudentEnumMapper.ToContract(subject.Type),
-                    subject.CustomName))
-                .ToList();
-
-        return new StudentDetailsResponse(
-            student.Id,
-            student.UserId,
-            student.Goal is null
-                ? null
-                : StudentEnumMapper.ToContract(student.Goal.Value),
-            student.Grade is null
-                ? null
-                : StudentEnumMapper.ToContract(student.Grade.Value),
-            subjects,
-            student.IsOnboardingCompleted);
+        return student.ToDetailsResponse();
     }
 }

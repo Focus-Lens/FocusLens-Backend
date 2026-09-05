@@ -4,4 +4,4 @@ using MediatR;
 
 namespace FocusLens.Application.Students;
 
-public sealed record GetMyStudentQuery : IRequest<StudentResponse?>;
+public sealed record GetMyStudentQuery : IRequest<StudentDetailsResponse?>;

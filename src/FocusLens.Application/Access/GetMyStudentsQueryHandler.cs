@@ -1,5 +1,6 @@
 using ICurrentUser = FocusLens.Application.Common.Interfaces.ICurrentUser;
 using FocusLens.Application.Common.Interfaces;
+using FocusLens.Application.Common.Mappings;
 using FocusLens.Contracts.Students;
 using FocusLens.Domain;
 using FocusLens.Domain.Access;
@@ -19,8 +20,13 @@ public sealed class GetMyStudentsQueryHandler(
         GetMyStudentsQuery request,
         CancellationToken cancellationToken)
     {
+        if (currentUser.UserId is not Guid userId || userId == Guid.Empty)
+        {
+            return [];
+        }
+
         Parent? parent = await parentRepository.FirstOrDefaultAsync(
-            parent => parent.UserId == currentUser.UserId);
+            parent => parent.UserId == userId);
 
         if (parent is null)
         {
@@ -47,10 +53,7 @@ public sealed class GetMyStudentsQueryHandler(
                 student => studentIds.Contains(student.Id));
 
         return students
-            .Select(student => new StudentResponse(
-                student.Id,
-                student.UserId,
-                student.IsOnboardingCompleted))
+            .Select(student => student.ToResponse())
             .ToList();
     }
 }

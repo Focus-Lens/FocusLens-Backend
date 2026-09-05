@@ -8,7 +8,7 @@ namespace FocusLens.API.Controllers;
 [ApiController]
 [Route("api/parents")]
 [Authorize(Roles = "Parent")]
-public sealed class ParentsController(ISender sender) : ControllerBase
+public sealed class ParentsController(ISender sender) : ApiController
 {
     [HttpGet("me")]
     public async Task<IActionResult> GetMe(CancellationToken cancellationToken)
