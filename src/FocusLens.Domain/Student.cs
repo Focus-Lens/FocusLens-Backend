@@ -49,26 +49,21 @@ public class Student : AuditableEntity
     }
 
     public void CompleteOnboarding(
-        StudentGoal goal,
-        StudentGrade grade,
+        StudentGoal? goal,
+        StudentGrade? grade,
         IEnumerable<StudentSubject> subjects)
     {
         ArgumentNullException.ThrowIfNull(subjects);
 
         List<StudentSubject> subjectList = subjects.ToList();
 
-        if (subjectList.Count == 0)
-        {
-            throw new ArgumentException(
-                "At least one subject is required.",
-                nameof(subjects));
-        }
-
         Goal = goal;
         Grade = grade;
 
         ReplaceSubjects(subjectList);
 
-        IsOnboardingCompleted = true;
+        IsOnboardingCompleted = Goal.HasValue
+            && Grade.HasValue
+            && subjectList.Count > 0;
     }
 }

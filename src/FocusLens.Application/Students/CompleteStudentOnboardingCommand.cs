@@ -1,4 +1,5 @@
 using FocusLens.Contracts.Students;
+using FocusLens.Application.Features.Identity.Dtos;
 using FocusLens.Domain.Common.Results;
 using MediatR;
 
@@ -6,4 +7,4 @@ namespace FocusLens.Application.Students;
 
 public sealed record CompleteStudentOnboardingCommand(
     CompleteStudentOnboardingRequest Request
-) : IRequest<Result<Success>>;
+) : IRequest<Result<AuthResponse>>;

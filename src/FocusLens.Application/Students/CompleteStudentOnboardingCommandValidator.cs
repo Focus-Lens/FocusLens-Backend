@@ -17,10 +17,9 @@ public sealed class CompleteStudentOnboardingCommandValidator
             .IsInEnum();
 
         RuleFor(command => command.Request.Subjects)
-            .NotNull()
-            .NotEmpty()
             .Must(HaveUniqueSubjects)
-            .WithMessage("Subjects must be unique.");
+            .WithMessage("Subjects must be unique.")
+            .When(command => command.Request.Subjects is not null);
 
         RuleForEach(command => command.Request.Subjects)
             .ChildRules(subject =>

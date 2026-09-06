@@ -17,6 +17,9 @@ public static class StudentEnumMapper
         ContractStudentGoal.BuildARoutine => DomainStudentGoal.BuildARoutine
     };
 
+    public static DomainStudentGoal? ToDomain(ContractStudentGoal? value)
+        => value.HasValue ? ToDomain(value.Value) : null;
+
     public static DomainStudentGrade ToDomain(ContractStudentGrade value) => value switch
     {
         ContractStudentGrade.Grade5 => DomainStudentGrade.Grade5,
@@ -29,6 +32,9 @@ public static class StudentEnumMapper
         ContractStudentGrade.Grade12 => DomainStudentGrade.Grade12,
         ContractStudentGrade.Other => DomainStudentGrade.Other
     };
+
+    public static DomainStudentGrade? ToDomain(ContractStudentGrade? value)
+        => value.HasValue ? ToDomain(value.Value) : null;
 
     public static DomainStudentSubjectType ToDomain(ContractStudentSubjectType value) => value switch
     {

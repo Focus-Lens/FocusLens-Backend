@@ -6,4 +6,9 @@ public sealed record AuthResponse(
     string FirstName,
     string LastName,
     IReadOnlyCollection<string> Roles,
-    TokenResponse Tokens);
+    TokenResponse? Tokens,
+    bool RequiresOnboarding = false,
+    string? RegistrationToken = null,
+    DateTimeOffset? RegistrationTokenExpiresOnUtc = null,
+    bool AccountCreated = false,
+    string? OnboardingStatus = null);

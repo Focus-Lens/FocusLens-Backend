@@ -19,13 +19,6 @@ public sealed class GoogleTokenValidator : IGoogleTokenValidator
         string idToken,
         CancellationToken cancellationToken = default)
     {
-        Console.WriteLine("========== GOOGLE VALIDATION ==========");
-        Console.WriteLine($"ClientId configured: {!string.IsNullOrWhiteSpace(_options.ClientId)}");
-        Console.WriteLine($"ClientId: {_options.ClientId}");
-        Console.WriteLine($"Token received: {!string.IsNullOrWhiteSpace(idToken)}");
-        Console.WriteLine($"Token length: {idToken?.Length}");
-        Console.WriteLine("=======================================");
-
         if (string.IsNullOrWhiteSpace(_options.ClientId))
         {
             return null;
@@ -48,13 +41,8 @@ public sealed class GoogleTokenValidator : IGoogleTokenValidator
                 payload.FamilyName,
                 payload.EmailVerified);
         }
-        catch (InvalidJwtException ex)
+        catch (InvalidJwtException)
         {
-            Console.WriteLine("========== GOOGLE TOKEN ERROR ==========");
-            Console.WriteLine(ex.Message);
-            Console.WriteLine(ex);
-            Console.WriteLine("========================================");
-
             return null;
         }
     }

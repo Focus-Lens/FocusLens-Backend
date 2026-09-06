@@ -18,6 +18,9 @@ namespace FocusLens.Infrastructure.Authentication;
 public sealed class TokenProvider : ITokenProvider
 {
     private static readonly TimeSpan ClockSkew = TimeSpan.Zero;
+    public const string TokenTypeClaim = "token_type";
+    public const string AccessTokenType = "access";
+    public const string OnboardingTokenType = "onboarding";
 
     private readonly ApplicationDbContext _dbContext;
     private readonly UserManager<ApplicationUser> _userManager;
@@ -40,10 +43,13 @@ public sealed class TokenProvider : ITokenProvider
         ApplicationUser user,
         CancellationToken cancellationToken = default)
     {
-        string accessToken = await GenerateAccessTokenAsync(user);
         DateTimeOffset accessTokenExpiresOnUtc = _timeProvider
             .GetUtcNow()
             .AddMinutes(_jwtOptions.TokenExpirationInMinutes);
+        string accessToken = await GenerateJwtAsync(
+            user,
+            accessTokenExpiresOnUtc,
+            AccessTokenType);
 
         string refreshTokenValue = GenerateRefreshToken();
         RefreshToken refreshToken = await PersistRefreshTokenAsync(
@@ -56,6 +62,14 @@ public sealed class TokenProvider : ITokenProvider
             accessTokenExpiresOnUtc,
             refreshTokenValue,
             refreshToken.ExpiresOnUtc);
+    }
+
+    public async Task<(string Token, DateTimeOffset ExpiresOnUtc)> CreateOnboardingTokenAsync(
+        ApplicationUser user)
+    {
+        DateTimeOffset expiresOnUtc = _timeProvider.GetUtcNow().AddMinutes(15);
+
+        return (await GenerateJwtAsync(user, expiresOnUtc, OnboardingTokenType), expiresOnUtc);
     }
 
     public ClaimsPrincipal GetPrincipalFromExpiredToken(string accessToken)
@@ -149,10 +163,13 @@ public sealed class TokenProvider : ITokenProvider
             return null;
         }
 
-        string accessToken = await GenerateAccessTokenAsync(user);
         DateTimeOffset accessTokenExpiresOnUtc = _timeProvider
             .GetUtcNow()
             .AddMinutes(_jwtOptions.TokenExpirationInMinutes);
+        string accessToken = await GenerateJwtAsync(
+            user,
+            accessTokenExpiresOnUtc,
+            AccessTokenType);
 
         string newRefreshTokenValue = GenerateRefreshToken();
         DateTimeOffset refreshTokenExpiresOnUtc = _timeProvider
@@ -229,13 +246,17 @@ public sealed class TokenProvider : ITokenProvider
         }
     }
 
-    private async Task<string> GenerateAccessTokenAsync(ApplicationUser user)
+    private async Task<string> GenerateJwtAsync(
+        ApplicationUser user,
+        DateTimeOffset expiresOnUtc,
+        string tokenType)
     {
         List<Claim> claims =
         [
             new(JwtRegisteredClaimNames.Sub, user.Id.ToString()),
             new(ClaimTypes.NameIdentifier, user.Id.ToString()),
-            new(JwtRegisteredClaimNames.Jti, Guid.CreateVersion7().ToString())
+            new(JwtRegisteredClaimNames.Jti, Guid.CreateVersion7().ToString()),
+            new(TokenTypeClaim, tokenType)
         ];
 
         if (!string.IsNullOrWhiteSpace(user.Email))
@@ -258,7 +279,7 @@ public sealed class TokenProvider : ITokenProvider
             audience: _jwtOptions.Audience,
             claims: claims,
             notBefore: utcNow.UtcDateTime,
-            expires: utcNow.AddMinutes(_jwtOptions.TokenExpirationInMinutes).UtcDateTime,
+            expires: expiresOnUtc.UtcDateTime,
             signingCredentials: credentials);
 
         return new JwtSecurityTokenHandler().WriteToken(token);
