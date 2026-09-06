@@ -6,6 +6,7 @@ public sealed class UpdateStudentPreferencesRequest
 {
     private StudentGoal? _goal;
     private StudentGrade? _grade;
+    private string? _preferredName;
     private IReadOnlyCollection<StudentSubjectRequest>? _subjects;
 
     // Setters record property presence so PATCH can distinguish omitted/null/value.
@@ -21,6 +22,12 @@ public sealed class UpdateStudentPreferencesRequest
         set { GradeProvided = true; _grade = value; }
     }
 
+    public string? PreferredName
+    {
+        get => _preferredName;
+        set { PreferredNameProvided = true; _preferredName = value; }
+    }
+
     public IReadOnlyCollection<StudentSubjectRequest>? Subjects
     {
         get => _subjects;
@@ -32,6 +39,9 @@ public sealed class UpdateStudentPreferencesRequest
 
     [JsonIgnore]
     public bool GradeProvided { get; private set; }
+
+    [JsonIgnore]
+    public bool PreferredNameProvided { get; private set; }
 
     [JsonIgnore]
     public bool SubjectsProvided { get; private set; }

@@ -57,6 +57,11 @@ public sealed class UpdateStudentPreferencesCommandHandler(
             return gradeError!.Value;
         }
 
+        if (!TryUpdatePreferredName(student, request.Request, out Error? preferredNameError))
+        {
+            return preferredNameError!.Value;
+        }
+
         if (!TryUpdateSubjects(student, request.Request, out Error? subjectsError))
         {
             return subjectsError!.Value;
@@ -68,7 +73,7 @@ public sealed class UpdateStudentPreferencesCommandHandler(
     }
 
     private static bool HasChanges(UpdateStudentPreferencesRequest request)
-        => request.GoalProvided || request.GradeProvided || request.SubjectsProvided;
+        => request.GoalProvided || request.GradeProvided || request.PreferredNameProvided || request.SubjectsProvided;
 
     private static bool TryUpdateGoal(Student student, UpdateStudentPreferencesRequest request, out Error? error)
     {
@@ -118,6 +123,33 @@ public sealed class UpdateStudentPreferencesCommandHandler(
         if (!AreValidSubjects(requests, out error)) return false;
 
         student.ReplaceSubjects(requests.Select(MapSubject));
+        return true;
+    }
+
+    private static bool TryUpdatePreferredName(Student student, UpdateStudentPreferencesRequest request, out Error? error)
+    {
+        error = null;
+        if (!request.PreferredNameProvided) return true;
+        if (request.PreferredName is null)
+        {
+            student.SetPreferredName(null);
+            return true;
+        }
+
+        string preferredName = request.PreferredName.Trim();
+        if (preferredName.Length == 0)
+        {
+            error = Error.Validation("Students.PreferredNameRequired", "Preferred name cannot be empty.");
+            return false;
+        }
+
+        if (preferredName.Length > 100)
+        {
+            error = Error.Validation("Students.PreferredNameTooLong", "Preferred name cannot exceed 100 characters.");
+            return false;
+        }
+
+        student.SetPreferredName(preferredName);
         return true;
     }
 

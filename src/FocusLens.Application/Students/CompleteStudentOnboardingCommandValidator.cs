@@ -11,17 +11,19 @@ public sealed class CompleteStudentOnboardingCommandValidator
     public CompleteStudentOnboardingCommandValidator()
     {
         RuleFor(command => command.Request.Goal)
-            .IsInEnum();
+            .IsInEnum()
+            .When(command => command.Request.Goal.HasValue);
 
         RuleFor(command => command.Request.Grade)
-            .IsInEnum();
+            .IsInEnum()
+            .When(command => command.Request.Grade.HasValue);
 
         RuleFor(command => command.Request.Subjects)
             .Must(HaveUniqueSubjects)
             .WithMessage("Subjects must be unique.")
             .When(command => command.Request.Subjects is not null);
 
-        RuleForEach(command => command.Request.Subjects)
+        RuleForEach(command => command.Request.Subjects!)
             .ChildRules(subject =>
             {
                 subject.RuleFor(item => item.Type)
@@ -48,8 +50,13 @@ public sealed class CompleteStudentOnboardingCommandValidator
     }
 
     private static bool HaveUniqueSubjects(
-        IReadOnlyCollection<StudentSubjectRequest> subjects)
+        IReadOnlyCollection<StudentSubjectRequest>? subjects)
     {
+        if (subjects is null)
+        {
+            return true;
+        }
+
         return subjects
             .Select(subject =>
                 subject.Type == ContractStudentSubjectType.Other

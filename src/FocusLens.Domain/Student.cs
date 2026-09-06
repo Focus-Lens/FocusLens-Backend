@@ -23,6 +23,8 @@ public class Student : AuditableEntity
 
     public ApplicationUser User { get; private set; } = null!;
 
+    public string? PreferredName { get; private set; }
+
     public StudentGoal? Goal { get; private set; }
 
     public StudentGrade? Grade { get; private set; }
@@ -32,9 +34,20 @@ public class Student : AuditableEntity
 
     public bool IsOnboardingCompleted { get; private set; }
 
-    public void SetGoal(StudentGoal? goal) => Goal = goal;
+    public void SetGoal(StudentGoal? goal)
+    {
+        Goal = goal;
+        UpdateOnboardingCompletionStatus();
+    }
 
-    public void SetGrade(StudentGrade? grade) => Grade = grade;
+    public void SetGrade(StudentGrade? grade)
+    {
+        Grade = grade;
+        UpdateOnboardingCompletionStatus();
+    }
+
+    public void SetPreferredName(string? preferredName)
+        => PreferredName = preferredName?.Trim();
 
     public void ReplaceSubjects(IEnumerable<StudentSubject> subjects)
     {
@@ -46,6 +59,8 @@ public class Student : AuditableEntity
         {
             Subjects.Add(subject);
         }
+
+        UpdateOnboardingCompletionStatus();
     }
 
     public void CompleteOnboarding(
@@ -59,11 +74,11 @@ public class Student : AuditableEntity
 
         Goal = goal;
         Grade = grade;
-
         ReplaceSubjects(subjectList);
-
-        IsOnboardingCompleted = Goal.HasValue
-            && Grade.HasValue
-            && subjectList.Count > 0;
     }
+
+    private void UpdateOnboardingCompletionStatus()
+        => IsOnboardingCompleted = Goal is not null
+            && Grade is not null
+            && Subjects.Count > 0;
 }

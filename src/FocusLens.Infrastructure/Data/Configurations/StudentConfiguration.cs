@@ -24,6 +24,9 @@ public class StudentConfiguration : IEntityTypeConfiguration<Student>
             .HasForeignKey<Student>(student => student.UserId)
             .OnDelete(DeleteBehavior.Cascade);
 
+        builder.Property(student => student.PreferredName)
+            .HasMaxLength(100);
+
         builder.Property(student => student.Goal)
             .HasConversion<string>()
             .HasMaxLength(50);

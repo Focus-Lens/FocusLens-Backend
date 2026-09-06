@@ -5,11 +5,14 @@ namespace FocusLens.Application.Access;
 
 internal static class AccessMappings
 {
-    public static InvitationResponse ToResponse(this ParentStudentRelationship relationship)
+    public static InvitationResponse ToResponse(
+        this ParentStudentRelationship relationship,
+        string? parentEmail = null)
         => new(
             relationship.Id,
             relationship.ParentId,
             relationship.StudentId,
             relationship.Status.ToString(),
-            relationship.RevokedAtUtc);
+            relationship.RevokedAtUtc,
+            parentEmail);
 }

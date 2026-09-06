@@ -51,8 +51,12 @@ public sealed class CompleteStudentOnboardingCommandHandler(
             .ToList();
 
         student.CompleteOnboarding(
-            StudentEnumMapper.ToDomain(request.Request.Goal),
-            StudentEnumMapper.ToDomain(request.Request.Grade),
+            request.Request.Goal is null
+                ? null
+                : StudentEnumMapper.ToDomain(request.Request.Goal.Value),
+            request.Request.Grade is null
+                ? null
+                : StudentEnumMapper.ToDomain(request.Request.Grade.Value),
             subjects);
 
         await unitOfWork.SaveChangesAsync();
