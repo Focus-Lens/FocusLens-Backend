@@ -12,6 +12,7 @@ internal static class StudentMappings
         => new(
             student.Id,
             student.UserId,
+            student.PreferredName,
             student.Goal is null ? null : StudentEnumMapper.ToContract(student.Goal.Value),
             student.Grade is null ? null : StudentEnumMapper.ToContract(student.Grade.Value),
             student.Subjects.Select(subject => new StudentSubjectResponse(

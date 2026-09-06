@@ -44,8 +44,22 @@ public sealed class GetMyInvitationsQueryHandler(
                     (parentId.HasValue && relationship.ParentId == parentId.Value) ||
                     (studentId.HasValue && relationship.StudentId == studentId.Value));
 
-        return relationships
-            .Select(relationship => relationship.ToResponse())
+        List<ParentStudentRelationship> relationshipList = relationships.ToList();
+        Guid[] parentIds = relationshipList
+            .Select(relationship => relationship.ParentId)
+            .Distinct()
+            .ToArray();
+
+        IEnumerable<Parent> invitationParents = await parentRepository.GetAllAsync(
+            parent => parentIds.Contains(parent.Id),
+            parent => parent.User);
+
+        IReadOnlyDictionary<Guid, string?> parentEmails = invitationParents
+            .ToDictionary(parent => parent.Id, parent => parent.User?.Email);
+
+        return relationshipList
+            .Select(relationship => relationship.ToResponse(
+                parentEmails.GetValueOrDefault(relationship.ParentId)))
             .ToList();
     }
 }

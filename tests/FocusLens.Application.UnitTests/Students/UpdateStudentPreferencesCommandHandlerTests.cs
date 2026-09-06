@@ -100,6 +100,58 @@ public class UpdateStudentPreferencesCommandHandlerTests
         Assert.Single(student.Subjects);
     }
 
+    [Fact]
+    public async Task Handle_WhenPreferredNameIsProvided_TrimsAndStoresIt()
+    {
+        Student student = CreateStudentWithPreferences();
+
+        Result<StudentDetailsResponse> result = await CreateHandler(student).Handle(
+            new UpdateStudentPreferencesCommand(new UpdateStudentPreferencesRequest
+            {
+                PreferredName = "  كريم  "
+            }),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal("كريم", student.PreferredName);
+        Assert.Equal("كريم", result.Value.PreferredName);
+    }
+
+    [Fact]
+    public async Task Handle_WhenPreferredNameIsNull_ClearsIt()
+    {
+        Student student = CreateStudentWithPreferences();
+        student.SetPreferredName("Karim");
+
+        Result<StudentDetailsResponse> result = await CreateHandler(student).Handle(
+            new UpdateStudentPreferencesCommand(new UpdateStudentPreferencesRequest
+            {
+                PreferredName = null
+            }),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Null(student.PreferredName);
+        Assert.Null(result.Value.PreferredName);
+    }
+
+    [Fact]
+    public async Task Handle_WhenPreferredNameIsWhitespace_ReturnsValidationError()
+    {
+        Student student = CreateStudentWithPreferences();
+
+        Result<StudentDetailsResponse> result = await CreateHandler(student).Handle(
+            new UpdateStudentPreferencesCommand(new UpdateStudentPreferencesRequest
+            {
+                PreferredName = "   "
+            }),
+            CancellationToken.None);
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal("Students.PreferredNameRequired", result.TopError.Code);
+        Assert.Null(student.PreferredName);
+    }
+
     private static UpdateStudentPreferencesCommandHandler CreateHandler(
         Student student,
         FakeUnitOfWork? unitOfWork = null)

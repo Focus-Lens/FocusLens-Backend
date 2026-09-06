@@ -39,13 +39,17 @@ public sealed class CompleteStudentOnboardingCommandHandler(
                 "The current user does not have a student profile.");
         }
 
-        List<StudentSubject> subjects = request.Request.Subjects
+        List<StudentSubject> subjects = (request.Request.Subjects ?? [])
             .Select(MapSubject)
             .ToList();
 
         student.CompleteOnboarding(
-            StudentEnumMapper.ToDomain(request.Request.Goal),
-            StudentEnumMapper.ToDomain(request.Request.Grade),
+            request.Request.Goal is null
+                ? null
+                : StudentEnumMapper.ToDomain(request.Request.Goal.Value),
+            request.Request.Grade is null
+                ? null
+                : StudentEnumMapper.ToDomain(request.Request.Grade.Value),
             subjects);
 
         await unitOfWork.SaveChangesAsync();
