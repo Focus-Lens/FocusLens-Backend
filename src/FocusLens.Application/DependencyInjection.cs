@@ -1,5 +1,6 @@
 using FluentValidation;
 using FocusLens.Application.Common.Behaviours;
+using FocusLens.Application.Terms;
 using MediatR;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -16,6 +17,7 @@ namespace FocusLens.Application
 
             services.AddTransient(typeof(IPipelineBehavior<,>), typeof(UnhandledExceptionBehavior<,>));
             services.AddTransient(typeof(IPipelineBehavior<,>), typeof(ValidationBehavior<,>));
+            services.AddSingleton<ITermsProvider, CurrentTermsProvider>();
 
             return services;
         }

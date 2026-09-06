@@ -64,8 +64,8 @@ public sealed class AuthController : ApiController
     }
 
     [AllowAnonymous]
-    [HttpPost("google-login")]
-    public async Task<IActionResult> GoogleLogin(
+    [HttpPost("continue-with-google")]
+    public async Task<IActionResult> ContinueWithGoogle(
         GoogleLoginCommand command,
         CancellationToken cancellationToken)
     {

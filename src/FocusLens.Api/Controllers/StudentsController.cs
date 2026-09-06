@@ -32,12 +32,9 @@ public sealed class StudentsController(ISender sender) : ApiController
             new CompleteStudentOnboardingCommand(request),
             cancellationToken);
 
-        if (result.IsSuccess)
-        {
-            return NoContent();
-        }
-
-        return Problem(result.Errors);
+        return result.Match(
+            Ok,
+            Problem);
     }
 
     [HttpPatch("me/preferences")]

@@ -9,6 +9,7 @@ using FocusLens.Infrastructure.Identity;
 using FocusLens.Infrastructure.Identity.Seed;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.Configuration;
@@ -122,11 +123,33 @@ namespace FocusLens.Infrastructure
                         ValidateLifetime = true,
                         ClockSkew = TimeSpan.Zero,
                     };
+                    options.Events = new JwtBearerEvents
+                    {
+                        OnTokenValidated = context =>
+                        {
+                            string? tokenType = context.Principal?.FindFirst(
+                                TokenProvider.TokenTypeClaim)?.Value;
+
+                            if (tokenType == TokenProvider.OnboardingTokenType
+                                && !IsStudentOnboardingRequest(context.HttpContext))
+                            {
+                                context.Fail("Onboarding token is only valid for student onboarding.");
+                            }
+
+                            return Task.CompletedTask;
+                        }
+                    };
                 });
 
             services.AddAuthorization();
 
             return services;
         }
+
+        private static bool IsStudentOnboardingRequest(HttpContext httpContext)
+            => HttpMethods.IsPost(httpContext.Request.Method)
+                && httpContext.Request.Path.Equals(
+                    "/api/students/onboarding",
+                    StringComparison.OrdinalIgnoreCase);
     }
 }

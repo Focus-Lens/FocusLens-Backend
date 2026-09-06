@@ -1,12 +1,17 @@
 using ContractStudentSubjectType = FocusLens.Contracts.Students.StudentSubjectType;
 using ICurrentUser = FocusLens.Application.Common.Interfaces.ICurrentUser;
+using FocusLens.Application.Common.Errors;
 using FocusLens.Application.Common.Interfaces;
 using FocusLens.Application.Common.Mappings;
+using FocusLens.Application.Features.Identity.Dtos;
 using FocusLens.Contracts.Students;
 using FocusLens.Domain;
+using FocusLens.Domain.Common.Constants;
 using FocusLens.Domain.Common.Interfaces;
 using FocusLens.Domain.Common.Results;
 using FocusLens.Domain.Students;
+using FocusLens.Domain.Identity;
+using FocusLens.Domain.Interfaces;
 using MediatR;
 
 namespace FocusLens.Application.Students;
@@ -14,10 +19,12 @@ namespace FocusLens.Application.Students;
 public sealed class CompleteStudentOnboardingCommandHandler(
     IBaseRepository<Student> studentRepository,
     ICurrentUser currentUser,
-    IUnitOfWork unitOfWork)
-    : IRequestHandler<CompleteStudentOnboardingCommand, Result<Success>>
+    IUnitOfWork unitOfWork,
+    IIdentityService identityService,
+    ITokenProvider tokenProvider)
+    : IRequestHandler<CompleteStudentOnboardingCommand, Result<AuthResponse>>
 {
-    public async Task<Result<Success>> Handle(
+    public async Task<Result<AuthResponse>> Handle(
         CompleteStudentOnboardingCommand request,
         CancellationToken cancellationToken)
     {
@@ -54,7 +61,39 @@ public sealed class CompleteStudentOnboardingCommandHandler(
 
         await unitOfWork.SaveChangesAsync();
 
-        return Result.Success;
+        ApplicationUser? user = await identityService.FindByIdAsync(userId);
+
+        if (user is null)
+        {
+            return Error.NotFound(
+                "Users.NotFound",
+                "The current user was not found.");
+        }
+
+        if (user.IsDisabled)
+        {
+            return ApplicationErrors.Identity.UserDisabled;
+        }
+
+        if (await identityService.IsLockedOutAsync(user))
+        {
+            return ApplicationErrors.Identity.UserLockedOut;
+        }
+
+        IReadOnlyCollection<string> roles = await identityService.GetRolesAsync(user);
+
+        if (!roles.Contains(ApplicationRoles.Student, StringComparer.Ordinal))
+        {
+            return Error.Forbidden(
+                "Students.CurrentUserIsNotStudent",
+                "The current user is not a student.");
+        }
+
+        TokenPair tokenPair = await tokenProvider.CreateTokenPairAsync(
+            user,
+            cancellationToken);
+
+        return user.ToAuthResponse(roles, tokenPair, student.IsOnboardingCompleted);
     }
 
     private static StudentSubject MapSubject(StudentSubjectRequest subject)

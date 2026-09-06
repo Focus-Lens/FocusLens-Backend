@@ -1,9 +1,10 @@
-using FocusLens.Domain.Common.Interfaces;
 using FocusLens.Application.Common.Errors;
 using FocusLens.Application.Common.Interfaces;
 using FocusLens.Application.Common.Models;
 using FocusLens.Application.Features.Identity.Dtos;
+using FocusLens.Domain;
 using FocusLens.Domain.Common.Constants;
+using FocusLens.Domain.Common.Interfaces;
 using FocusLens.Domain.Common.Results;
 using FocusLens.Domain.Identity;
 using FocusLens.Domain.Interfaces;
@@ -19,15 +20,21 @@ public sealed class GoogleLoginCommandHandler
     private readonly IGoogleTokenValidator _googleTokenValidator;
     private readonly IIdentityService _identityService;
     private readonly ITokenProvider _tokenProvider;
+    private readonly IBaseRepository<Student> _studentRepository;
+    private readonly IUnitOfWork _unitOfWork;
 
     public GoogleLoginCommandHandler(
         IGoogleTokenValidator googleTokenValidator,
         IIdentityService identityService,
-        ITokenProvider tokenProvider)
+        ITokenProvider tokenProvider,
+        IBaseRepository<Student> studentRepository,
+        IUnitOfWork unitOfWork)
     {
         _googleTokenValidator = googleTokenValidator;
         _identityService = identityService;
         _tokenProvider = tokenProvider;
+        _studentRepository = studentRepository;
+        _unitOfWork = unitOfWork;
     }
 
     public async Task<Result<AuthResponse>> Handle(
@@ -48,6 +55,8 @@ public sealed class GoogleLoginCommandHandler
             return ApplicationErrors.Identity.ExternalEmailNotVerified;
         }
 
+        bool accountCreated = false;
+
         ApplicationUser? user = await _identityService.FindByLoginAsync(
             LoginProvider,
             googleUser.ProviderKey);
@@ -67,34 +76,30 @@ public sealed class GoogleLoginCommandHandler
                     EmailConfirmed = true
                 };
 
-                IdentityResultSummary createResult = await _identityService.CreateAsync(
+                Result<Success> createResult = await CreateGoogleStudentAsync(
                     user,
-                    Guid.CreateVersion7().ToString("N") + "Aa1");
+                    googleUser.ProviderKey);
 
-                if (!createResult.Succeeded)
+                if (createResult.IsError)
                 {
-                    return createResult.ToApplicationErrors();
+                    return createResult.Errors;
                 }
 
-                IdentityResultSummary roleResult = await _identityService.AddToRoleAsync(
-                    user,
-                    ApplicationRoles.Student);
-
-                if (!roleResult.Succeeded)
-                {
-                    return roleResult.ToApplicationErrors();
-                }
+                accountCreated = true;
             }
 
-            IdentityResultSummary loginResult = await _identityService.AddLoginAsync(
-                user,
-                LoginProvider,
-                googleUser.ProviderKey,
-                LoginProvider);
-
-            if (!loginResult.Succeeded)
+            if (!accountCreated)
             {
-                return loginResult.ToApplicationErrors();
+                IdentityResultSummary loginResult = await _identityService.AddLoginAsync(
+                    user,
+                    LoginProvider,
+                    googleUser.ProviderKey,
+                    LoginProvider);
+
+                if (!loginResult.Succeeded)
+                {
+                    return loginResult.ToApplicationErrors();
+                }
             }
         }
 
@@ -109,10 +114,102 @@ public sealed class GoogleLoginCommandHandler
         }
 
         IReadOnlyCollection<string> roles = await _identityService.GetRolesAsync(user);
+
+        Student? student = await _studentRepository.FirstOrDefaultAsync(
+            student => student.UserId == user.Id,
+            student => student.Subjects);
+
+        if (roles.Contains(ApplicationRoles.Student, StringComparer.Ordinal)
+            && student is not null
+            && !student.IsOnboardingCompleted)
+        {
+            if (accountCreated)
+            {
+                var registrationToken = await _tokenProvider.CreateOnboardingTokenAsync(user);
+
+                return new AuthResponse(
+                    user.Id,
+                    user.Email ?? string.Empty,
+                    user.FirstName,
+                    user.LastName,
+                    roles,
+                    Tokens: null,
+                    RequiresOnboarding: true,
+                    RegistrationToken: registrationToken.Token,
+                    RegistrationTokenExpiresOnUtc: registrationToken.ExpiresOnUtc,
+                    AccountCreated: true);
+            }
+
+            TokenPair incompleteOnboardingTokenPair = await _tokenProvider.CreateTokenPairAsync(
+                user,
+                cancellationToken);
+
+            return user.ToAuthResponse(
+                roles,
+                incompleteOnboardingTokenPair,
+                isOnboardingCompleted: false);
+        }
+
         TokenPair tokenPair = await _tokenProvider.CreateTokenPairAsync(
             user,
             cancellationToken);
 
-        return user.ToAuthResponse(roles, tokenPair);
+        return user.ToAuthResponse(
+            roles,
+            tokenPair,
+            student?.IsOnboardingCompleted);
+    }
+
+    private async Task<Result<Success>> CreateGoogleStudentAsync(
+        ApplicationUser user,
+        string providerKey)
+    {
+        await _unitOfWork.BeginTransactionAsync();
+
+        try
+        {
+            IdentityResultSummary createResult = await _identityService.CreateAsync(
+                user,
+                Guid.CreateVersion7().ToString("N") + "Aa1");
+
+            if (!createResult.Succeeded)
+            {
+                await _unitOfWork.RollbackTransactionAsync();
+                return createResult.ToApplicationErrors();
+            }
+
+            IdentityResultSummary roleResult = await _identityService.AddToRoleAsync(
+                user,
+                ApplicationRoles.Student);
+
+            if (!roleResult.Succeeded)
+            {
+                await _unitOfWork.RollbackTransactionAsync();
+                return roleResult.ToApplicationErrors();
+            }
+
+            IdentityResultSummary loginResult = await _identityService.AddLoginAsync(
+                user,
+                LoginProvider,
+                providerKey,
+                LoginProvider);
+
+            if (!loginResult.Succeeded)
+            {
+                await _unitOfWork.RollbackTransactionAsync();
+                return loginResult.ToApplicationErrors();
+            }
+
+            _studentRepository.Add(new Student(user.Id));
+            await _unitOfWork.SaveChangesAsync();
+            await _unitOfWork.CommitTransactionAsync();
+
+            return Result.Success;
+        }
+        catch
+        {
+            await _unitOfWork.RollbackTransactionAsync();
+            throw;
+        }
     }
 }

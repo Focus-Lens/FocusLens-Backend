@@ -3,7 +3,11 @@ using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
 using FocusLens.Domain;
+using FocusLens.Domain.Common.Constants;
+using FocusLens.Domain.Identity;
 using FocusLens.Domain.Students;
+using FocusLens.Infrastructure.Data;
+using Microsoft.AspNetCore.Identity;
 
 namespace FocusLens.Api.IntegrationTests;
 
@@ -16,6 +20,7 @@ public class StudentsApiTests
         await using var factory = new CustomWebApplicationFactory();
         await factory.SeedAsync(db =>
         {
+            SeedStudentIdentity(db, userId);
             db.Students.Add(new Student(userId));
             return Task.CompletedTask;
         });
@@ -25,7 +30,7 @@ public class StudentsApiTests
 
         HttpResponseMessage response = await client.PostAsync("/api/students/onboarding", content);
 
-        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.False(await GetOnboardingCompletedAsync(client));
     }
 
@@ -36,6 +41,7 @@ public class StudentsApiTests
         await using var factory = new CustomWebApplicationFactory();
         await factory.SeedAsync(db =>
         {
+            SeedStudentIdentity(db, userId);
             db.Students.Add(new Student(userId));
             return Task.CompletedTask;
         });
@@ -48,7 +54,7 @@ public class StudentsApiTests
 
         HttpResponseMessage response = await client.PostAsync("/api/students/onboarding", content);
 
-        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.True(await GetOnboardingCompletedAsync(client));
     }
 
@@ -134,6 +140,30 @@ public class StudentsApiTests
             "Bearer",
             TestJwtTokenFactory.Create(userId, "Student"));
         return client;
+    }
+
+    private static void SeedStudentIdentity(ApplicationDbContext db, Guid userId)
+    {
+        var role = new ApplicationRole
+        {
+            Name = ApplicationRoles.Student,
+            NormalizedName = ApplicationRoles.Student.ToUpperInvariant()
+        };
+
+        db.Users.Add(new ApplicationUser
+        {
+            Id = userId,
+            Email = "student@example.com",
+            UserName = "student@example.com",
+            FirstName = "Focus",
+            LastName = "Student"
+        });
+        db.Roles.Add(role);
+        db.UserRoles.Add(new IdentityUserRole<Guid>
+        {
+            UserId = userId,
+            RoleId = role.Id
+        });
     }
 
     private static async Task<bool> GetOnboardingCompletedAsync(HttpClient client)

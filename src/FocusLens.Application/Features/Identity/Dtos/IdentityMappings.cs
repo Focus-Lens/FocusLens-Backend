@@ -16,12 +16,17 @@ internal static class IdentityMappings
     public static AuthResponse ToAuthResponse(
         this ApplicationUser user,
         IReadOnlyCollection<string> roles,
-        TokenPair tokenPair)
+        TokenPair tokenPair,
+        bool? isOnboardingCompleted = null)
         => new(
             user.Id,
             user.Email ?? string.Empty,
             user.FirstName,
             user.LastName,
             roles,
-            tokenPair.ToResponse());
+            tokenPair.ToResponse(),
+            RequiresOnboarding: isOnboardingCompleted == false,
+            OnboardingStatus: isOnboardingCompleted is null
+                ? null
+                : isOnboardingCompleted.Value ? "completed" : "incomplete");
 }
