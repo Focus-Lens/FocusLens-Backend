@@ -7,6 +7,7 @@ using FocusLens.Infrastructure.Data;
 using FocusLens.Infrastructure.Data.Interceptors;
 using FocusLens.Infrastructure.Identity;
 using FocusLens.Infrastructure.Identity.Seed;
+using FocusLens.Infrastructure.StudySessions;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Http;
@@ -43,6 +44,8 @@ namespace FocusLens.Infrastructure
             services.AddScoped<ITokenProvider, TokenProvider>();
             services.AddScoped(typeof(IBaseRepository<>), typeof(BaseRepository<>));
             services.AddScoped<IUnitOfWork, UnitOfWork>();
+            services.AddScoped<IStudyMaterialFileStore, LocalStudyMaterialFileStore>();
+            services.AddScoped<IStudyMaterialPdfProcessor, PdfSharpStudyMaterialPdfProcessor>();
 
             services.AddDbContext<ApplicationDbContext>(
                 (serviceProvider, options) =>

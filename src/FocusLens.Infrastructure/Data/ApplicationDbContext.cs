@@ -1,6 +1,7 @@
 using FocusLens.Domain;
 using FocusLens.Domain.Access;
 using FocusLens.Domain.Identity;
+using FocusLens.Domain.StudySessions;
 using FocusLens.Infrastructure.Identity.Verification;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
@@ -18,6 +19,12 @@ namespace FocusLens.Infrastructure.Data
         public DbSet<Parent> Parents => Set<Parent>();
 
         public DbSet<Student> Students => Set<Student>();
+
+        public DbSet<StudySession> StudySessions => Set<StudySession>();
+
+        public DbSet<StudyMaterial> StudyMaterials => Set<StudyMaterial>();
+
+        public DbSet<StudyMaterialSection> StudyMaterialSections => Set<StudyMaterialSection>();
 
         public DbSet<ParentStudentRelationship> ParentStudentRelationships =>
             Set<ParentStudentRelationship>();
