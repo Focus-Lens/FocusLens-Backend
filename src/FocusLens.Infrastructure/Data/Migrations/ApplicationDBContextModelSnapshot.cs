@@ -311,10 +311,6 @@ namespace FocusLens.Infrastructure.Data.Migrations
                     b.Property<string>("CreatedBy")
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<string>("DerivedStorageReference")
-                        .HasMaxLength(500)
-                        .HasColumnType("nvarchar(500)");
-
                     b.Property<string>("FileName")
                         .IsRequired()
                         .HasMaxLength(260)
@@ -440,17 +436,61 @@ namespace FocusLens.Infrastructure.Data.Migrations
                     b.Property<Guid>("StudyMaterialSectionId")
                         .HasColumnType("uniqueidentifier");
 
-                    b.Property<Guid>("StudySessionId")
+                    b.Property<Guid>("StudySessionSelectionId")
                         .HasColumnType("uniqueidentifier");
 
                     b.HasKey("Id");
 
                     b.HasIndex("StudyMaterialSectionId");
 
-                    b.HasIndex("StudySessionId", "StudyMaterialSectionId")
+                    b.HasIndex("StudySessionSelectionId", "StudyMaterialSectionId")
                         .IsUnique();
 
                     b.ToTable("StudySessionSelectedSections", (string)null);
+                });
+
+            modelBuilder.Entity("FocusLens.Domain.StudySessions.StudySessionSelection", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("CreatedBy")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("DerivedStorageReference")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<int>("FromPage")
+                        .HasColumnType("int");
+
+                    b.Property<string>("LastModifiedBy")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTimeOffset>("LastModifiedUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid>("StudyMaterialId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("StudySessionId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int>("ToPage")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("StudyMaterialId");
+
+                    b.HasIndex("StudySessionId")
+                        .IsUnique();
+
+                    b.ToTable("StudySessionSelections", (string)null);
                 });
 
             modelBuilder.Entity("FocusLens.Infrastructure.Identity.Verification.EmailVerificationCode", b =>
@@ -704,30 +744,7 @@ namespace FocusLens.Infrastructure.Data.Migrations
                         .HasForeignKey("StudyMaterialId")
                         .OnDelete(DeleteBehavior.Restrict);
 
-                    b.OwnsOne("FocusLens.Domain.StudySessions.StudySessionPageRange", "PageRange", b1 =>
-                        {
-                            b1.Property<Guid>("StudySessionId")
-                                .HasColumnType("uniqueidentifier");
-
-                            b1.Property<int>("FromPage")
-                                .HasColumnType("int")
-                                .HasColumnName("FromPage");
-
-                            b1.Property<int>("ToPage")
-                                .HasColumnType("int")
-                                .HasColumnName("ToPage");
-
-                            b1.HasKey("StudySessionId");
-
-                            b1.ToTable("StudySessions");
-
-                            b1.WithOwner()
-                                .HasForeignKey("StudySessionId");
-                        });
-
                     b.Navigation("Material");
-
-                    b.Navigation("PageRange");
                 });
 
             modelBuilder.Entity("FocusLens.Domain.StudySessions.StudySessionSelectedSection", b =>
@@ -738,11 +755,28 @@ namespace FocusLens.Infrastructure.Data.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
-                    b.HasOne("FocusLens.Domain.StudySessions.StudySession", null)
+                    b.HasOne("FocusLens.Domain.StudySessions.StudySessionSelection", null)
                         .WithMany("SelectedSections")
-                        .HasForeignKey("StudySessionId")
+                        .HasForeignKey("StudySessionSelectionId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+                });
+
+            modelBuilder.Entity("FocusLens.Domain.StudySessions.StudySessionSelection", b =>
+                {
+                    b.HasOne("FocusLens.Domain.StudySessions.StudyMaterial", null)
+                        .WithMany()
+                        .HasForeignKey("StudyMaterialId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("FocusLens.Domain.StudySessions.StudySession", "Session")
+                        .WithOne("Selection")
+                        .HasForeignKey("FocusLens.Domain.StudySessions.StudySessionSelection", "StudySessionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Session");
                 });
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRoleClaim<System.Guid>", b =>
@@ -802,6 +836,11 @@ namespace FocusLens.Infrastructure.Data.Migrations
                 });
 
             modelBuilder.Entity("FocusLens.Domain.StudySessions.StudySession", b =>
+                {
+                    b.Navigation("Selection");
+                });
+
+            modelBuilder.Entity("FocusLens.Domain.StudySessions.StudySessionSelection", b =>
                 {
                     b.Navigation("SelectedSections");
                 });

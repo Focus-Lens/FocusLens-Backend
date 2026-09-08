@@ -10,10 +10,10 @@ public sealed class StudySessionSelectedSectionConfiguration : IEntityTypeConfig
     {
         builder.ToTable("StudySessionSelectedSections");
         builder.HasKey(section => section.Id);
-        builder.Property(section => section.StudySessionId).IsRequired();
+        builder.Property(section => section.StudySessionSelectionId).IsRequired();
         builder.Property(section => section.StudyMaterialSectionId).IsRequired();
         builder.Property(section => section.EstimatedDurationMinutes).IsRequired();
-        builder.HasIndex(section => new { section.StudySessionId, section.StudyMaterialSectionId }).IsUnique();
+        builder.HasIndex(section => new { section.StudySessionSelectionId, section.StudyMaterialSectionId }).IsUnique();
         builder.HasOne<StudyMaterialSection>()
             .WithMany()
             .HasForeignKey(section => section.StudyMaterialSectionId)

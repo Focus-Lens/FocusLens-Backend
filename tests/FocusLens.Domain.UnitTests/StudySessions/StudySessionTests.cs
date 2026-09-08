@@ -19,7 +19,7 @@ public class StudySessionTests
     }
 
     [Fact]
-    public void Setup_WithSubjectDurationMaterialRangeAndSections_CalculatesStudyTime()
+    public void Setup_WithSubjectDurationMaterialSelectionAndSections_CalculatesStudyTime()
     {
         StudySession session = StudySession.Create(Guid.NewGuid(), StudySessionMode.Digital).Value;
         StudentSubject subject = StudentSubject.Predefined(StudentSubjectType.Math);
@@ -31,13 +31,13 @@ public class StudySessionTests
         Assert.True(session.SetSubject(subject).IsSuccess);
         Assert.True(session.SetDuration(25).IsSuccess);
         Assert.True(session.SetStudyMaterial(material).IsSuccess);
-        Assert.True(session.SetPageRange(StudySessionPageRange.Create(1, 10).Value).IsSuccess);
+        Assert.True(session.SetSelection(StudySessionSelection.Create(session, material, 1, 10).Value).IsSuccess);
         Assert.True(session.SetSelectedSections([first, second, third]).IsSuccess);
 
         Assert.Equal(subject.Id, session.SelectedSubjectId);
         Assert.Equal(32, session.EstimatedStudyTimeMinutes);
-        Assert.Equal(1, session.PageRange!.FromPage);
-        Assert.Equal(10, session.PageRange.ToPage);
+        Assert.Equal(1, session.Selection!.FromPage);
+        Assert.Equal(10, session.Selection.ToPage);
     }
 
     [Theory]
@@ -94,13 +94,13 @@ public class StudySessionTests
     {
         StudySession session = CreateReadyDigitalSession();
         Guid materialId = session.StudyMaterialId!.Value;
-        Guid[] sectionIds = session.SelectedSections.Select(section => section.StudyMaterialSectionId).ToArray();
+        Guid[] sectionIds = session.Selection!.SelectedSections.Select(section => section.StudyMaterialSectionId).ToArray();
 
         Assert.True(session.SetDuration(50).IsSuccess);
 
         Assert.Equal(StudySessionStatus.Draft, session.Status);
         Assert.Equal(materialId, session.StudyMaterialId);
-        Assert.Equal(sectionIds, session.SelectedSections.Select(section => section.StudyMaterialSectionId));
+        Assert.Equal(sectionIds, session.Selection!.SelectedSections.Select(section => section.StudyMaterialSectionId));
     }
 
     [Fact]
@@ -115,14 +115,46 @@ public class StudySessionTests
     }
 
     [Fact]
-    public void Material_KeepsOriginalReferenceWhenDerivedReferenceIsSet()
+    public void Selection_KeepsDerivedReferenceSeparateFromMaterial()
     {
-        StudyMaterial material = CreateMaterial(Guid.NewGuid());
+        StudySession session = StudySession.Create(Guid.NewGuid(), StudySessionMode.Digital).Value;
+        StudyMaterial material = CreateMaterial(session.StudentId);
+        session.SetStudyMaterial(material);
+        StudySessionSelection selection = StudySessionSelection.Create(session, material, 1, 2).Value;
 
-        Assert.True(material.SetDerivedStorageReference("derived/selection.pdf").IsSuccess);
+        Assert.True(selection.SetDerivedStorageReference("derived/selection.pdf").IsSuccess);
 
         Assert.Equal("original/book.pdf", material.StorageReference);
-        Assert.Equal("derived/selection.pdf", material.DerivedStorageReference);
+        Assert.Equal("derived/selection.pdf", selection.DerivedStorageReference);
+    }
+
+    [Fact]
+    public void Selection_RejectsMaterialOtherThanTheSessionMaterial()
+    {
+        StudySession session = StudySession.Create(Guid.NewGuid(), StudySessionMode.Digital).Value;
+        StudyMaterial attachedMaterial = CreateMaterial(session.StudentId);
+        StudyMaterial differentMaterial = CreateMaterial(session.StudentId);
+        session.SetStudyMaterial(attachedMaterial);
+
+        Result<StudySessionSelection> result = StudySessionSelection.Create(session, differentMaterial, 1, 2);
+
+        Assert.True(result.IsError);
+        Assert.Equal(StudySessionErrors.SelectionMaterialMismatch.Code, result.TopError.Code);
+    }
+
+    [Fact]
+    public void SettingANewSelection_ReplacesTheActiveSelection()
+    {
+        StudySession session = StudySession.Create(Guid.NewGuid(), StudySessionMode.Digital).Value;
+        StudyMaterial material = CreateMaterial(session.StudentId);
+        session.SetStudyMaterial(material);
+        StudySessionSelection first = StudySessionSelection.Create(session, material, 1, 2).Value;
+        StudySessionSelection replacement = StudySessionSelection.Create(session, material, 3, 4).Value;
+
+        session.SetSelection(first);
+        session.SetSelection(replacement);
+
+        Assert.Equal(replacement.Id, session.Selection!.Id);
     }
 
     private static StudySession CreateReadyDigitalSession()
@@ -133,6 +165,7 @@ public class StudySessionTests
         session.SetSubject(StudentSubject.Predefined(StudentSubjectType.Math));
         session.SetDuration(25);
         session.SetStudyMaterial(material);
+        session.SetSelection(StudySessionSelection.Create(session, material, 1, 5).Value);
         session.SetSelectedSections([section]);
         session.MarkReady();
         return session;

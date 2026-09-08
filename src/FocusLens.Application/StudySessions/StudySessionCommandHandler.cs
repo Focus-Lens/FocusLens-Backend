@@ -15,7 +15,9 @@ public sealed class StudySessionCommandHandler(
     IBaseRepository<Student> studentRepository,
     IBaseRepository<StudySession> studySessionRepository,
     IBaseRepository<StudyMaterial> materialRepository,
+    IBaseRepository<StudySessionSelection> selectionRepository,
     IBaseRepository<StudyMaterialSection> sectionRepository,
+    IBaseRepository<StudySessionSelectedSection> selectedSectionRepository,
     IStudyMaterialFileStore fileStore,
     IStudyMaterialPdfProcessor pdfProcessor,
     ICurrentUser currentUser,
@@ -24,36 +26,29 @@ public sealed class StudySessionCommandHandler(
         IRequestHandler<SetStudySessionModeCommand, Result<StudySessionResponse>>,
         IRequestHandler<SetStudySessionSubjectCommand, Result<StudySessionResponse>>,
         IRequestHandler<SetStudySessionDurationCommand, Result<StudySessionResponse>>,
-        IRequestHandler<SetStudySessionSelectionCommand, Result<StudySessionResponse>>,
-        IRequestHandler<UpdateStudySessionSelectionCommand, Result<StudySessionResponse>>,
+        IRequestHandler<SetStudySessionSelectionCommand, Result<StudySessionSelectionResponse>>,
+        IRequestHandler<UpdateStudySessionSelectionCommand, Result<StudySessionSelectionResponse>>,
         IRequestHandler<ReceiveStudySessionSectionsCommand, Result<StudySessionResponse>>,
-        IRequestHandler<ChangeStudySessionMaterialCommand, Result<StudySessionResponse>>,
+        IRequestHandler<ChangeStudySessionMaterialCommand, Result<StudyMaterialResponse>>,
         IRequestHandler<StartStudySessionCommand, Result<StudySessionResponse>>,
-        IRequestHandler<UploadStudyMaterialCommand, Result<StudySessionResponse>>
+        IRequestHandler<UploadStudyMaterialCommand, Result<StudyMaterialResponse>>
 {
     public async Task<Result<StudySessionResponse>> Handle(CreateStudySessionCommand request, CancellationToken cancellationToken)
     {
         Result<Student> studentResult = await GetCurrentStudentAsync(includeSubjects: true);
         if (studentResult.IsError) return studentResult.TopError;
         if (!Enum.IsDefined(request.Request.Mode)) return StudySessionErrors.InvalidMode;
-
-        Result<StudySession> sessionResult = StudySession.Create(
-            studentResult.Value.Id,
-            (DomainStudySessionMode)request.Request.Mode);
+        Result<StudySession> sessionResult = StudySession.Create(studentResult.Value.Id, (DomainStudySessionMode)request.Request.Mode);
         if (sessionResult.IsError) return sessionResult.TopError;
-
         StudentSubject? subject = studentResult.Value.Subjects.SingleOrDefault(item => item.Id == request.Request.SubjectId);
         if (subject is null) return Error.Validation("StudySessions.InvalidSubject", "The selected subject does not belong to the student.");
-
         Result<Success> subjectResult = sessionResult.Value.SetSubject(subject);
         if (subjectResult.IsError) return subjectResult.TopError;
-
         Result<Success> durationResult = sessionResult.Value.SetDuration(request.Request.FocusDurationMinutes);
         if (durationResult.IsError) return durationResult.TopError;
-
         studySessionRepository.Add(sessionResult.Value);
         await unitOfWork.SaveChangesAsync();
-        return sessionResult.Value.ToResponse([]);
+        return sessionResult.Value.ToResponse();
     }
 
     public async Task<Result<StudySessionResponse>> Handle(SetStudySessionModeCommand request, CancellationToken cancellationToken)
@@ -61,7 +56,7 @@ public sealed class StudySessionCommandHandler(
         Result<StudySession> sessionResult = await GetSessionAsync(request.SessionId);
         if (sessionResult.IsError) return sessionResult.TopError;
         if (!Enum.IsDefined(request.Request.Mode)) return StudySessionErrors.InvalidMode;
-        return await SaveAsync(sessionResult.Value.SetMode((DomainStudySessionMode)request.Request.Mode), sessionResult.Value);
+        return await SaveSessionAsync(sessionResult.Value.SetMode((DomainStudySessionMode)request.Request.Mode), sessionResult.Value);
     }
 
     public async Task<Result<StudySessionResponse>> Handle(SetStudySessionSubjectCommand request, CancellationToken cancellationToken)
@@ -70,98 +65,117 @@ public sealed class StudySessionCommandHandler(
         if (studentResult.IsError) return studentResult.TopError;
         Result<StudySession> sessionResult = await GetSessionAsync(request.SessionId, studentResult.Value);
         if (sessionResult.IsError) return sessionResult.TopError;
-
-        var subject = studentResult.Value.Subjects.SingleOrDefault(item => item.Id == request.Request.SubjectId);
+        StudentSubject? subject = studentResult.Value.Subjects.SingleOrDefault(item => item.Id == request.Request.SubjectId);
         if (subject is null) return Error.Validation("StudySessions.InvalidSubject", "The selected subject does not belong to the student.");
-        return await SaveAsync(sessionResult.Value.SetSubject(subject), sessionResult.Value);
+        return await SaveSessionAsync(sessionResult.Value.SetSubject(subject), sessionResult.Value);
     }
 
     public async Task<Result<StudySessionResponse>> Handle(SetStudySessionDurationCommand request, CancellationToken cancellationToken)
     {
         Result<StudySession> sessionResult = await GetSessionAsync(request.SessionId);
-        if (sessionResult.IsError) return sessionResult.TopError;
-        return await SaveAsync(sessionResult.Value.SetDuration(request.Request.FocusDurationMinutes), sessionResult.Value);
+        return sessionResult.IsError ? sessionResult.TopError : await SaveSessionAsync(sessionResult.Value.SetDuration(request.Request.FocusDurationMinutes), sessionResult.Value);
     }
 
-    public async Task<Result<StudySessionResponse>> Handle(SetStudySessionSelectionCommand request, CancellationToken cancellationToken)
+    public async Task<Result<StudySessionSelectionResponse>> Handle(SetStudySessionSelectionCommand request, CancellationToken cancellationToken)
     {
         Result<StudySession> sessionResult = await GetSessionAsync(request.SessionId, includeMaterial: true);
         if (sessionResult.IsError) return sessionResult.TopError;
-
-        if (sessionResult.Value.PageRange is not null)
-            return Error.Conflict("StudySessions.SelectionAlreadySet", "A selection has already been set for this study session.");
-
-        return await SetSelectionAsync(sessionResult.Value, request.Request, cancellationToken);
+        StudySessionSelection? existing = await selectionRepository.FirstOrDefaultAsync(selection => selection.StudySessionId == request.SessionId);
+        if (existing is not null) return Error.Conflict("StudySessions.SelectionAlreadySet", "A selection has already been set for this study session.");
+        return await CreateSelectionAsync(sessionResult.Value, request.Request, cancellationToken);
     }
 
-    public async Task<Result<StudySessionResponse>> Handle(UpdateStudySessionSelectionCommand request, CancellationToken cancellationToken)
+    public async Task<Result<StudySessionSelectionResponse>> Handle(UpdateStudySessionSelectionCommand request, CancellationToken cancellationToken)
     {
         Result<StudySession> sessionResult = await GetSessionAsync(request.SessionId, includeMaterial: true);
         if (sessionResult.IsError) return sessionResult.TopError;
+        StudySessionSelection? existing = await selectionRepository.FirstOrDefaultAsync(selection => selection.StudySessionId == request.SessionId, selection => selection.SelectedSections);
+        if (existing is null) return Error.Validation("StudySessions.SelectionNotSet", "Set a selection before updating it.");
+        if (existing.StudyMaterialId != sessionResult.Value.StudyMaterialId) return StudySessionErrors.SelectionMaterialMismatch;
+        string? oldDerivedStorageReference = existing.DerivedStorageReference;
+        selectionRepository.Delete(existing);
+        Result<StudySessionSelectionResponse> result = await CreateSelectionAsync(sessionResult.Value, request.Request, cancellationToken);
+        if (result.IsSuccess && oldDerivedStorageReference is not null)
+        {
+            await fileStore.DeleteAsync(oldDerivedStorageReference, cancellationToken);
+        }
 
-        if (sessionResult.Value.PageRange is null)
-            return Error.Validation("StudySessions.SelectionNotSet", "Set a selection before updating it.");
-
-        return await SetSelectionAsync(sessionResult.Value, request.Request, cancellationToken);
+        return result;
     }
 
-    private async Task<Result<StudySessionResponse>> SetSelectionAsync(
-        StudySession session,
-        SetStudySessionSelectionRequest request,
-        CancellationToken cancellationToken)
+    private async Task<Result<StudySessionSelectionResponse>> CreateSelectionAsync(StudySession session, SetStudySessionSelectionRequest request, CancellationToken cancellationToken)
     {
-        Result<StudySessionPageRange> rangeResult = StudySessionPageRange.Create(request.FromPage, request.ToPage);
-        if (rangeResult.IsError) return rangeResult.TopError;
-
         if (session.Material is not { } material) return StudySessionErrors.PageRangeRequiresMaterial;
+        Result<StudySessionSelection> selectionResult = StudySessionSelection.Create(session, material, request.FromPage, request.ToPage);
+        if (selectionResult.IsError) return selectionResult.TopError;
+        string? derivedStorageReference = null;
+        try
+        {
+            await using Stream original = await fileStore.OpenReadAsync(material.StorageReference, cancellationToken);
+            await using Stream derived = await pdfProcessor.ExtractPagesAsync(original, StudySessionPageRange.Create(request.FromPage, request.ToPage).Value, cancellationToken);
+            derivedStorageReference = await fileStore.SaveDerivedAsync(session.StudentId, material.FileName, derived, cancellationToken);
+            Result<Success> derivedResult = selectionResult.Value.SetDerivedStorageReference(derivedStorageReference);
+            if (derivedResult.IsError)
+            {
+                await fileStore.DeleteAsync(derivedStorageReference, cancellationToken);
+                return derivedResult.TopError;
+            }
+        }
+        catch
+        {
+            if (derivedStorageReference is not null)
+            {
+                await fileStore.DeleteAsync(derivedStorageReference, cancellationToken);
+            }
 
-        Result<Success> setRangeResult = session.SetPageRange(rangeResult.Value);
-        if (setRangeResult.IsError) return setRangeResult.TopError;
+            throw;
+        }
 
-        await using Stream original = await fileStore.OpenReadAsync(material.StorageReference, cancellationToken);
-        await using Stream derived = await pdfProcessor.ExtractPagesAsync(original, rangeResult.Value, cancellationToken);
-        Result<Success> derivedResult = material.SetDerivedStorageReference(
-            await fileStore.SaveDerivedAsync(session.StudentId, material.FileName, derived, cancellationToken));
-        if (derivedResult.IsError) return derivedResult.TopError;
+        Result<Success> setSelectionResult = session.SetSelection(selectionResult.Value);
+        if (setSelectionResult.IsError)
+        {
+            await fileStore.DeleteAsync(derivedStorageReference!, cancellationToken);
+            return setSelectionResult.TopError;
+        }
 
-        return await SaveAsync(Result.Success, session);
+        selectionRepository.Add(selectionResult.Value);
+        try
+        {
+            await unitOfWork.SaveChangesAsync();
+        }
+        catch
+        {
+            await fileStore.DeleteAsync(derivedStorageReference!, cancellationToken);
+            throw;
+        }
+
+        return selectionResult.Value.ToResponse();
     }
 
     public async Task<Result<StudySessionResponse>> Handle(ReceiveStudySessionSectionsCommand request, CancellationToken cancellationToken)
     {
-        Result<StudySession> sessionResult = await GetSessionAsync(request.SessionId, includeMaterial: true);
+        Result<StudySession> sessionResult = await GetSessionAsync(request.SessionId, includeMaterial: true, includeSelection: true);
         if (sessionResult.IsError) return sessionResult.TopError;
-
-        if (sessionResult.Value.Material is not { } material) return StudySessionErrors.SectionsRequireMaterial;
-
-        List<StudyMaterialSection> selectedSections = [];
+        if (sessionResult.Value.Material is not { } material || sessionResult.Value.Selection is null) return StudySessionErrors.SectionsRequireMaterial;
+        List<StudyMaterialSection> materialSections = [];
         foreach (StudyMaterialSectionRequest requestedSection in request.Request.Sections ?? [])
         {
-            Result<StudyMaterialSection> sectionResult = StudyMaterialSection.Create(
-                material.Id,
-                requestedSection.Name,
-                requestedSection.EstimatedDurationMinutes);
+            Result<StudyMaterialSection> sectionResult = StudyMaterialSection.Create(material.Id, requestedSection.Name, requestedSection.EstimatedDurationMinutes);
             if (sectionResult.IsError) return sectionResult.TopError;
-            selectedSections.Add(sectionResult.Value);
+            materialSections.Add(sectionResult.Value);
         }
-
-        Result<Success> setSectionsResult = sessionResult.Value.SetSelectedSections(selectedSections);
+        Result<Success> setSectionsResult = sessionResult.Value.SetSelectedSections(materialSections);
         if (setSectionsResult.IsError) return setSectionsResult.TopError;
-
-        await sectionRepository.AddRangeAsync(selectedSections);
-        return await SaveAsync(Result.Success, sessionResult.Value, selectedSections);
+        IEnumerable<StudySessionSelectedSection> oldSelectedSections = await selectedSectionRepository.GetAllAsync(
+            section => section.StudySessionSelectionId == sessionResult.Value.Selection.Id);
+        selectedSectionRepository.DeleteRange(oldSelectedSections);
+        await sectionRepository.AddRangeAsync(materialSections);
+        await selectedSectionRepository.AddRangeAsync(sessionResult.Value.Selection.SelectedSections);
+        return await SaveSessionAsync(Result.Success, sessionResult.Value);
     }
 
-    public async Task<Result<StudySessionResponse>> Handle(ChangeStudySessionMaterialCommand request, CancellationToken cancellationToken)
-    {
-        Result<StudySession> sessionResult = await GetSessionAsync(request.SessionId);
-        if (sessionResult.IsError) return sessionResult.TopError;
-        StudyMaterial? material = await materialRepository.FirstOrDefaultAsync(
-            item => item.Id == request.Request.StudyMaterialId
-                && item.StudentId == sessionResult.Value.StudentId);
-        if (material is null) return Error.NotFound("StudyMaterials.NotFound", "The study material was not found.");
-        return await SaveAsync(sessionResult.Value.SetStudyMaterial(material), sessionResult.Value);
-    }
+    public async Task<Result<StudyMaterialResponse>> Handle(ChangeStudySessionMaterialCommand request, CancellationToken cancellationToken)
+        => await UploadMaterialAsync(request.SessionId, request.FileName, request.FileSizeBytes, request.Content, request.Source, true, cancellationToken);
 
     public async Task<Result<StudySessionResponse>> Handle(StartStudySessionCommand request, CancellationToken cancellationToken)
     {
@@ -172,88 +186,88 @@ public sealed class StudySessionCommandHandler(
             Result<Success> readyResult = sessionResult.Value.MarkReady();
             if (readyResult.IsError) return readyResult.TopError;
         }
-
-        return await SaveAsync(sessionResult.Value.Start(DateTimeOffset.UtcNow), sessionResult.Value);
+        return await SaveSessionAsync(sessionResult.Value.Start(DateTimeOffset.UtcNow), sessionResult.Value);
     }
 
-    public async Task<Result<StudySessionResponse>> Handle(UploadStudyMaterialCommand request, CancellationToken cancellationToken)
+    public async Task<Result<StudyMaterialResponse>> Handle(UploadStudyMaterialCommand request, CancellationToken cancellationToken)
+        => await UploadMaterialAsync(request.SessionId, request.FileName, request.FileSizeBytes, request.Content, request.Source, false, cancellationToken);
+
+    private async Task<Result<StudyMaterialResponse>> UploadMaterialAsync(Guid sessionId, string fileName, long fileSizeBytes, byte[] contentBytes, FocusLens.Contracts.StudySessions.StudyMaterialSource source, bool replaceExisting, CancellationToken cancellationToken)
     {
-        Result<StudySession> sessionResult = await GetSessionAsync(request.SessionId);
+        Result<StudySession> sessionResult = await GetSessionAsync(sessionId, includeMaterial: true, includeSelection: true);
         if (sessionResult.IsError) return sessionResult.TopError;
-        if (request.Content.Length == 0) return Error.Validation("StudyMaterials.EmptyFile", "The uploaded file is empty.");
-        if (!Enum.IsDefined(request.Source)) return Error.Validation("StudyMaterials.SourceInvalid", "Material source is invalid.");
-
-        await using var content = new MemoryStream(request.Content, writable: false);
+        if (contentBytes.Length == 0) return Error.Validation("StudyMaterials.EmptyFile", "The uploaded file is empty.");
+        if (!Enum.IsDefined(source)) return Error.Validation("StudyMaterials.SourceInvalid", "Material source is invalid.");
+        if (!replaceExisting && sessionResult.Value.Material is not null) return Error.Conflict("StudySessions.MaterialAlreadySet", "Use the material update endpoint to replace the study material.");
+        if (replaceExisting && sessionResult.Value.Material is null) return StudySessionErrors.MaterialRequired;
+        await using var content = new MemoryStream(contentBytes, writable: false);
         int pageCount;
-        try
+        try { pageCount = await pdfProcessor.GetPageCountAsync(content, cancellationToken); }
+        catch (Exception) { return Error.Validation("StudyMaterials.InvalidPdf", "The uploaded file is not a readable PDF."); }
+        content.Position = 0;
+        string storageReference = await fileStore.SaveOriginalAsync(sessionResult.Value.StudentId, fileName, content, cancellationToken);
+        Result<StudyMaterial> materialResult = StudyMaterial.Create(sessionResult.Value.StudentId, fileName, fileSizeBytes, pageCount, storageReference, (DomainStudyMaterialSource)source);
+        if (materialResult.IsError)
         {
-            pageCount = await pdfProcessor.GetPageCountAsync(content, cancellationToken);
-        }
-        catch (Exception)
-        {
-            return Error.Validation("StudyMaterials.InvalidPdf", "The uploaded file is not a readable PDF.");
+            await fileStore.DeleteAsync(storageReference, cancellationToken);
+            return materialResult.TopError;
         }
 
-        content.Position = 0;
-        string storageReference = await fileStore.SaveOriginalAsync(
-            sessionResult.Value.StudentId,
-            request.FileName,
-            content,
-            cancellationToken);
-        Result<StudyMaterial> materialResult = StudyMaterial.Create(
-            sessionResult.Value.StudentId,
-            request.FileName,
-            request.FileSizeBytes,
-            pageCount,
-            storageReference,
-            (DomainStudyMaterialSource)request.Source);
-        if (materialResult.IsError) return materialResult.TopError;
+        StudyMaterial? oldMaterial = sessionResult.Value.Material;
+        StudySessionSelection? oldSelection = sessionResult.Value.Selection;
+        if (oldSelection is not null) selectionRepository.Delete(oldSelection);
 
         Result<Success> attachResult = sessionResult.Value.SetStudyMaterial(materialResult.Value);
-        if (attachResult.IsError) return attachResult.TopError;
+        if (attachResult.IsError)
+        {
+            await fileStore.DeleteAsync(storageReference, cancellationToken);
+            return attachResult.TopError;
+        }
 
         materialRepository.Add(materialResult.Value);
-        return await SaveAsync(Result.Success, sessionResult.Value);
+        bool oldMaterialIsShared = oldMaterial is not null
+            && studySessionRepository.GetAll().Any(session => session.Id != sessionId && session.StudyMaterialId == oldMaterial.Id);
+        if (oldMaterial is not null && !oldMaterialIsShared) materialRepository.Delete(oldMaterial);
+
+        try
+        {
+            await unitOfWork.SaveChangesAsync();
+        }
+        catch
+        {
+            await fileStore.DeleteAsync(storageReference, cancellationToken);
+            throw;
+        }
+
+        if (oldSelection?.DerivedStorageReference is { } derivedReference) await fileStore.DeleteAsync(derivedReference, cancellationToken);
+        if (oldMaterial is not null && !oldMaterialIsShared) await fileStore.DeleteAsync(oldMaterial.StorageReference, cancellationToken);
+        return materialResult.Value.ToResponse();
     }
 
     private async Task<Result<Student>> GetCurrentStudentAsync(bool includeSubjects = false)
     {
-        if (currentUser.UserId is not Guid userId || userId == Guid.Empty)
-            return Error.Unauthorized("StudySessions.CurrentUserUnavailable", "The current user could not be identified.");
-
-        Student? student = includeSubjects
-            ? await studentRepository.FirstOrDefaultAsync(item => item.UserId == userId, item => item.Subjects)
-            : await studentRepository.FirstOrDefaultAsync(item => item.UserId == userId);
-        return student is null
-            ? Error.NotFound("StudySessions.StudentNotFound", "The student profile was not found.")
-            : student;
+        if (currentUser.UserId is not Guid userId || userId == Guid.Empty) return Error.Unauthorized("StudySessions.CurrentUserUnavailable", "The current user could not be identified.");
+        Student? student = includeSubjects ? await studentRepository.FirstOrDefaultAsync(item => item.UserId == userId, item => item.Subjects) : await studentRepository.FirstOrDefaultAsync(item => item.UserId == userId);
+        return student is null ? Error.NotFound("StudySessions.StudentNotFound", "The student profile was not found.") : student;
     }
 
-    private async Task<Result<StudySession>> GetSessionAsync(Guid sessionId, Student? knownStudent = null, bool includeMaterial = false)
+    private async Task<Result<StudySession>> GetSessionAsync(Guid sessionId, Student? knownStudent = null, bool includeMaterial = false, bool includeSelection = false)
     {
         if (sessionId == Guid.Empty) return Error.Validation("StudySessions.IdRequired", "Study session id is required.");
         Result<Student> studentResult = knownStudent is null ? await GetCurrentStudentAsync() : knownStudent;
         if (studentResult.IsError) return studentResult.TopError;
-
-        StudySession? session = includeMaterial
-            ? await studySessionRepository.FirstOrDefaultAsync(item => item.Id == sessionId && item.StudentId == studentResult.Value.Id, item => item.Material!, item => item.SelectedSections)
-            : await studySessionRepository.FirstOrDefaultAsync(item => item.Id == sessionId && item.StudentId == studentResult.Value.Id, item => item.SelectedSections);
-        return session is null
-            ? Error.NotFound("StudySessions.NotFound", "The study session was not found.")
-            : session;
+        StudySession? session = includeMaterial && includeSelection
+            ? await studySessionRepository.FirstOrDefaultAsync(item => item.Id == sessionId && item.StudentId == studentResult.Value.Id, item => item.Material!, item => item.Selection!)
+            : includeMaterial
+                ? await studySessionRepository.FirstOrDefaultAsync(item => item.Id == sessionId && item.StudentId == studentResult.Value.Id, item => item.Material!)
+                : await studySessionRepository.FirstOrDefaultAsync(item => item.Id == sessionId && item.StudentId == studentResult.Value.Id);
+        return session is null ? Error.NotFound("StudySessions.NotFound", "The study session was not found.") : session;
     }
 
-    private async Task<Result<StudySessionResponse>> SaveAsync(Result<Success> result, StudySession session, IReadOnlyCollection<StudyMaterialSection>? knownSections = null)
+    private async Task<Result<StudySessionResponse>> SaveSessionAsync(Result<Success> result, StudySession session)
     {
         if (result.IsError) return result.TopError;
         await unitOfWork.SaveChangesAsync();
-        IReadOnlyCollection<StudyMaterialSection> sections = knownSections ?? await GetMaterialSectionsAsync(session);
-        return session.ToResponse(sections);
-    }
-
-    private async Task<IReadOnlyCollection<StudyMaterialSection>> GetMaterialSectionsAsync(StudySession session)
-    {
-        if (session.StudyMaterialId is not Guid materialId) return [];
-        return (await sectionRepository.GetAllAsync(section => section.StudyMaterialId == materialId)).ToArray();
+        return session.ToResponse();
     }
 }

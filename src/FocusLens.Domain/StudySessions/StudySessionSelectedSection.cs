@@ -15,7 +15,7 @@ public sealed class StudySessionSelectedSection : Entity
         EstimatedDurationMinutes = estimatedDurationMinutes;
     }
 
-    public Guid StudySessionId { get; private set; }
+    public Guid StudySessionSelectionId { get; private set; }
 
     public Guid StudyMaterialSectionId { get; private set; }
 

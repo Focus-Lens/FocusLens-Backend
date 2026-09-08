@@ -1,12 +1,14 @@
 using FocusLens.Domain.Common.Interfaces;
-using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Options;
 
 namespace FocusLens.Infrastructure.StudySessions;
 
-public sealed class LocalStudyMaterialFileStore(IConfiguration configuration) : IStudyMaterialFileStore
+public sealed class LocalStudyMaterialFileStore(
+    IOptions<StudyMaterialStorageOptions> options,
+    IHostEnvironment environment) : IStudyMaterialFileStore
 {
-    private readonly string _rootPath = configuration["StudyMaterialStorage:RootPath"]
-        ?? Path.Combine(AppContext.BaseDirectory, "study-materials");
+    private readonly string _rootPath = ResolveRootPath(options.Value.RootPath, environment.ContentRootPath);
 
     public Task<string> SaveOriginalAsync(
         Guid studentId,
@@ -29,6 +31,18 @@ public sealed class LocalStudyMaterialFileStore(IConfiguration configuration) : 
         return Task.FromResult(stream);
     }
 
+    public Task DeleteAsync(string storageReference, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        string path = ToFullPath(storageReference);
+        if (File.Exists(path))
+        {
+            File.Delete(path);
+        }
+
+        return Task.CompletedTask;
+    }
+
     private async Task<string> SaveAsync(
         Guid studentId,
         string category,
@@ -41,9 +55,21 @@ public sealed class LocalStudyMaterialFileStore(IConfiguration configuration) : 
         string path = ToFullPath(relativePath);
         Directory.CreateDirectory(Path.GetDirectoryName(path)!);
 
-        await using FileStream output = File.Create(path);
-        await content.CopyToAsync(output, cancellationToken);
-        return relativePath.Replace(Path.DirectorySeparatorChar, '/');
+        try
+        {
+            await using FileStream output = File.Create(path);
+            await content.CopyToAsync(output, cancellationToken);
+            return relativePath.Replace(Path.DirectorySeparatorChar, '/');
+        }
+        catch
+        {
+            if (File.Exists(path))
+            {
+                File.Delete(path);
+            }
+
+            throw;
+        }
     }
 
     private string ToFullPath(string storageReference)
@@ -58,5 +84,17 @@ public sealed class LocalStudyMaterialFileStore(IConfiguration configuration) : 
         }
 
         return path;
+    }
+
+    private static string ResolveRootPath(string? configuredRootPath, string contentRootPath)
+    {
+        if (string.IsNullOrWhiteSpace(configuredRootPath))
+        {
+            throw new InvalidOperationException("StudyMaterialStorage:RootPath must be configured.");
+        }
+
+        return Path.IsPathRooted(configuredRootPath)
+            ? Path.GetFullPath(configuredRootPath)
+            : Path.GetFullPath(Path.Combine(contentRootPath, configuredRootPath));
     }
 }

@@ -7,9 +7,7 @@ namespace FocusLens.Application.StudySessions;
 
 internal static class StudySessionMappings
 {
-    public static StudySessionResponse ToResponse(
-        this StudySession session,
-        IReadOnlyCollection<StudyMaterialSection> sections)
+    public static StudySessionResponse ToResponse(this StudySession session)
         => new(
             session.Id,
             session.StudentId,
@@ -18,25 +16,24 @@ internal static class StudySessionMappings
             session.StartedAtUtc,
             session.SelectedSubjectId,
             session.FocusDurationMinutes,
-            session.EstimatedStudyTimeMinutes,
-            session.Material is null
-                ? null
-                : new StudyMaterialResponse(
-                    session.Material.Id,
-                    session.Material.FileName,
-                    session.Material.FileSizeBytes,
-                    session.Material.PageCount,
-                    session.Material.StorageReference,
-                    session.Material.DerivedStorageReference,
-                    (ContractStudyMaterialSource)session.Material.Source,
-                    sections.Select(section => new StudyMaterialSectionResponse(
-                        section.Id,
-                        section.Name,
-                        section.EstimatedDurationMinutes)).ToArray()),
-            session.PageRange is null
-                ? null
-                : new StudySessionPageRangeResponse(
-                    session.PageRange.FromPage,
-                    session.PageRange.ToPage),
-            session.SelectedSections.Select(section => section.StudyMaterialSectionId).ToArray());
+            session.EstimatedStudyTimeMinutes);
+
+    public static StudyMaterialResponse ToResponse(this StudyMaterial material)
+        => new(
+            material.Id,
+            material.FileName,
+            material.FileSizeBytes,
+            material.PageCount,
+            material.StorageReference,
+            (ContractStudyMaterialSource)material.Source);
+
+    public static StudySessionSelectionResponse ToResponse(this StudySessionSelection selection)
+        => new(
+            selection.Id,
+            selection.StudySessionId,
+            selection.StudyMaterialId,
+            selection.FromPage,
+            selection.ToPage,
+            selection.SelectedSections.Select(section => section.StudyMaterialSectionId).ToArray(),
+            selection.EstimatedStudyTimeMinutes);
 }

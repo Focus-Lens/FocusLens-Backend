@@ -37,8 +37,6 @@ public sealed class StudyMaterial : AuditableEntity
 
     public string StorageReference { get; private set; } = string.Empty;
 
-    public string? DerivedStorageReference { get; private set; }
-
     public StudyMaterialSource Source { get; private set; }
 
     public static Result<StudyMaterial> Create(
@@ -89,14 +87,4 @@ public sealed class StudyMaterial : AuditableEntity
             source);
     }
 
-    public Result<Success> SetDerivedStorageReference(string? storageReference)
-    {
-        if (string.IsNullOrWhiteSpace(storageReference))
-        {
-            return Error.Validation("StudyMaterials.DerivedStorageReferenceRequired", "Derived storage reference is required.");
-        }
-
-        DerivedStorageReference = storageReference.Trim();
-        return Result.Success;
-    }
 }

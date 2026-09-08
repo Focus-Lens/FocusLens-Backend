@@ -12,6 +12,7 @@ public static class StudySessionErrors
     public static readonly Error MaterialMismatch = Error.Validation("StudySessions.MaterialMismatch", "The material does not belong to this student or session.");
     public static readonly Error PageRangeRequiresMaterial = Error.Validation("StudySessions.PageRangeRequiresMaterial", "Attach material before selecting a page range.");
     public static readonly Error PageRangeExceedsMaterial = Error.Validation("StudySessions.PageRangeExceedsMaterial", "The selected page range exceeds the material page count.");
+    public static readonly Error SelectionMaterialMismatch = Error.Validation("StudySessions.SelectionMaterialMismatch", "The selection must reference the study session material.");
     public static readonly Error SectionsRequireMaterial = Error.Validation("StudySessions.SectionsRequireMaterial", "Attach material before selecting sections.");
     public static readonly Error SectionMismatch = Error.Validation("StudySessions.SectionMismatch", "Each selected section must belong to the attached material.");
     public static readonly Error DuplicateSection = Error.Validation("StudySessions.DuplicateSection", "A section can only be selected once.");

@@ -1,6 +1,8 @@
 using FocusLens.Domain.StudySessions;
 using FocusLens.Infrastructure.StudySessions;
-using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.FileProviders;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Options;
 using PdfSharp.Pdf;
 
 namespace FocusLens.Application.SubcutaneousTests.StudySessions;
@@ -8,18 +10,14 @@ namespace FocusLens.Application.SubcutaneousTests.StudySessions;
 public class PdfStudyMaterialProcessingTests
 {
     [Fact]
-    public async Task ExtractPages_WhenPageRangeChanges_KeepsOriginalAndReplacesDerivedReference()
+    public async Task ExtractPages_WhenSelectionChanges_KeepsOriginalAndUsesNewDerivedReference()
     {
         string rootPath = Path.Combine(Path.GetTempPath(), $"focuslens-study-materials-{Guid.NewGuid():N}");
         try
         {
-            var configuration = new ConfigurationBuilder()
-                .AddInMemoryCollection(new Dictionary<string, string?>
-                {
-                    ["StudyMaterialStorage:RootPath"] = rootPath
-                })
-                .Build();
-            var fileStore = new LocalStudyMaterialFileStore(configuration);
+            var fileStore = new LocalStudyMaterialFileStore(
+                Options.Create(new StudyMaterialStorageOptions { RootPath = rootPath }),
+                new TestHostEnvironment());
             var processor = new PdfSharpStudyMaterialPdfProcessor();
             byte[] originalPdf = CreatePdf(pageCount: 5);
             Guid studentId = Guid.NewGuid();
@@ -31,6 +29,9 @@ public class PdfStudyMaterialProcessingTests
                 originalContent,
                 CancellationToken.None);
 
+            Assert.False(Path.IsPathRooted(originalReference));
+            Assert.Contains("/original/", originalReference);
+
             StudyMaterial material = StudyMaterial.Create(
                 studentId,
                 "book.pdf",
@@ -38,29 +39,36 @@ public class PdfStudyMaterialProcessingTests
                 5,
                 originalReference,
                 StudyMaterialSource.Upload).Value;
+            StudySession session = StudySession.Create(studentId, StudySessionMode.Digital).Value;
+            session.SetStudyMaterial(material);
+            StudySessionSelection firstSelection = StudySessionSelection.Create(session, material, 2, 4).Value;
             string firstDerivedReference = await ExtractAndSaveDerivedAsync(
                 fileStore,
                 processor,
                 studentId,
                 originalReference,
                 StudySessionPageRange.Create(2, 4).Value);
-            material.SetDerivedStorageReference(firstDerivedReference);
+            firstSelection.SetDerivedStorageReference(firstDerivedReference);
 
+            StudySessionSelection secondSelection = StudySessionSelection.Create(session, material, 4, 5).Value;
             string secondDerivedReference = await ExtractAndSaveDerivedAsync(
                 fileStore,
                 processor,
                 studentId,
                 originalReference,
                 StudySessionPageRange.Create(4, 5).Value);
-            material.SetDerivedStorageReference(secondDerivedReference);
+            secondSelection.SetDerivedStorageReference(secondDerivedReference);
+
+            Assert.False(Path.IsPathRooted(secondDerivedReference));
+            Assert.Contains("/derived/", secondDerivedReference);
 
             await using Stream originalAgain = await fileStore.OpenReadAsync(originalReference, CancellationToken.None);
-            await using Stream derived = await fileStore.OpenReadAsync(material.DerivedStorageReference!, CancellationToken.None);
+            await using Stream derived = await fileStore.OpenReadAsync(secondSelection.DerivedStorageReference!, CancellationToken.None);
 
             Assert.Equal(5, await processor.GetPageCountAsync(originalAgain, CancellationToken.None));
             Assert.Equal(2, await processor.GetPageCountAsync(derived, CancellationToken.None));
-            Assert.NotEqual(firstDerivedReference, material.DerivedStorageReference);
-            Assert.Equal(secondDerivedReference, material.DerivedStorageReference);
+            Assert.NotEqual(firstDerivedReference, secondSelection.DerivedStorageReference);
+            Assert.Equal(secondDerivedReference, secondSelection.DerivedStorageReference);
         }
         finally
         {
@@ -94,5 +102,16 @@ public class PdfStudyMaterialProcessingTests
         using var output = new MemoryStream();
         document.Save(output, closeStream: false);
         return output.ToArray();
+    }
+
+    private sealed class TestHostEnvironment : IHostEnvironment
+    {
+        public string EnvironmentName { get; set; } = Environments.Development;
+
+        public string ApplicationName { get; set; } = "FocusLens.Tests";
+
+        public string ContentRootPath { get; set; } = Path.GetTempPath();
+
+        public IFileProvider ContentRootFileProvider { get; set; } = new NullFileProvider();
     }
 }

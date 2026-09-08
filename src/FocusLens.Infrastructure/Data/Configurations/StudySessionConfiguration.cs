@@ -29,16 +29,5 @@ public sealed class StudySessionConfiguration : IEntityTypeConfiguration<StudySe
             .WithMany()
             .HasForeignKey(session => session.StudyMaterialId)
             .OnDelete(DeleteBehavior.Restrict);
-
-        builder.OwnsOne(session => session.PageRange, range =>
-        {
-            range.Property(pageRange => pageRange.FromPage).HasColumnName("FromPage");
-            range.Property(pageRange => pageRange.ToPage).HasColumnName("ToPage");
-        });
-
-        builder.HasMany(session => session.SelectedSections)
-            .WithOne()
-            .HasForeignKey(section => section.StudySessionId)
-            .OnDelete(DeleteBehavior.Cascade);
     }
 }

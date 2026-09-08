@@ -15,4 +15,6 @@ public interface IStudyMaterialFileStore
         string fileName,
         Stream content,
         CancellationToken cancellationToken);
+
+    Task DeleteAsync(string storageReference, CancellationToken cancellationToken);
 }

@@ -13,8 +13,6 @@ public sealed record SetStudySessionDurationRequest(int FocusDurationMinutes);
 
 public sealed record SetStudySessionSelectionRequest(int FromPage, int ToPage);
 
-public sealed record ChangeStudySessionMaterialRequest(Guid StudyMaterialId);
-
 public sealed record StudyMaterialSectionRequest(string Name, int EstimatedDurationMinutes);
 
 public sealed record ReceiveStudySessionSectionsRequest(

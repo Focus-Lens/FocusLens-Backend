@@ -10,7 +10,6 @@ namespace FocusLens.Application.StudySessions;
 public sealed class GetStudySessionQueryHandler(
     IBaseRepository<Student> studentRepository,
     IBaseRepository<StudySession> studySessionRepository,
-    IBaseRepository<StudyMaterialSection> sectionRepository,
     ICurrentUser currentUser)
     : IRequestHandler<GetStudySessionQuery, StudySessionResponse?>
 {
@@ -24,13 +23,8 @@ public sealed class GetStudySessionQueryHandler(
 
         StudySession? session = await studySessionRepository.FirstOrDefaultAsync(
             item => item.Id == request.SessionId && item.StudentId == student.Id,
-            item => item.Material!,
-            item => item.SelectedSections);
+            item => item.Selection!);
         if (session is null) return null;
-
-        IReadOnlyCollection<StudyMaterialSection> sections = session.StudyMaterialId is Guid materialId
-            ? (await sectionRepository.GetAllAsync(section => section.StudyMaterialId == materialId)).ToArray()
-            : [];
-        return session.ToResponse(sections);
+        return session.ToResponse();
     }
 }

@@ -8,10 +8,7 @@ public sealed record StudySessionResponse(
     DateTimeOffset? StartedAtUtc,
     Guid? SelectedSubjectId,
     int? FocusDurationMinutes,
-    int EstimatedStudyTimeMinutes,
-    StudyMaterialResponse? Material,
-    StudySessionPageRangeResponse? PageRange,
-    IReadOnlyCollection<Guid> SelectedSectionIds);
+    int EstimatedStudyTimeMinutes);
 
 public sealed record StudyMaterialResponse(
     Guid Id,
@@ -19,13 +16,18 @@ public sealed record StudyMaterialResponse(
     long FileSizeBytes,
     int PageCount,
     string StorageReference,
-    string? DerivedStorageReference,
-    StudyMaterialSource Source,
-    IReadOnlyCollection<StudyMaterialSectionResponse> Sections);
+    StudyMaterialSource Source);
 
 public sealed record StudyMaterialSectionResponse(
     Guid Id,
     string Name,
     int EstimatedDurationMinutes);
 
-public sealed record StudySessionPageRangeResponse(int FromPage, int ToPage);
+public sealed record StudySessionSelectionResponse(
+    Guid Id,
+    Guid StudySessionId,
+    Guid StudyMaterialId,
+    int FromPage,
+    int ToPage,
+    IReadOnlyCollection<Guid> SelectedSectionIds,
+    int EstimatedStudyTimeMinutes);

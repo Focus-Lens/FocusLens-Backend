@@ -6,8 +6,6 @@ namespace FocusLens.Domain.StudySessions;
 
 public sealed class StudySession : AuditableEntity
 {
-    private readonly List<StudySessionSelectedSection> _selectedSections = [];
-
     private StudySession()
     {
     }
@@ -36,11 +34,9 @@ public sealed class StudySession : AuditableEntity
 
     public StudyMaterial? Material { get; private set; }
 
-    public StudySessionPageRange? PageRange { get; private set; }
+    public StudySessionSelection? Selection { get; private set; }
 
-    public IReadOnlyCollection<StudySessionSelectedSection> SelectedSections => _selectedSections.AsReadOnly();
-
-    public int EstimatedStudyTimeMinutes => _selectedSections.Sum(section => section.EstimatedDurationMinutes);
+    public int EstimatedStudyTimeMinutes => Selection?.EstimatedStudyTimeMinutes ?? 0;
 
     public static Result<StudySession> Create(Guid studentId, StudySessionMode mode)
     {
@@ -109,13 +105,12 @@ public sealed class StudySession : AuditableEntity
 
         StudyMaterialId = material.Id;
         Material = material;
-        PageRange = null;
-        _selectedSections.Clear();
+        Selection = null;
         MarkDraft();
         return Result.Success;
     }
 
-    public Result<Success> SetPageRange(StudySessionPageRange? pageRange)
+    public Result<Success> SetSelection(StudySessionSelection? selection)
     {
         Result<Success> configurable = EnsureConfigurable();
         if (configurable.IsError)
@@ -123,17 +118,22 @@ public sealed class StudySession : AuditableEntity
             return configurable;
         }
 
-        if (pageRange is null || Material is null)
+        if (selection is null || Material is null)
         {
             return StudySessionErrors.PageRangeRequiresMaterial;
         }
 
-        if (pageRange.ToPage > Material.PageCount)
+        if (selection.StudySessionId != Id || selection.StudyMaterialId != Material.Id)
+        {
+            return StudySessionErrors.SelectionMaterialMismatch;
+        }
+
+        if (selection.ToPage > Material.PageCount)
         {
             return StudySessionErrors.PageRangeExceedsMaterial;
         }
 
-        PageRange = pageRange;
+        Selection = selection;
         MarkDraft();
         return Result.Success;
     }
@@ -146,7 +146,7 @@ public sealed class StudySession : AuditableEntity
             return configurable;
         }
 
-        if (Material is null)
+        if (Material is null || Selection is null)
         {
             return StudySessionErrors.SectionsRequireMaterial;
         }
@@ -162,9 +162,12 @@ public sealed class StudySession : AuditableEntity
             return StudySessionErrors.DuplicateSection;
         }
 
-        _selectedSections.Clear();
-        _selectedSections.AddRange(selectedSections.Select(section =>
-            new StudySessionSelectedSection(section.Id, section.EstimatedDurationMinutes)));
+        Result<Success> selectionResult = Selection.SetSelectedSections(selectedSections);
+        if (selectionResult.IsError)
+        {
+            return selectionResult;
+        }
+
         MarkDraft();
         return Result.Success;
     }

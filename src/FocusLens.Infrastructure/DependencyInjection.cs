@@ -44,6 +44,8 @@ namespace FocusLens.Infrastructure
             services.AddScoped<ITokenProvider, TokenProvider>();
             services.AddScoped(typeof(IBaseRepository<>), typeof(BaseRepository<>));
             services.AddScoped<IUnitOfWork, UnitOfWork>();
+            services.Configure<StudyMaterialStorageOptions>(
+                configuration.GetRequiredSection(StudyMaterialStorageOptions.SectionName));
             services.AddScoped<IStudyMaterialFileStore, LocalStudyMaterialFileStore>();
             services.AddScoped<IStudyMaterialPdfProcessor, PdfSharpStudyMaterialPdfProcessor>();
 

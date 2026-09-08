@@ -42,8 +42,25 @@ public sealed class StudySessionsController(ISender sender) : ApiController
         => ToActionResult(await sender.Send(new ReceiveStudySessionSectionsCommand(sessionId, request), cancellationToken));
 
     [HttpPut("{sessionId:guid}/material")]
-    public async Task<IActionResult> ChangeMaterial(Guid sessionId, [FromBody] ChangeStudySessionMaterialRequest request, CancellationToken cancellationToken)
-        => ToActionResult(await sender.Send(new ChangeStudySessionMaterialCommand(sessionId, request), cancellationToken));
+    [Consumes("multipart/form-data")]
+    public async Task<IActionResult> ChangeMaterial(
+        Guid sessionId,
+        [FromForm] IFormFile file,
+        [FromForm] StudyMaterialSource source,
+        CancellationToken cancellationToken)
+    {
+        if (file.Length == 0)
+        {
+            return Problem([FocusLens.Domain.Common.Results.Error.Validation("StudyMaterials.EmptyFile", "The uploaded file is empty.")]);
+        }
+
+        return ToActionResult(await sender.Send(new ChangeStudySessionMaterialCommand(
+            sessionId,
+            file.FileName,
+            file.Length,
+            await ReadFileAsync(file, cancellationToken),
+            source), cancellationToken));
+    }
 
     [HttpPost("{sessionId:guid}/start")]
     public async Task<IActionResult> Start(Guid sessionId, CancellationToken cancellationToken)
@@ -65,17 +82,22 @@ public sealed class StudySessionsController(ISender sender) : ApiController
             });
         }
 
-        await using Stream input = file.OpenReadStream();
-        using var buffer = new MemoryStream();
-        await input.CopyToAsync(buffer, cancellationToken);
         return ToActionResult(await sender.Send(new UploadStudyMaterialCommand(
             sessionId,
             file.FileName,
             file.Length,
-            buffer.ToArray(),
+            await ReadFileAsync(file, cancellationToken),
             source), cancellationToken));
     }
 
-    private ActionResult ToActionResult(FocusLens.Domain.Common.Results.Result<StudySessionResponse> result)
+    private static async Task<byte[]> ReadFileAsync(IFormFile file, CancellationToken cancellationToken)
+    {
+        await using Stream input = file.OpenReadStream();
+        using var buffer = new MemoryStream();
+        await input.CopyToAsync(buffer, cancellationToken);
+        return buffer.ToArray();
+    }
+
+    private ActionResult ToActionResult<TResponse>(FocusLens.Domain.Common.Results.Result<TResponse> result)
         => result.IsSuccess ? Ok(result.Value) : Problem(result.Errors);
 }
