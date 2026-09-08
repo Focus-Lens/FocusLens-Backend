@@ -15,6 +15,7 @@ internal static class StudySessionMappings
             session.StudentId,
             (ContractStudySessionMode)session.Mode,
             session.Status.ToString(),
+            session.StartedAtUtc,
             session.SelectedSubjectId,
             session.FocusDurationMinutes,
             session.EstimatedStudyTimeMinutes,

@@ -1,4 +1,3 @@
-using System.Text.Json;
 using FocusLens.Application.StudySessions;
 using FocusLens.Contracts.StudySessions;
 using MediatR;
@@ -18,52 +17,44 @@ public sealed class StudySessionsController(ISender sender) : ApiController
         CancellationToken cancellationToken)
         => ToActionResult(await sender.Send(new CreateStudySessionCommand(request), cancellationToken));
 
-    [HttpGet("{sessionId:guid}")]
-    public async Task<IActionResult> Get(Guid sessionId, CancellationToken cancellationToken)
-    {
-        StudySessionResponse? session = await sender.Send(new GetStudySessionQuery(sessionId), cancellationToken);
-        return session is null ? NotFound() : Ok(session);
-    }
-
-    [HttpPatch("{sessionId:guid}/mode")]
+    [HttpPut("{sessionId:guid}/mode")]
     public async Task<IActionResult> SetMode(Guid sessionId, [FromBody] SetStudySessionModeRequest request, CancellationToken cancellationToken)
         => ToActionResult(await sender.Send(new SetStudySessionModeCommand(sessionId, request), cancellationToken));
 
-    [HttpPatch("{sessionId:guid}/subject")]
+    [HttpPut("{sessionId:guid}/subject")]
     public async Task<IActionResult> SetSubject(Guid sessionId, [FromBody] SetStudySessionSubjectRequest request, CancellationToken cancellationToken)
         => ToActionResult(await sender.Send(new SetStudySessionSubjectCommand(sessionId, request), cancellationToken));
 
-    [HttpPatch("{sessionId:guid}/duration")]
+    [HttpPut("{sessionId:guid}/duration")]
     public async Task<IActionResult> SetDuration(Guid sessionId, [FromBody] SetStudySessionDurationRequest request, CancellationToken cancellationToken)
         => ToActionResult(await sender.Send(new SetStudySessionDurationCommand(sessionId, request), cancellationToken));
 
-    [HttpPatch("{sessionId:guid}/page-range")]
-    public async Task<IActionResult> SetPageRange(Guid sessionId, [FromBody] SetStudySessionPageRangeRequest request, CancellationToken cancellationToken)
-        => ToActionResult(await sender.Send(new SetStudySessionPageRangeCommand(sessionId, request), cancellationToken));
+    [HttpPost("{sessionId:guid}/selection")]
+    public async Task<IActionResult> SetSelection(Guid sessionId, [FromBody] SetStudySessionSelectionRequest request, CancellationToken cancellationToken)
+        => ToActionResult(await sender.Send(new SetStudySessionSelectionCommand(sessionId, request), cancellationToken));
 
-    [HttpPatch("{sessionId:guid}/sections")]
-    public async Task<IActionResult> SetSections(Guid sessionId, [FromBody] SetStudySessionSectionsRequest request, CancellationToken cancellationToken)
-        => ToActionResult(await sender.Send(new SetStudySessionSectionsCommand(sessionId, request), cancellationToken));
+    [HttpPut("{sessionId:guid}/selection")]
+    public async Task<IActionResult> UpdateSelection(Guid sessionId, [FromBody] SetStudySessionSelectionRequest request, CancellationToken cancellationToken)
+        => ToActionResult(await sender.Send(new UpdateStudySessionSelectionCommand(sessionId, request), cancellationToken));
 
-    [HttpPatch("{sessionId:guid}/settings")]
-    public async Task<IActionResult> ChangeSettings(Guid sessionId, [FromBody] ChangeStudySessionSettingsRequest request, CancellationToken cancellationToken)
-        => ToActionResult(await sender.Send(new ChangeStudySessionSettingsCommand(sessionId, request), cancellationToken));
+    [HttpPost("{sessionId:guid}/sections")]
+    public async Task<IActionResult> ReceiveSections(Guid sessionId, [FromBody] ReceiveStudySessionSectionsRequest request, CancellationToken cancellationToken)
+        => ToActionResult(await sender.Send(new ReceiveStudySessionSectionsCommand(sessionId, request), cancellationToken));
 
-    [HttpPost("{sessionId:guid}/ready")]
-    public async Task<IActionResult> MarkReady(Guid sessionId, CancellationToken cancellationToken)
-        => ToActionResult(await sender.Send(new MarkStudySessionReadyCommand(sessionId), cancellationToken));
+    [HttpPut("{sessionId:guid}/material")]
+    public async Task<IActionResult> ChangeMaterial(Guid sessionId, [FromBody] ChangeStudySessionMaterialRequest request, CancellationToken cancellationToken)
+        => ToActionResult(await sender.Send(new ChangeStudySessionMaterialCommand(sessionId, request), cancellationToken));
 
     [HttpPost("{sessionId:guid}/start")]
     public async Task<IActionResult> Start(Guid sessionId, CancellationToken cancellationToken)
         => ToActionResult(await sender.Send(new StartStudySessionCommand(sessionId), cancellationToken));
 
-    [HttpPost("{sessionId:guid}/material")]
+    [HttpPost("{sessionId:guid}/upload-material")]
     [Consumes("multipart/form-data")]
     public async Task<IActionResult> UploadMaterial(
         Guid sessionId,
         [FromForm] IFormFile file,
         [FromForm] StudyMaterialSource source,
-        [FromForm] string? sections,
         CancellationToken cancellationToken)
     {
         if (file.Length == 0)
@@ -71,29 +62,6 @@ public sealed class StudySessionsController(ISender sender) : ApiController
             return Problem(new List<FocusLens.Domain.Common.Results.Error>
             {
                 FocusLens.Domain.Common.Results.Error.Validation("StudyMaterials.EmptyFile", "The uploaded file is empty.")
-            });
-        }
-
-        IReadOnlyCollection<StudyMaterialSectionRequest>? requestedSections;
-        try
-        {
-            requestedSections = string.IsNullOrWhiteSpace(sections)
-                ? []
-                : JsonSerializer.Deserialize<IReadOnlyCollection<StudyMaterialSectionRequest>>(sections);
-        }
-        catch (JsonException)
-        {
-            return Problem(new List<FocusLens.Domain.Common.Results.Error>
-            {
-                FocusLens.Domain.Common.Results.Error.Validation("StudyMaterials.InvalidSections", "Sections must be valid JSON.")
-            });
-        }
-
-        if (requestedSections is null)
-        {
-            return Problem(new List<FocusLens.Domain.Common.Results.Error>
-            {
-                FocusLens.Domain.Common.Results.Error.Validation("StudyMaterials.InvalidSections", "Sections must be a JSON array.")
             });
         }
 
@@ -105,8 +73,7 @@ public sealed class StudySessionsController(ISender sender) : ApiController
             file.FileName,
             file.Length,
             buffer.ToArray(),
-            source,
-            requestedSections), cancellationToken));
+            source), cancellationToken));
     }
 
     private ActionResult ToActionResult(FocusLens.Domain.Common.Results.Result<StudySessionResponse> result)

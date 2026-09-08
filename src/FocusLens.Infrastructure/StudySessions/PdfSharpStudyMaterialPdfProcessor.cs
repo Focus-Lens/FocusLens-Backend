@@ -1,7 +1,7 @@
 using FocusLens.Domain.Common.Interfaces;
 using FocusLens.Domain.StudySessions;
-using PdfSharpCore.Pdf;
-using PdfSharpCore.Pdf.IO;
+using PdfSharp.Pdf;
+using PdfSharp.Pdf.IO;
 
 namespace FocusLens.Infrastructure.StudySessions;
 

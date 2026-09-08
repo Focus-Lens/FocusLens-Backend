@@ -26,6 +26,8 @@ public sealed class StudySession : AuditableEntity
 
     public StudySessionStatus Status { get; private set; }
 
+    public DateTimeOffset? StartedAtUtc { get; private set; }
+
     public Guid? SelectedSubjectId { get; private set; }
 
     public int? FocusDurationMinutes { get; private set; }
@@ -188,13 +190,14 @@ public sealed class StudySession : AuditableEntity
         return Result.Success;
     }
 
-    public Result<Success> Start()
+    public Result<Success> Start(DateTimeOffset startedAtUtc)
     {
         if (Status != StudySessionStatus.Ready)
         {
             return StudySessionErrors.NotReady;
         }
 
+        StartedAtUtc = startedAtUtc;
         Status = StudySessionStatus.Active;
         return Result.Success;
     }

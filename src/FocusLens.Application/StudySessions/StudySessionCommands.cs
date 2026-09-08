@@ -16,16 +16,16 @@ public sealed record SetStudySessionSubjectCommand(Guid SessionId, SetStudySessi
 public sealed record SetStudySessionDurationCommand(Guid SessionId, SetStudySessionDurationRequest Request)
     : IRequest<Result<StudySessionResponse>>;
 
-public sealed record SetStudySessionPageRangeCommand(Guid SessionId, SetStudySessionPageRangeRequest Request)
+public sealed record SetStudySessionSelectionCommand(Guid SessionId, SetStudySessionSelectionRequest Request)
     : IRequest<Result<StudySessionResponse>>;
 
-public sealed record SetStudySessionSectionsCommand(Guid SessionId, SetStudySessionSectionsRequest Request)
+public sealed record UpdateStudySessionSelectionCommand(Guid SessionId, SetStudySessionSelectionRequest Request)
     : IRequest<Result<StudySessionResponse>>;
 
-public sealed record ChangeStudySessionSettingsCommand(Guid SessionId, ChangeStudySessionSettingsRequest Request)
+public sealed record ReceiveStudySessionSectionsCommand(Guid SessionId, ReceiveStudySessionSectionsRequest Request)
     : IRequest<Result<StudySessionResponse>>;
 
-public sealed record MarkStudySessionReadyCommand(Guid SessionId)
+public sealed record ChangeStudySessionMaterialCommand(Guid SessionId, ChangeStudySessionMaterialRequest Request)
     : IRequest<Result<StudySessionResponse>>;
 
 public sealed record StartStudySessionCommand(Guid SessionId)
@@ -36,6 +36,5 @@ public sealed record UploadStudyMaterialCommand(
     string FileName,
     long FileSizeBytes,
     byte[] Content,
-    StudyMaterialSource Source,
-    IReadOnlyCollection<StudyMaterialSectionRequest> Sections)
+    StudyMaterialSource Source)
     : IRequest<Result<StudySessionResponse>>;

@@ -125,4 +125,31 @@ public class AuthorizationTests
 
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
+
+    [Fact]
+    public async Task CreateStudySession_WithoutToken_ReturnsUnauthorized()
+    {
+        await using var factory = new CustomWebApplicationFactory();
+        using HttpClient client = factory.CreateClient();
+        using StringContent content = new("{}", System.Text.Encoding.UTF8, "application/json");
+
+        HttpResponseMessage response = await client.PostAsync("/api/study-sessions", content);
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task CreateStudySession_WithParentToken_ReturnsForbidden()
+    {
+        await using var factory = new CustomWebApplicationFactory();
+        using HttpClient client = factory.CreateClient();
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue(
+            "Bearer",
+            TestJwtTokenFactory.Create(Guid.NewGuid(), "Parent"));
+        using StringContent content = new("{}", System.Text.Encoding.UTF8, "application/json");
+
+        HttpResponseMessage response = await client.PostAsync("/api/study-sessions", content);
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
 }

@@ -1,7 +1,7 @@
 using FocusLens.Domain.StudySessions;
 using FocusLens.Infrastructure.StudySessions;
 using Microsoft.Extensions.Configuration;
-using PdfSharpCore.Pdf;
+using PdfSharp.Pdf;
 
 namespace FocusLens.Application.SubcutaneousTests.StudySessions;
 

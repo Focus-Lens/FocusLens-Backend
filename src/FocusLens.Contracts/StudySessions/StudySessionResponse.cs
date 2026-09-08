@@ -5,6 +5,7 @@ public sealed record StudySessionResponse(
     Guid StudentId,
     StudySessionMode Mode,
     string Status,
+    DateTimeOffset? StartedAtUtc,
     Guid? SelectedSubjectId,
     int? FocusDurationMinutes,
     int EstimatedStudyTimeMinutes,

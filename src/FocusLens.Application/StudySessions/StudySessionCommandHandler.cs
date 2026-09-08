@@ -4,6 +4,7 @@ using FocusLens.Domain;
 using FocusLens.Domain.Common.Interfaces;
 using FocusLens.Domain.Common.Results;
 using FocusLens.Domain.StudySessions;
+using FocusLens.Domain.Students;
 using MediatR;
 using DomainStudyMaterialSource = FocusLens.Domain.StudySessions.StudyMaterialSource;
 using DomainStudySessionMode = FocusLens.Domain.StudySessions.StudySessionMode;
@@ -23,16 +24,16 @@ public sealed class StudySessionCommandHandler(
         IRequestHandler<SetStudySessionModeCommand, Result<StudySessionResponse>>,
         IRequestHandler<SetStudySessionSubjectCommand, Result<StudySessionResponse>>,
         IRequestHandler<SetStudySessionDurationCommand, Result<StudySessionResponse>>,
-        IRequestHandler<SetStudySessionPageRangeCommand, Result<StudySessionResponse>>,
-        IRequestHandler<SetStudySessionSectionsCommand, Result<StudySessionResponse>>,
-        IRequestHandler<ChangeStudySessionSettingsCommand, Result<StudySessionResponse>>,
-        IRequestHandler<MarkStudySessionReadyCommand, Result<StudySessionResponse>>,
+        IRequestHandler<SetStudySessionSelectionCommand, Result<StudySessionResponse>>,
+        IRequestHandler<UpdateStudySessionSelectionCommand, Result<StudySessionResponse>>,
+        IRequestHandler<ReceiveStudySessionSectionsCommand, Result<StudySessionResponse>>,
+        IRequestHandler<ChangeStudySessionMaterialCommand, Result<StudySessionResponse>>,
         IRequestHandler<StartStudySessionCommand, Result<StudySessionResponse>>,
         IRequestHandler<UploadStudyMaterialCommand, Result<StudySessionResponse>>
 {
     public async Task<Result<StudySessionResponse>> Handle(CreateStudySessionCommand request, CancellationToken cancellationToken)
     {
-        Result<Student> studentResult = await GetCurrentStudentAsync();
+        Result<Student> studentResult = await GetCurrentStudentAsync(includeSubjects: true);
         if (studentResult.IsError) return studentResult.TopError;
         if (!Enum.IsDefined(request.Request.Mode)) return StudySessionErrors.InvalidMode;
 
@@ -40,6 +41,15 @@ public sealed class StudySessionCommandHandler(
             studentResult.Value.Id,
             (DomainStudySessionMode)request.Request.Mode);
         if (sessionResult.IsError) return sessionResult.TopError;
+
+        StudentSubject? subject = studentResult.Value.Subjects.SingleOrDefault(item => item.Id == request.Request.SubjectId);
+        if (subject is null) return Error.Validation("StudySessions.InvalidSubject", "The selected subject does not belong to the student.");
+
+        Result<Success> subjectResult = sessionResult.Value.SetSubject(subject);
+        if (subjectResult.IsError) return subjectResult.TopError;
+
+        Result<Success> durationResult = sessionResult.Value.SetDuration(request.Request.FocusDurationMinutes);
+        if (durationResult.IsError) return durationResult.TopError;
 
         studySessionRepository.Add(sessionResult.Value);
         await unitOfWork.SaveChangesAsync();
@@ -73,14 +83,36 @@ public sealed class StudySessionCommandHandler(
         return await SaveAsync(sessionResult.Value.SetDuration(request.Request.FocusDurationMinutes), sessionResult.Value);
     }
 
-    public async Task<Result<StudySessionResponse>> Handle(SetStudySessionPageRangeCommand request, CancellationToken cancellationToken)
+    public async Task<Result<StudySessionResponse>> Handle(SetStudySessionSelectionCommand request, CancellationToken cancellationToken)
     {
         Result<StudySession> sessionResult = await GetSessionAsync(request.SessionId, includeMaterial: true);
         if (sessionResult.IsError) return sessionResult.TopError;
-        Result<StudySessionPageRange> rangeResult = StudySessionPageRange.Create(request.Request.FromPage, request.Request.ToPage);
+
+        if (sessionResult.Value.PageRange is not null)
+            return Error.Conflict("StudySessions.SelectionAlreadySet", "A selection has already been set for this study session.");
+
+        return await SetSelectionAsync(sessionResult.Value, request.Request, cancellationToken);
+    }
+
+    public async Task<Result<StudySessionResponse>> Handle(UpdateStudySessionSelectionCommand request, CancellationToken cancellationToken)
+    {
+        Result<StudySession> sessionResult = await GetSessionAsync(request.SessionId, includeMaterial: true);
+        if (sessionResult.IsError) return sessionResult.TopError;
+
+        if (sessionResult.Value.PageRange is null)
+            return Error.Validation("StudySessions.SelectionNotSet", "Set a selection before updating it.");
+
+        return await SetSelectionAsync(sessionResult.Value, request.Request, cancellationToken);
+    }
+
+    private async Task<Result<StudySessionResponse>> SetSelectionAsync(
+        StudySession session,
+        SetStudySessionSelectionRequest request,
+        CancellationToken cancellationToken)
+    {
+        Result<StudySessionPageRange> rangeResult = StudySessionPageRange.Create(request.FromPage, request.ToPage);
         if (rangeResult.IsError) return rangeResult.TopError;
 
-        StudySession session = sessionResult.Value;
         if (session.Material is not { } material) return StudySessionErrors.PageRangeRequiresMaterial;
 
         Result<Success> setRangeResult = session.SetPageRange(rangeResult.Value);
@@ -95,67 +127,53 @@ public sealed class StudySessionCommandHandler(
         return await SaveAsync(Result.Success, session);
     }
 
-    public async Task<Result<StudySessionResponse>> Handle(SetStudySessionSectionsCommand request, CancellationToken cancellationToken)
+    public async Task<Result<StudySessionResponse>> Handle(ReceiveStudySessionSectionsCommand request, CancellationToken cancellationToken)
     {
         Result<StudySession> sessionResult = await GetSessionAsync(request.SessionId, includeMaterial: true);
         if (sessionResult.IsError) return sessionResult.TopError;
-        IReadOnlyCollection<Guid> sectionIds = request.Request.SectionIds ?? [];
-        if (sectionIds.Distinct().Count() != sectionIds.Count) return StudySessionErrors.DuplicateSection;
 
-        IEnumerable<StudyMaterialSection> sections = await sectionRepository.GetAllAsync(section => sectionIds.Contains(section.Id));
-        List<StudyMaterialSection> selectedSections = sections.ToList();
-        if (selectedSections.Count != sectionIds.Count) return StudySessionErrors.SectionMismatch;
-        return await SaveAsync(sessionResult.Value.SetSelectedSections(selectedSections), sessionResult.Value, selectedSections);
+        if (sessionResult.Value.Material is not { } material) return StudySessionErrors.SectionsRequireMaterial;
+
+        List<StudyMaterialSection> selectedSections = [];
+        foreach (StudyMaterialSectionRequest requestedSection in request.Request.Sections ?? [])
+        {
+            Result<StudyMaterialSection> sectionResult = StudyMaterialSection.Create(
+                material.Id,
+                requestedSection.Name,
+                requestedSection.EstimatedDurationMinutes);
+            if (sectionResult.IsError) return sectionResult.TopError;
+            selectedSections.Add(sectionResult.Value);
+        }
+
+        Result<Success> setSectionsResult = sessionResult.Value.SetSelectedSections(selectedSections);
+        if (setSectionsResult.IsError) return setSectionsResult.TopError;
+
+        await sectionRepository.AddRangeAsync(selectedSections);
+        return await SaveAsync(Result.Success, sessionResult.Value, selectedSections);
     }
 
-    public async Task<Result<StudySessionResponse>> Handle(ChangeStudySessionSettingsCommand request, CancellationToken cancellationToken)
+    public async Task<Result<StudySessionResponse>> Handle(ChangeStudySessionMaterialCommand request, CancellationToken cancellationToken)
     {
-        ChangeStudySessionSettingsRequest settings = request.Request;
-        if (settings.Mode is null && settings.SubjectId is null && settings.FocusDurationMinutes is null)
-            return Error.Validation("StudySessions.NoSettingsProvided", "Provide at least one setting to change.");
-
-        Result<Student> studentResult = await GetCurrentStudentAsync(includeSubjects: settings.SubjectId is not null);
-        if (studentResult.IsError) return studentResult.TopError;
-        Result<StudySession> sessionResult = await GetSessionAsync(request.SessionId, studentResult.Value);
+        Result<StudySession> sessionResult = await GetSessionAsync(request.SessionId);
         if (sessionResult.IsError) return sessionResult.TopError;
-        StudySession session = sessionResult.Value;
-
-        if (settings.Mode is not null)
-        {
-            if (!Enum.IsDefined(settings.Mode.Value)) return StudySessionErrors.InvalidMode;
-            Result<Success> result = session.SetMode((DomainStudySessionMode)settings.Mode.Value);
-            if (result.IsError) return result.TopError;
-        }
-
-        if (settings.SubjectId is not null)
-        {
-            var subject = studentResult.Value.Subjects.SingleOrDefault(item => item.Id == settings.SubjectId.Value);
-            if (subject is null) return Error.Validation("StudySessions.InvalidSubject", "The selected subject does not belong to the student.");
-            Result<Success> result = session.SetSubject(subject);
-            if (result.IsError) return result.TopError;
-        }
-
-        if (settings.FocusDurationMinutes is not null)
-        {
-            Result<Success> result = session.SetDuration(settings.FocusDurationMinutes.Value);
-            if (result.IsError) return result.TopError;
-        }
-
-        return await SaveAsync(Result.Success, session);
-    }
-
-    public async Task<Result<StudySessionResponse>> Handle(MarkStudySessionReadyCommand request, CancellationToken cancellationToken)
-    {
-        Result<StudySession> sessionResult = await GetSessionAsync(request.SessionId, includeMaterial: true);
-        if (sessionResult.IsError) return sessionResult.TopError;
-        return await SaveAsync(sessionResult.Value.MarkReady(), sessionResult.Value);
+        StudyMaterial? material = await materialRepository.FirstOrDefaultAsync(
+            item => item.Id == request.Request.StudyMaterialId
+                && item.StudentId == sessionResult.Value.StudentId);
+        if (material is null) return Error.NotFound("StudyMaterials.NotFound", "The study material was not found.");
+        return await SaveAsync(sessionResult.Value.SetStudyMaterial(material), sessionResult.Value);
     }
 
     public async Task<Result<StudySessionResponse>> Handle(StartStudySessionCommand request, CancellationToken cancellationToken)
     {
         Result<StudySession> sessionResult = await GetSessionAsync(request.SessionId, includeMaterial: true);
         if (sessionResult.IsError) return sessionResult.TopError;
-        return await SaveAsync(sessionResult.Value.Start(), sessionResult.Value);
+        if (sessionResult.Value.Status == StudySessionStatus.Draft)
+        {
+            Result<Success> readyResult = sessionResult.Value.MarkReady();
+            if (readyResult.IsError) return readyResult.TopError;
+        }
+
+        return await SaveAsync(sessionResult.Value.Start(DateTimeOffset.UtcNow), sessionResult.Value);
     }
 
     public async Task<Result<StudySessionResponse>> Handle(UploadStudyMaterialCommand request, CancellationToken cancellationToken)
@@ -194,20 +212,8 @@ public sealed class StudySessionCommandHandler(
         Result<Success> attachResult = sessionResult.Value.SetStudyMaterial(materialResult.Value);
         if (attachResult.IsError) return attachResult.TopError;
 
-        List<StudyMaterialSection> sections = [];
-        foreach (StudyMaterialSectionRequest requestedSection in request.Sections)
-        {
-            Result<StudyMaterialSection> sectionResult = StudyMaterialSection.Create(
-                materialResult.Value.Id,
-                requestedSection.Name,
-                requestedSection.EstimatedDurationMinutes);
-            if (sectionResult.IsError) return sectionResult.TopError;
-            sections.Add(sectionResult.Value);
-        }
-
         materialRepository.Add(materialResult.Value);
-        await sectionRepository.AddRangeAsync(sections);
-        return await SaveAsync(Result.Success, sessionResult.Value, sections);
+        return await SaveAsync(Result.Success, sessionResult.Value);
     }
 
     private async Task<Result<Student>> GetCurrentStudentAsync(bool includeSubjects = false)

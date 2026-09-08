@@ -53,4 +53,16 @@ public sealed class StudentsController(ISender sender) : ApiController
 
         return Problem(result.Errors);
     }
+
+    [HttpPost("me/subjects")]
+    public async Task<IActionResult> CreateCustomSubject(
+        [FromBody] CreateCustomStudentSubjectRequest request,
+        CancellationToken cancellationToken)
+    {
+        var result = await sender.Send(
+            new CreateCustomStudentSubjectCommand(request),
+            cancellationToken);
+
+        return result.IsSuccess ? Ok(result.Value) : Problem(result.Errors);
+    }
 }

@@ -55,9 +55,10 @@ public class StudySessionTests
     {
         StudySession session = StudySession.Create(Guid.NewGuid(), StudySessionMode.Digital).Value;
 
-        Result<Success> result = session.Start();
+        Result<Success> result = session.Start(new DateTimeOffset(2026, 9, 8, 10, 30, 0, TimeSpan.Zero));
 
         Assert.True(result.IsError);
+        Assert.Equal(StudySessionErrors.NotReady.Code, result.TopError.Code);
         Assert.Equal(StudySessionStatus.Draft, session.Status);
     }
 
@@ -81,9 +82,11 @@ public class StudySessionTests
     public void ReadySession_CanStartAndBecomesActive()
     {
         StudySession session = CreateReadyDigitalSession();
+        DateTimeOffset startedAtUtc = new(2026, 9, 8, 10, 30, 0, TimeSpan.Zero);
 
-        Assert.True(session.Start().IsSuccess);
+        Assert.True(session.Start(startedAtUtc).IsSuccess);
         Assert.Equal(StudySessionStatus.Active, session.Status);
+        Assert.Equal(startedAtUtc, session.StartedAtUtc);
     }
 
     [Fact]
