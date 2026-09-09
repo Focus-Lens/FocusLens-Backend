@@ -14,7 +14,8 @@ public static class StudentEnumMapper
         ContractStudentGoal.FocusBetter => DomainStudentGoal.FocusBetter,
         ContractStudentGoal.CatchUp => DomainStudentGoal.CatchUp,
         ContractStudentGoal.PrepareForExams => DomainStudentGoal.PrepareForExams,
-        ContractStudentGoal.BuildARoutine => DomainStudentGoal.BuildARoutine
+        ContractStudentGoal.BuildARoutine => DomainStudentGoal.BuildARoutine,
+        _ => throw new ArgumentOutOfRangeException(nameof(value), value, "Unsupported student goal.")
     };
 
     public static DomainStudentGoal? ToDomain(ContractStudentGoal? value)
@@ -30,7 +31,8 @@ public static class StudentEnumMapper
         ContractStudentGrade.Grade10 => DomainStudentGrade.Grade10,
         ContractStudentGrade.Grade11 => DomainStudentGrade.Grade11,
         ContractStudentGrade.Grade12 => DomainStudentGrade.Grade12,
-        ContractStudentGrade.Other => DomainStudentGrade.Other
+        ContractStudentGrade.Other => DomainStudentGrade.Other,
+        _ => throw new ArgumentOutOfRangeException(nameof(value), value, "Unsupported student grade.")
     };
 
     public static DomainStudentGrade? ToDomain(ContractStudentGrade? value)
@@ -47,7 +49,8 @@ public static class StudentEnumMapper
         ContractStudentSubjectType.Geography => DomainStudentSubjectType.Geography,
         ContractStudentSubjectType.Languages => DomainStudentSubjectType.Languages,
         ContractStudentSubjectType.ComputerScience => DomainStudentSubjectType.ComputerScience,
-        ContractStudentSubjectType.Other => DomainStudentSubjectType.Other
+        ContractStudentSubjectType.Other => DomainStudentSubjectType.Other,
+        _ => throw new ArgumentOutOfRangeException(nameof(value), value, "Unsupported student subject type.")
     };
 
     public static ContractStudentGoal ToContract(DomainStudentGoal value) => value switch
@@ -55,7 +58,8 @@ public static class StudentEnumMapper
         DomainStudentGoal.FocusBetter => ContractStudentGoal.FocusBetter,
         DomainStudentGoal.CatchUp => ContractStudentGoal.CatchUp,
         DomainStudentGoal.PrepareForExams => ContractStudentGoal.PrepareForExams,
-        DomainStudentGoal.BuildARoutine => ContractStudentGoal.BuildARoutine
+        DomainStudentGoal.BuildARoutine => ContractStudentGoal.BuildARoutine,
+        _ => throw new ArgumentOutOfRangeException(nameof(value), value, "Unsupported student goal.")
     };
 
     public static ContractStudentGrade ToContract(DomainStudentGrade value) => value switch
@@ -68,7 +72,8 @@ public static class StudentEnumMapper
         DomainStudentGrade.Grade10 => ContractStudentGrade.Grade10,
         DomainStudentGrade.Grade11 => ContractStudentGrade.Grade11,
         DomainStudentGrade.Grade12 => ContractStudentGrade.Grade12,
-        DomainStudentGrade.Other => ContractStudentGrade.Other
+        DomainStudentGrade.Other => ContractStudentGrade.Other,
+        _ => throw new ArgumentOutOfRangeException(nameof(value), value, "Unsupported student grade.")
     };
 
     public static ContractStudentSubjectType ToContract(DomainStudentSubjectType value) => value switch
@@ -82,6 +87,7 @@ public static class StudentEnumMapper
         DomainStudentSubjectType.Geography => ContractStudentSubjectType.Geography,
         DomainStudentSubjectType.Languages => ContractStudentSubjectType.Languages,
         DomainStudentSubjectType.ComputerScience => ContractStudentSubjectType.ComputerScience,
-        DomainStudentSubjectType.Other => ContractStudentSubjectType.Other
+        DomainStudentSubjectType.Other => ContractStudentSubjectType.Other,
+        _ => throw new ArgumentOutOfRangeException(nameof(value), value, "Unsupported student subject type.")
     };
 }

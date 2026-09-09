@@ -23,14 +23,14 @@ public sealed class StudySessionCommandHandler(
     ICurrentUser currentUser,
     IUnitOfWork unitOfWork)
     : IRequestHandler<CreateStudySessionCommand, Result<StudySessionResponse>>,
-        IRequestHandler<SetStudySessionModeCommand, Result<StudySessionResponse>>,
-        IRequestHandler<SetStudySessionSubjectCommand, Result<StudySessionResponse>>,
-        IRequestHandler<SetStudySessionDurationCommand, Result<StudySessionResponse>>,
+        IRequestHandler<SetStudySessionModeCommand, Result<Success>>,
+        IRequestHandler<SetStudySessionSubjectCommand, Result<Success>>,
+        IRequestHandler<SetStudySessionDurationCommand, Result<Success>>,
         IRequestHandler<SetStudySessionSelectionCommand, Result<StudySessionSelectionResponse>>,
         IRequestHandler<UpdateStudySessionSelectionCommand, Result<StudySessionSelectionResponse>>,
         IRequestHandler<ReceiveStudySessionSectionsCommand, Result<StudySessionResponse>>,
         IRequestHandler<ChangeStudySessionMaterialCommand, Result<StudyMaterialResponse>>,
-        IRequestHandler<StartStudySessionCommand, Result<StudySessionResponse>>,
+        IRequestHandler<StartStudySessionCommand, Result<Success>>,
         IRequestHandler<UploadStudyMaterialCommand, Result<StudyMaterialResponse>>
 {
     public async Task<Result<StudySessionResponse>> Handle(CreateStudySessionCommand request, CancellationToken cancellationToken)
@@ -51,15 +51,15 @@ public sealed class StudySessionCommandHandler(
         return sessionResult.Value.ToResponse();
     }
 
-    public async Task<Result<StudySessionResponse>> Handle(SetStudySessionModeCommand request, CancellationToken cancellationToken)
+    public async Task<Result<Success>> Handle(SetStudySessionModeCommand request, CancellationToken cancellationToken)
     {
         Result<StudySession> sessionResult = await GetSessionAsync(request.SessionId);
         if (sessionResult.IsError) return sessionResult.TopError;
         if (!Enum.IsDefined(request.Request.Mode)) return StudySessionErrors.InvalidMode;
-        return await SaveSessionAsync(sessionResult.Value.SetMode((DomainStudySessionMode)request.Request.Mode), sessionResult.Value);
+        return await SaveSessionAsync(sessionResult.Value.SetMode((DomainStudySessionMode)request.Request.Mode));
     }
 
-    public async Task<Result<StudySessionResponse>> Handle(SetStudySessionSubjectCommand request, CancellationToken cancellationToken)
+    public async Task<Result<Success>> Handle(SetStudySessionSubjectCommand request, CancellationToken cancellationToken)
     {
         Result<Student> studentResult = await GetCurrentStudentAsync(includeSubjects: true);
         if (studentResult.IsError) return studentResult.TopError;
@@ -67,13 +67,13 @@ public sealed class StudySessionCommandHandler(
         if (sessionResult.IsError) return sessionResult.TopError;
         StudentSubject? subject = studentResult.Value.Subjects.SingleOrDefault(item => item.Id == request.Request.SubjectId);
         if (subject is null) return Error.Validation("StudySessions.InvalidSubject", "The selected subject does not belong to the student.");
-        return await SaveSessionAsync(sessionResult.Value.SetSubject(subject), sessionResult.Value);
+        return await SaveSessionAsync(sessionResult.Value.SetSubject(subject));
     }
 
-    public async Task<Result<StudySessionResponse>> Handle(SetStudySessionDurationCommand request, CancellationToken cancellationToken)
+    public async Task<Result<Success>> Handle(SetStudySessionDurationCommand request, CancellationToken cancellationToken)
     {
         Result<StudySession> sessionResult = await GetSessionAsync(request.SessionId);
-        return sessionResult.IsError ? sessionResult.TopError : await SaveSessionAsync(sessionResult.Value.SetDuration(request.Request.FocusDurationMinutes), sessionResult.Value);
+        return sessionResult.IsError ? sessionResult.TopError : await SaveSessionAsync(sessionResult.Value.SetDuration(request.Request.FocusDurationMinutes));
     }
 
     public async Task<Result<StudySessionSelectionResponse>> Handle(SetStudySessionSelectionCommand request, CancellationToken cancellationToken)
@@ -177,7 +177,7 @@ public sealed class StudySessionCommandHandler(
     public async Task<Result<StudyMaterialResponse>> Handle(ChangeStudySessionMaterialCommand request, CancellationToken cancellationToken)
         => await UploadMaterialAsync(request.SessionId, request.FileName, request.FileSizeBytes, request.Content, request.Source, true, cancellationToken);
 
-    public async Task<Result<StudySessionResponse>> Handle(StartStudySessionCommand request, CancellationToken cancellationToken)
+    public async Task<Result<Success>> Handle(StartStudySessionCommand request, CancellationToken cancellationToken)
     {
         Result<StudySession> sessionResult = await GetSessionAsync(request.SessionId, includeMaterial: true);
         if (sessionResult.IsError) return sessionResult.TopError;
@@ -186,7 +186,7 @@ public sealed class StudySessionCommandHandler(
             Result<Success> readyResult = sessionResult.Value.MarkReady();
             if (readyResult.IsError) return readyResult.TopError;
         }
-        return await SaveSessionAsync(sessionResult.Value.Start(DateTimeOffset.UtcNow), sessionResult.Value);
+        return await SaveSessionAsync(sessionResult.Value.Start(DateTimeOffset.UtcNow));
     }
 
     public async Task<Result<StudyMaterialResponse>> Handle(UploadStudyMaterialCommand request, CancellationToken cancellationToken)
@@ -269,5 +269,12 @@ public sealed class StudySessionCommandHandler(
         if (result.IsError) return result.TopError;
         await unitOfWork.SaveChangesAsync();
         return session.ToResponse();
+    }
+
+    private async Task<Result<Success>> SaveSessionAsync(Result<Success> result)
+    {
+        if (result.IsError) return result.TopError;
+        await unitOfWork.SaveChangesAsync();
+        return Result.Success;
     }
 }

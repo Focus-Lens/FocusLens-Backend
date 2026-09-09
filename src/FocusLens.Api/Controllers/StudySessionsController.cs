@@ -19,15 +19,24 @@ public sealed class StudySessionsController(ISender sender) : ApiController
 
     [HttpPut("{sessionId:guid}/mode")]
     public async Task<IActionResult> SetMode(Guid sessionId, [FromBody] SetStudySessionModeRequest request, CancellationToken cancellationToken)
-        => ToActionResult(await sender.Send(new SetStudySessionModeCommand(sessionId, request), cancellationToken));
+    {
+        var result = await sender.Send(new SetStudySessionModeCommand(sessionId, request), cancellationToken);
+        return result.Match(_ => NoContent(), Problem);
+    }
 
     [HttpPut("{sessionId:guid}/subject")]
     public async Task<IActionResult> SetSubject(Guid sessionId, [FromBody] SetStudySessionSubjectRequest request, CancellationToken cancellationToken)
-        => ToActionResult(await sender.Send(new SetStudySessionSubjectCommand(sessionId, request), cancellationToken));
+    {
+        var result = await sender.Send(new SetStudySessionSubjectCommand(sessionId, request), cancellationToken);
+        return result.Match(_ => NoContent(), Problem);
+    }
 
     [HttpPut("{sessionId:guid}/duration")]
     public async Task<IActionResult> SetDuration(Guid sessionId, [FromBody] SetStudySessionDurationRequest request, CancellationToken cancellationToken)
-        => ToActionResult(await sender.Send(new SetStudySessionDurationCommand(sessionId, request), cancellationToken));
+    {
+        var result = await sender.Send(new SetStudySessionDurationCommand(sessionId, request), cancellationToken);
+        return result.Match(_ => NoContent(), Problem);
+    }
 
     [HttpPost("{sessionId:guid}/selection")]
     public async Task<IActionResult> SetSelection(Guid sessionId, [FromBody] SetStudySessionSelectionRequest request, CancellationToken cancellationToken)
@@ -64,7 +73,10 @@ public sealed class StudySessionsController(ISender sender) : ApiController
 
     [HttpPost("{sessionId:guid}/start")]
     public async Task<IActionResult> Start(Guid sessionId, CancellationToken cancellationToken)
-        => ToActionResult(await sender.Send(new StartStudySessionCommand(sessionId), cancellationToken));
+    {
+        var result = await sender.Send(new StartStudySessionCommand(sessionId), cancellationToken);
+        return result.Match(_ => NoContent(), Problem);
+    }
 
     [HttpPost("{sessionId:guid}/upload-material")]
     [Consumes("multipart/form-data")]

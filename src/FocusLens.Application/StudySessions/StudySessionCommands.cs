@@ -8,13 +8,13 @@ public sealed record CreateStudySessionCommand(CreateStudySessionRequest Request
     : IRequest<Result<StudySessionResponse>>;
 
 public sealed record SetStudySessionModeCommand(Guid SessionId, SetStudySessionModeRequest Request)
-    : IRequest<Result<StudySessionResponse>>;
+    : IRequest<Result<Success>>;
 
 public sealed record SetStudySessionSubjectCommand(Guid SessionId, SetStudySessionSubjectRequest Request)
-    : IRequest<Result<StudySessionResponse>>;
+    : IRequest<Result<Success>>;
 
 public sealed record SetStudySessionDurationCommand(Guid SessionId, SetStudySessionDurationRequest Request)
-    : IRequest<Result<StudySessionResponse>>;
+    : IRequest<Result<Success>>;
 
 public sealed record SetStudySessionSelectionCommand(Guid SessionId, SetStudySessionSelectionRequest Request)
     : IRequest<Result<StudySessionSelectionResponse>>;
@@ -34,7 +34,7 @@ public sealed record ChangeStudySessionMaterialCommand(
     : IRequest<Result<StudyMaterialResponse>>;
 
 public sealed record StartStudySessionCommand(Guid SessionId)
-    : IRequest<Result<StudySessionResponse>>;
+    : IRequest<Result<Success>>;
 
 public sealed record UploadStudyMaterialCommand(
     Guid SessionId,

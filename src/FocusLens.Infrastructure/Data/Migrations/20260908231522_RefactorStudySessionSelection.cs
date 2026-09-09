@@ -55,9 +55,14 @@ public partial class RefactorStudySessionSelection : Migration
         migrationBuilder.Sql("""
             INSERT INTO StudySessionSelections
                 (Id, StudySessionId, StudyMaterialId, FromPage, ToPage, DerivedStorageReference, CreatedAtUtc, CreatedBy, LastModifiedUtc, LastModifiedBy)
-            SELECT NEWID(), Id, StudyMaterialId, FromPage, ToPage, DerivedStorageReference, CreatedAtUtc, CreatedBy, LastModifiedUtc, LastModifiedBy
-            FROM StudySessions
-            WHERE StudyMaterialId IS NOT NULL AND FromPage IS NOT NULL AND ToPage IS NOT NULL;
+            SELECT NEWID(), sessions.Id, sessions.StudyMaterialId, sessions.FromPage, sessions.ToPage,
+                   materials.DerivedStorageReference, sessions.CreatedAtUtc, sessions.CreatedBy,
+                   sessions.LastModifiedUtc, sessions.LastModifiedBy
+            FROM StudySessions AS sessions
+            INNER JOIN StudyMaterials AS materials ON materials.Id = sessions.StudyMaterialId
+            WHERE sessions.StudyMaterialId IS NOT NULL
+              AND sessions.FromPage IS NOT NULL
+              AND sessions.ToPage IS NOT NULL;
             """);
 
         migrationBuilder.Sql("""
