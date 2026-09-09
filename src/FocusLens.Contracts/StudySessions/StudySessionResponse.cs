@@ -6,6 +6,13 @@ public sealed record StudySessionResponse(
     StudySessionMode Mode,
     string Status,
     DateTimeOffset? StartedAtUtc,
+    DateTimeOffset? PausedAtUtc,
+    DateTimeOffset? CompletedAtUtc,
+    DateTimeOffset? CancelledAtUtc,
+    int RemainingSeconds,
+    int? CurrentPage,
+    DateTimeOffset? LastActivityAtUtc,
+    IReadOnlyCollection<Guid> CompletedSectionIds,
     Guid? SelectedSubjectId,
     int? FocusDurationMinutes,
     int EstimatedStudyTimeMinutes);

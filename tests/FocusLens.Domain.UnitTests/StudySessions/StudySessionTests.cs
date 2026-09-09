@@ -90,6 +90,87 @@ public class StudySessionTests
     }
 
     [Fact]
+    public void ActiveSession_PauseAndResume_ExcludesPausedTimeFromRemainingDuration()
+    {
+        StudySession session = CreateReadyDigitalSession();
+        DateTimeOffset startedAt = new(2026, 9, 7, 10, 0, 0, TimeSpan.Zero);
+
+        session.Start(startedAt);
+        Assert.True(session.Pause(startedAt.AddMinutes(10)).IsSuccess);
+        Assert.True(session.Resume(startedAt.AddMinutes(20)).IsSuccess);
+
+        Assert.Equal(StudySessionStatus.Active, session.Status);
+        Assert.Equal(TimeSpan.FromMinutes(10), session.GetRemainingDuration(startedAt.AddMinutes(25)));
+    }
+
+    [Fact]
+    public void PausedSession_CanEndAndBecomesCancelled()
+    {
+        StudySession session = CreateReadyDigitalSession();
+        DateTimeOffset startedAt = new(2026, 9, 7, 10, 0, 0, TimeSpan.Zero);
+
+        session.Start(startedAt);
+        session.Pause(startedAt.AddMinutes(5));
+
+        Assert.True(session.End(startedAt.AddMinutes(20)).IsSuccess);
+        Assert.Equal(StudySessionStatus.Cancelled, session.Status);
+        Assert.Equal(startedAt.AddMinutes(20), session.CancelledAtUtc);
+    }
+
+    [Fact]
+    public void ActiveSession_WhenDurationElapses_CompletesOnObservation()
+    {
+        StudySession session = CreateReadyDigitalSession();
+        DateTimeOffset startedAt = new(2026, 9, 7, 10, 0, 0, TimeSpan.Zero);
+
+        session.Start(startedAt);
+
+        Assert.True(session.CompleteIfElapsed(startedAt.AddMinutes(25)));
+        Assert.Equal(StudySessionStatus.Completed, session.Status);
+        Assert.Equal(startedAt.AddMinutes(25), session.CompletedAtUtc);
+        Assert.Equal(TimeSpan.Zero, session.GetRemainingDuration(startedAt.AddMinutes(25)));
+    }
+
+    [Fact]
+    public void PausedSession_DoesNotExpireWhilePaused()
+    {
+        StudySession session = CreateReadyDigitalSession();
+        DateTimeOffset startedAt = new(2026, 9, 7, 10, 0, 0, TimeSpan.Zero);
+
+        session.Start(startedAt);
+        session.Pause(startedAt.AddMinutes(10));
+
+        Assert.False(session.CompleteIfElapsed(startedAt.AddHours(1)));
+        Assert.Equal(StudySessionStatus.Paused, session.Status);
+        Assert.Equal(TimeSpan.FromMinutes(15), session.GetRemainingDuration(startedAt.AddHours(1)));
+    }
+
+    [Fact]
+    public void ActiveSession_UpdatesOnlyConfiguredProgress()
+    {
+        StudySession session = CreateReadyDigitalSession();
+        StudyMaterialSection selected = StudyMaterialSection.Create(
+            session.StudyMaterialId!.Value, "Chapter 1", 15).Value;
+        StudySessionSelection selection = StudySessionSelection.Create(
+            session,
+            session.Material,
+            2,
+            10).Value;
+        session.SetSelection(selection);
+        session.SetSelectedSections([selected]);
+        session.MarkReady();
+        DateTimeOffset now = new(2026, 9, 7, 10, 0, 0, TimeSpan.Zero);
+        session.Start(now);
+
+        Result<Success> result = session.UpdateProgress(5, [selected.Id], now.AddMinutes(2));
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(5, session.CurrentPage);
+        Assert.Equal(selected.Id, Assert.Single(session.CompletedSections).StudyMaterialSectionId);
+        Assert.Equal(now.AddMinutes(2), session.LastActivityAtUtc);
+    }
+
+    [Fact]
     public void ChangingDuration_PreservesMaterialAndSections()
     {
         StudySession session = CreateReadyDigitalSession();

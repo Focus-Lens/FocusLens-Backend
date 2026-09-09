@@ -15,6 +15,12 @@ public sealed class StudySessionConfiguration : IEntityTypeConfiguration<StudySe
         builder.Property(session => session.Status).HasConversion<string>().HasMaxLength(20).IsRequired();
         builder.Property(session => session.StartedAtUtc);
         builder.Property(session => session.FocusDurationMinutes);
+        builder.Property(session => session.PausedAtUtc);
+        builder.Property(session => session.AccumulatedPausedSeconds).IsRequired();
+        builder.Property(session => session.CompletedAtUtc);
+        builder.Property(session => session.CancelledAtUtc);
+        builder.Property(session => session.CurrentPage);
+        builder.Property(session => session.LastActivityAtUtc);
         builder.Property(session => session.SelectedSubjectId);
         builder.Property(session => session.StudyMaterialId);
 
@@ -29,5 +35,9 @@ public sealed class StudySessionConfiguration : IEntityTypeConfiguration<StudySe
             .WithMany()
             .HasForeignKey(session => session.StudyMaterialId)
             .OnDelete(DeleteBehavior.Restrict);
+        builder.HasMany(session => session.CompletedSections)
+            .WithOne()
+            .HasForeignKey(section => section.StudySessionId)
+            .OnDelete(DeleteBehavior.Cascade);
     }
 }

@@ -21,7 +21,8 @@ public sealed class StudySessionCommandHandler(
     IStudyMaterialFileStore fileStore,
     IStudyMaterialPdfProcessor pdfProcessor,
     ICurrentUser currentUser,
-    IUnitOfWork unitOfWork)
+    IUnitOfWork unitOfWork,
+    TimeProvider timeProvider = null!)
     : IRequestHandler<CreateStudySessionCommand, Result<StudySessionResponse>>,
         IRequestHandler<SetStudySessionModeCommand, Result<Success>>,
         IRequestHandler<SetStudySessionSubjectCommand, Result<Success>>,
@@ -31,7 +32,11 @@ public sealed class StudySessionCommandHandler(
         IRequestHandler<ReceiveStudySessionSectionsCommand, Result<StudySessionResponse>>,
         IRequestHandler<ChangeStudySessionMaterialCommand, Result<StudyMaterialResponse>>,
         IRequestHandler<StartStudySessionCommand, Result<Success>>,
-        IRequestHandler<UploadStudyMaterialCommand, Result<StudyMaterialResponse>>
+        IRequestHandler<UploadStudyMaterialCommand, Result<StudyMaterialResponse>>,
+        IRequestHandler<PauseStudySessionCommand, Result<StudySessionResponse>>,
+        IRequestHandler<ResumeStudySessionCommand, Result<StudySessionResponse>>,
+        IRequestHandler<EndStudySessionCommand, Result<StudySessionResponse>>,
+        IRequestHandler<UpdateStudySessionProgressCommand, Result<StudySessionResponse>>
 {
     public async Task<Result<StudySessionResponse>> Handle(CreateStudySessionCommand request, CancellationToken cancellationToken)
     {
@@ -48,7 +53,7 @@ public sealed class StudySessionCommandHandler(
         if (durationResult.IsError) return durationResult.TopError;
         studySessionRepository.Add(sessionResult.Value);
         await unitOfWork.SaveChangesAsync();
-        return sessionResult.Value.ToResponse();
+        return sessionResult.Value.ToResponse(timeProvider.GetUtcNow());
     }
 
     public async Task<Result<Success>> Handle(SetStudySessionModeCommand request, CancellationToken cancellationToken)
@@ -186,8 +191,27 @@ public sealed class StudySessionCommandHandler(
             Result<Success> readyResult = sessionResult.Value.MarkReady();
             if (readyResult.IsError) return readyResult.TopError;
         }
-        return await SaveSessionAsync(sessionResult.Value.Start(DateTimeOffset.UtcNow));
+        return await SaveSessionAsync(sessionResult.Value.Start(timeProvider.GetUtcNow()));
     }
+
+    public Task<Result<StudySessionResponse>> Handle(PauseStudySessionCommand request, CancellationToken cancellationToken)
+        => HandleRuntimeAsync(request.SessionId, session => session.Pause(timeProvider.GetUtcNow()));
+
+    public Task<Result<StudySessionResponse>> Handle(ResumeStudySessionCommand request, CancellationToken cancellationToken)
+        => HandleRuntimeAsync(request.SessionId, session => session.Resume(timeProvider.GetUtcNow()));
+
+    public Task<Result<StudySessionResponse>> Handle(EndStudySessionCommand request, CancellationToken cancellationToken)
+        => HandleRuntimeAsync(request.SessionId, session => session.End(timeProvider.GetUtcNow()));
+
+    public Task<Result<StudySessionResponse>> Handle(
+        UpdateStudySessionProgressCommand request,
+        CancellationToken cancellationToken)
+        => HandleRuntimeAsync(
+            request.SessionId,
+            session => session.UpdateProgress(
+                request.Request.CurrentPage,
+                request.Request.CompletedSectionIds,
+                timeProvider.GetUtcNow()));
 
     public async Task<Result<StudyMaterialResponse>> Handle(UploadStudyMaterialCommand request, CancellationToken cancellationToken)
         => await UploadMaterialAsync(request.SessionId, request.FileName, request.FileSizeBytes, request.Content, request.Source, false, cancellationToken);
@@ -257,10 +281,10 @@ public sealed class StudySessionCommandHandler(
         Result<Student> studentResult = knownStudent is null ? await GetCurrentStudentAsync() : knownStudent;
         if (studentResult.IsError) return studentResult.TopError;
         StudySession? session = includeMaterial && includeSelection
-            ? await studySessionRepository.FirstOrDefaultAsync(item => item.Id == sessionId && item.StudentId == studentResult.Value.Id, item => item.Material!, item => item.Selection!)
+            ? await studySessionRepository.FirstOrDefaultAsync(item => item.Id == sessionId && item.StudentId == studentResult.Value.Id, item => item.Material!, item => item.Selection!, item => item.CompletedSections)
             : includeMaterial
-                ? await studySessionRepository.FirstOrDefaultAsync(item => item.Id == sessionId && item.StudentId == studentResult.Value.Id, item => item.Material!)
-                : await studySessionRepository.FirstOrDefaultAsync(item => item.Id == sessionId && item.StudentId == studentResult.Value.Id);
+                ? await studySessionRepository.FirstOrDefaultAsync(item => item.Id == sessionId && item.StudentId == studentResult.Value.Id, item => item.Material!, item => item.Selection!, item => item.CompletedSections)
+                : await studySessionRepository.FirstOrDefaultAsync(item => item.Id == sessionId && item.StudentId == studentResult.Value.Id, item => item.Selection!, item => item.CompletedSections);
         return session is null ? Error.NotFound("StudySessions.NotFound", "The study session was not found.") : session;
     }
 
@@ -268,7 +292,31 @@ public sealed class StudySessionCommandHandler(
     {
         if (result.IsError) return result.TopError;
         await unitOfWork.SaveChangesAsync();
-        return session.ToResponse();
+        return session.ToResponse(timeProvider.GetUtcNow());
+    }
+
+    private async Task<Result<StudySessionResponse>> HandleRuntimeAsync(
+        Guid sessionId,
+        Func<StudySession, Result<Success>> operation)
+    {
+        Result<StudySession> sessionResult = await GetSessionAsync(sessionId, includeMaterial: true);
+        if (sessionResult.IsError) return sessionResult.TopError;
+
+        StudySession session = sessionResult.Value;
+        bool completedNaturally = session.CompleteIfElapsed(timeProvider.GetUtcNow());
+        Result<Success> result = operation(session);
+        if (result.IsError)
+        {
+            if (completedNaturally)
+            {
+                await unitOfWork.SaveChangesAsync();
+            }
+
+            return result.TopError;
+        }
+
+        await unitOfWork.SaveChangesAsync();
+        return session.ToResponse(timeProvider.GetUtcNow());
     }
 
     private async Task<Result<Success>> SaveSessionAsync(Result<Success> result)

@@ -381,6 +381,18 @@ namespace FocusLens.Infrastructure.Data.Migrations
                     b.Property<DateTimeOffset>("CreatedAtUtc")
                         .HasColumnType("datetimeoffset");
 
+                    b.Property<int>("AccumulatedPausedSeconds")
+                        .HasColumnType("int");
+
+                    b.Property<DateTimeOffset?>("CancelledAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<DateTimeOffset?>("CompletedAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<int?>("CurrentPage")
+                        .HasColumnType("int");
+
                     b.Property<string>("CreatedBy")
                         .HasColumnType("nvarchar(max)");
 
@@ -393,10 +405,16 @@ namespace FocusLens.Infrastructure.Data.Migrations
                     b.Property<DateTimeOffset>("LastModifiedUtc")
                         .HasColumnType("datetimeoffset");
 
+                    b.Property<DateTimeOffset?>("LastActivityAtUtc")
+                        .HasColumnType("datetimeoffset");
+
                     b.Property<string>("Mode")
                         .IsRequired()
                         .HasMaxLength(20)
                         .HasColumnType("nvarchar(20)");
+
+                    b.Property<DateTimeOffset?>("PausedAtUtc")
+                        .HasColumnType("datetimeoffset");
 
                     b.Property<Guid?>("SelectedSubjectId")
                         .HasColumnType("uniqueidentifier");
@@ -422,6 +440,28 @@ namespace FocusLens.Infrastructure.Data.Migrations
                     b.HasIndex("StudentId", "Status");
 
                     b.ToTable("StudySessions", (string)null);
+                });
+
+            modelBuilder.Entity("FocusLens.Domain.StudySessions.StudySessionCompletedSection", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("StudyMaterialSectionId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("StudySessionId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("StudyMaterialSectionId");
+
+                    b.HasIndex("StudySessionId", "StudyMaterialSectionId")
+                        .IsUnique();
+
+                    b.ToTable("StudySessionCompletedSections", (string)null);
                 });
 
             modelBuilder.Entity("FocusLens.Domain.StudySessions.StudySessionSelectedSection", b =>
@@ -747,6 +787,21 @@ namespace FocusLens.Infrastructure.Data.Migrations
                     b.Navigation("Material");
                 });
 
+            modelBuilder.Entity("FocusLens.Domain.StudySessions.StudySessionCompletedSection", b =>
+                {
+                    b.HasOne("FocusLens.Domain.StudySessions.StudyMaterialSection", null)
+                        .WithMany()
+                        .HasForeignKey("StudyMaterialSectionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("FocusLens.Domain.StudySessions.StudySession", null)
+                        .WithMany("CompletedSections")
+                        .HasForeignKey("StudySessionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("FocusLens.Domain.StudySessions.StudySessionSelectedSection", b =>
                 {
                     b.HasOne("FocusLens.Domain.StudySessions.StudyMaterialSection", null)
@@ -837,6 +892,8 @@ namespace FocusLens.Infrastructure.Data.Migrations
 
             modelBuilder.Entity("FocusLens.Domain.StudySessions.StudySession", b =>
                 {
+                    b.Navigation("CompletedSections");
+
                     b.Navigation("Selection");
                 });
 

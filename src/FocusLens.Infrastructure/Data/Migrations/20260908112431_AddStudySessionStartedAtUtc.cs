@@ -11,19 +11,23 @@ namespace FocusLens.Infrastructure.Data.Migrations
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.AddColumn<DateTimeOffset>(
-                name: "StartedAtUtc",
-                table: "StudySessions",
-                type: "datetimeoffset",
-                nullable: true);
+            migrationBuilder.Sql("""
+                IF COL_LENGTH(N'[StudySessions]', N'StartedAtUtc') IS NULL
+                BEGIN
+                    ALTER TABLE [StudySessions] ADD [StartedAtUtc] datetimeoffset NULL;
+                END
+                """);
         }
 
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.DropColumn(
-                name: "StartedAtUtc",
-                table: "StudySessions");
+            migrationBuilder.Sql("""
+                IF COL_LENGTH(N'[StudySessions]', N'StartedAtUtc') IS NOT NULL
+                BEGIN
+                    ALTER TABLE [StudySessions] DROP COLUMN [StartedAtUtc];
+                END
+                """);
         }
     }
 }

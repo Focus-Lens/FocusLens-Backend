@@ -18,4 +18,9 @@ public static class StudySessionErrors
     public static readonly Error DuplicateSection = Error.Validation("StudySessions.DuplicateSection", "A section can only be selected once.");
     public static readonly Error NotReady = Error.Conflict("StudySessions.NotReady", "Complete the study session setup before starting.");
     public static readonly Error NotConfigurable = Error.Conflict("StudySessions.NotConfigurable", "Only draft or ready study sessions can be configured.");
+    public static readonly Error NotActive = Error.Conflict("StudySessions.NotActive", "Only an active study session can perform this operation.");
+    public static readonly Error NotPaused = Error.Conflict("StudySessions.NotPaused", "Only a paused study session can be resumed.");
+    public static readonly Error NotInProgress = Error.Conflict("StudySessions.NotInProgress", "Only an active or paused study session can be ended.");
+    public static readonly Error AlreadyCompleted = Error.Conflict("StudySessions.AlreadyCompleted", "The study session has already completed.");
+    public static readonly Error CurrentPageOutsideRange = Error.Validation("StudySessions.CurrentPageOutsideRange", "The current page must be within the selected page range.");
 }

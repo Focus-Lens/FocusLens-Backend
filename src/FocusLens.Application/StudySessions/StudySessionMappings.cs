@@ -7,13 +7,20 @@ namespace FocusLens.Application.StudySessions;
 
 internal static class StudySessionMappings
 {
-    public static StudySessionResponse ToResponse(this StudySession session)
+    public static StudySessionResponse ToResponse(this StudySession session, DateTimeOffset utcNow)
         => new(
             session.Id,
             session.StudentId,
             (ContractStudySessionMode)session.Mode,
             session.Status.ToString(),
             session.StartedAtUtc,
+            session.PausedAtUtc,
+            session.CompletedAtUtc,
+            session.CancelledAtUtc,
+            (int)Math.Ceiling(session.GetRemainingDuration(utcNow).TotalSeconds),
+            session.CurrentPage,
+            session.LastActivityAtUtc,
+            session.CompletedSections.Select(section => section.StudyMaterialSectionId).ToArray(),
             session.SelectedSubjectId,
             session.FocusDurationMinutes,
             session.EstimatedStudyTimeMinutes);

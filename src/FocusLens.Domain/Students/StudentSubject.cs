@@ -4,13 +4,9 @@ namespace FocusLens.Domain.Students;
 
 public sealed class StudentSubject : Entity
 {
-    private StudentSubject()
-    {
-    }
+    private StudentSubject() { }
 
-    private StudentSubject(
-        StudentSubjectType type,
-        string? customName)
+    private StudentSubject(StudentSubjectType type, string? customName)
         : base(Guid.CreateVersion7())
     {
         Type = type;
@@ -25,9 +21,7 @@ public sealed class StudentSubject : Entity
     {
         if (type == StudentSubjectType.Other)
         {
-            throw new ArgumentException(
-                "Use Custom() for an Other subject.",
-                nameof(type));
+            throw new ArgumentException("Use Custom() for an Other subject.", nameof(type));
         }
 
         return new StudentSubject(type, null);
@@ -37,13 +31,9 @@ public sealed class StudentSubject : Entity
     {
         if (string.IsNullOrWhiteSpace(name))
         {
-            throw new ArgumentException(
-                "Custom subject name is required.",
-                nameof(name));
+            throw new ArgumentException("Custom subject name is required.", nameof(name));
         }
 
-        return new StudentSubject(
-            StudentSubjectType.Other,
-            name.Trim());
+        return new StudentSubject(StudentSubjectType.Other, name.Trim());
     }
 }

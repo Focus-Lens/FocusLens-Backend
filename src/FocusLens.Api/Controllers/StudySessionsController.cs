@@ -14,8 +14,21 @@ public sealed class StudySessionsController(ISender sender) : ApiController
     [HttpPost]
     public async Task<IActionResult> Create(
         [FromBody] CreateStudySessionRequest request,
-        CancellationToken cancellationToken)
-        => ToActionResult(await sender.Send(new CreateStudySessionCommand(request), cancellationToken));
+        CancellationToken cancellationToken
+    ) =>
+        ToActionResult(
+            await sender.Send(new CreateStudySessionCommand(request), cancellationToken)
+        );
+
+    [HttpGet("{sessionId:guid}")]
+    public async Task<IActionResult> Get(Guid sessionId, CancellationToken cancellationToken)
+    {
+        StudySessionResponse? session = await sender.Send(
+            new GetStudySessionQuery(sessionId),
+            cancellationToken
+        );
+        return session is null ? NotFound() : Ok(session);
+    }
 
     [HttpPut("{sessionId:guid}/mode")]
     public async Task<IActionResult> SetMode(Guid sessionId, [FromBody] SetStudySessionModeRequest request, CancellationToken cancellationToken)
@@ -39,16 +52,43 @@ public sealed class StudySessionsController(ISender sender) : ApiController
     }
 
     [HttpPost("{sessionId:guid}/selection")]
-    public async Task<IActionResult> SetSelection(Guid sessionId, [FromBody] SetStudySessionSelectionRequest request, CancellationToken cancellationToken)
-        => ToActionResult(await sender.Send(new SetStudySessionSelectionCommand(sessionId, request), cancellationToken));
+    public async Task<IActionResult> SetSelection(
+        Guid sessionId,
+        [FromBody] SetStudySessionSelectionRequest request,
+        CancellationToken cancellationToken
+    ) =>
+        ToActionResult(
+            await sender.Send(
+                new SetStudySessionSelectionCommand(sessionId, request),
+                cancellationToken
+            )
+        );
 
     [HttpPut("{sessionId:guid}/selection")]
-    public async Task<IActionResult> UpdateSelection(Guid sessionId, [FromBody] SetStudySessionSelectionRequest request, CancellationToken cancellationToken)
-        => ToActionResult(await sender.Send(new UpdateStudySessionSelectionCommand(sessionId, request), cancellationToken));
+    public async Task<IActionResult> UpdateSelection(
+        Guid sessionId,
+        [FromBody] SetStudySessionSelectionRequest request,
+        CancellationToken cancellationToken
+    ) =>
+        ToActionResult(
+            await sender.Send(
+                new UpdateStudySessionSelectionCommand(sessionId, request),
+                cancellationToken
+            )
+        );
 
     [HttpPost("{sessionId:guid}/sections")]
-    public async Task<IActionResult> ReceiveSections(Guid sessionId, [FromBody] ReceiveStudySessionSectionsRequest request, CancellationToken cancellationToken)
-        => ToActionResult(await sender.Send(new ReceiveStudySessionSectionsCommand(sessionId, request), cancellationToken));
+    public async Task<IActionResult> ReceiveSections(
+        Guid sessionId,
+        [FromBody] ReceiveStudySessionSectionsRequest request,
+        CancellationToken cancellationToken
+    ) =>
+        ToActionResult(
+            await sender.Send(
+                new ReceiveStudySessionSectionsCommand(sessionId, request),
+                cancellationToken
+            )
+        );
 
     [HttpPut("{sessionId:guid}/material")]
     [Consumes("multipart/form-data")]
@@ -78,20 +118,55 @@ public sealed class StudySessionsController(ISender sender) : ApiController
         return result.Match(_ => NoContent(), Problem);
     }
 
+    [HttpPost("{sessionId:guid}/pause")]
+    public async Task<IActionResult> Pause(Guid sessionId, CancellationToken cancellationToken) =>
+        ToActionResult(
+            await sender.Send(new PauseStudySessionCommand(sessionId), cancellationToken)
+        );
+
+    [HttpPost("{sessionId:guid}/resume")]
+    public async Task<IActionResult> Resume(Guid sessionId, CancellationToken cancellationToken) =>
+        ToActionResult(
+            await sender.Send(new ResumeStudySessionCommand(sessionId), cancellationToken)
+        );
+
+    [HttpPost("{sessionId:guid}/end")]
+    public async Task<IActionResult> End(Guid sessionId, CancellationToken cancellationToken) =>
+        ToActionResult(await sender.Send(new EndStudySessionCommand(sessionId), cancellationToken));
+
+    [HttpPut("{sessionId:guid}/progress")]
+    public async Task<IActionResult> UpdateProgress(
+        Guid sessionId,
+        [FromBody] UpdateStudySessionProgressRequest request,
+        CancellationToken cancellationToken
+    ) =>
+        ToActionResult(
+            await sender.Send(
+                new UpdateStudySessionProgressCommand(sessionId, request),
+                cancellationToken
+            )
+        );
+
     [HttpPost("{sessionId:guid}/upload-material")]
     [Consumes("multipart/form-data")]
     public async Task<IActionResult> UploadMaterial(
         Guid sessionId,
         [FromForm] IFormFile file,
         [FromForm] StudyMaterialSource source,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken
+    )
     {
         if (file.Length == 0)
         {
-            return Problem(new List<FocusLens.Domain.Common.Results.Error>
-            {
-                FocusLens.Domain.Common.Results.Error.Validation("StudyMaterials.EmptyFile", "The uploaded file is empty.")
-            });
+            return Problem(
+                new List<FocusLens.Domain.Common.Results.Error>
+                {
+                    FocusLens.Domain.Common.Results.Error.Validation(
+                        "StudyMaterials.EmptyFile",
+                        "The uploaded file is empty."
+                    ),
+                }
+            );
         }
 
         return ToActionResult(await sender.Send(new UploadStudyMaterialCommand(

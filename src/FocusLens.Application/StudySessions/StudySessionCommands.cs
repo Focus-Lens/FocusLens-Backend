@@ -36,6 +36,20 @@ public sealed record ChangeStudySessionMaterialCommand(
 public sealed record StartStudySessionCommand(Guid SessionId)
     : IRequest<Result<Success>>;
 
+public sealed record PauseStudySessionCommand(Guid SessionId)
+    : IRequest<Result<StudySessionResponse>>;
+
+public sealed record ResumeStudySessionCommand(Guid SessionId)
+    : IRequest<Result<StudySessionResponse>>;
+
+public sealed record EndStudySessionCommand(Guid SessionId)
+    : IRequest<Result<StudySessionResponse>>;
+
+public sealed record UpdateStudySessionProgressCommand(
+    Guid SessionId,
+    UpdateStudySessionProgressRequest Request)
+    : IRequest<Result<StudySessionResponse>>;
+
 public sealed record UploadStudyMaterialCommand(
     Guid SessionId,
     string FileName,

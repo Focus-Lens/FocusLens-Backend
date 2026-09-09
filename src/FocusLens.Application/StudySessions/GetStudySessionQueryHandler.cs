@@ -10,7 +10,9 @@ namespace FocusLens.Application.StudySessions;
 public sealed class GetStudySessionQueryHandler(
     IBaseRepository<Student> studentRepository,
     IBaseRepository<StudySession> studySessionRepository,
-    ICurrentUser currentUser)
+    ICurrentUser currentUser,
+    IUnitOfWork unitOfWork,
+    TimeProvider timeProvider)
     : IRequestHandler<GetStudySessionQuery, StudySessionResponse?>
 {
     public async Task<StudySessionResponse?> Handle(GetStudySessionQuery request, CancellationToken cancellationToken)
@@ -23,8 +25,16 @@ public sealed class GetStudySessionQueryHandler(
 
         StudySession? session = await studySessionRepository.FirstOrDefaultAsync(
             item => item.Id == request.SessionId && item.StudentId == student.Id,
-            item => item.Selection!);
+            item => item.Selection!,
+            item => item.CompletedSections);
         if (session is null) return null;
-        return session.ToResponse();
+
+        DateTimeOffset utcNow = timeProvider.GetUtcNow();
+        if (session.CompleteIfElapsed(utcNow))
+        {
+            await unitOfWork.SaveChangesAsync();
+        }
+
+        return session.ToResponse(utcNow);
     }
 }
