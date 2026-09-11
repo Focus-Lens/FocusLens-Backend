@@ -11,7 +11,8 @@ namespace FocusLens.Application.Access;
 public sealed class AcceptInvitationCommandHandler(
     IBaseRepository<ParentStudentRelationship> relationshipRepository,
     ICurrentUser currentUser,
-    IUnitOfWork unitOfWork)
+    IUnitOfWork unitOfWork,
+    TimeProvider? timeProvider = null)
     : IRequestHandler<AcceptInvitationCommand, Result<InvitationResponse>>
 {
     public async Task<Result<InvitationResponse>> Handle(
@@ -58,7 +59,16 @@ public sealed class AcceptInvitationCommandHandler(
                 "Only a pending invitation can be accepted.");
         }
 
-        relationship.Accept();
+        DateTimeOffset now = (timeProvider ?? TimeProvider.System).GetUtcNow();
+
+        if (relationship.IsExpired(now))
+        {
+            return Error.Conflict(
+                "Access.InvitationExpired",
+                "This invitation has expired. Ask the sender to create a new one.");
+        }
+
+        relationship.Accept(now);
         relationshipRepository.Update(relationship);
         await unitOfWork.SaveChangesAsync();
 

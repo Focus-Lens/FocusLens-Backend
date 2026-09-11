@@ -13,6 +13,8 @@ internal static class AccessMappings
             relationship.ParentId,
             relationship.StudentId,
             relationship.Status.ToString(),
+            relationship.InitiatedBy.ToString(),
+            relationship.ExpiresAtUtc,
             relationship.RevokedAtUtc,
             parentEmail);
 }

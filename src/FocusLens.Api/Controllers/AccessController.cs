@@ -29,6 +29,75 @@ public sealed class AccessController(ISender sender) : ApiController
         return Problem(result.Errors);
     }
 
+    [HttpPost("parent-invitations")]
+    [Authorize(Roles = "Student")]
+    public async Task<IActionResult> CreateStudentParentInvitation(
+        [FromBody] CreateStudentParentInvitationRequest request,
+        CancellationToken cancellationToken)
+    {
+        var result = await sender.Send(
+            new CreateStudentParentInvitationCommand(request),
+            cancellationToken);
+
+        return result.IsSuccess
+            ? StatusCode(StatusCodes.Status201Created, result.Value)
+            : Problem(result.Errors);
+    }
+
+    [HttpGet("parent-invitations/resolve")]
+    [AllowAnonymous]
+    public async Task<IActionResult> ResolveStudentParentInvitation(
+        [FromQuery] string token,
+        CancellationToken cancellationToken)
+    {
+        var result = await sender.Send(
+            new ResolveStudentParentInvitationQuery(token),
+            cancellationToken);
+
+        return result.IsSuccess
+            ? Ok(result.Value)
+            : Problem(result.Errors);
+    }
+
+    [HttpPost("parent-invitations/accept")]
+    [Authorize(Roles = "Parent")]
+    public async Task<IActionResult> AcceptStudentParentInvitation(
+        [FromBody] RespondToStudentParentInvitationRequest request,
+        CancellationToken cancellationToken)
+    {
+        var result = await sender.Send(
+            new RespondToStudentParentInvitationCommand(request.Token, Accept: true),
+            cancellationToken);
+
+        return result.IsSuccess ? Ok(result.Value) : Problem(result.Errors);
+    }
+
+    [HttpPost("parent-invitations/decline")]
+    [Authorize(Roles = "Parent")]
+    public async Task<IActionResult> DeclineStudentParentInvitation(
+        [FromBody] RespondToStudentParentInvitationRequest request,
+        CancellationToken cancellationToken)
+    {
+        var result = await sender.Send(
+            new RespondToStudentParentInvitationCommand(request.Token, Accept: false),
+            cancellationToken);
+
+        return result.IsSuccess ? Ok(result.Value) : Problem(result.Errors);
+    }
+
+    [HttpPost("parent-invitations/{invitationId:guid}/cancel")]
+    [Authorize(Roles = "Student")]
+    public async Task<IActionResult> CancelStudentParentInvitation(
+        Guid invitationId,
+        CancellationToken cancellationToken)
+    {
+        var result = await sender.Send(
+            new CancelStudentParentInvitationCommand(invitationId),
+            cancellationToken);
+
+        return result.IsSuccess ? NoContent() : Problem(result.Errors);
+    }
+
     [HttpGet("invitations")]
     [Authorize(Roles = "Parent,Student")]
     public async Task<IActionResult> GetMyInvitations(

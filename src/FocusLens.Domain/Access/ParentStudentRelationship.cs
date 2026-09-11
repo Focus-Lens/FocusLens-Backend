@@ -7,6 +7,15 @@ public class ParentStudentRelationship : AuditableEntity
     private ParentStudentRelationship() { }
 
     public ParentStudentRelationship(Guid parentId, Guid studentId)
+        : this(parentId, studentId, InvitationInitiator.Parent, null)
+    {
+    }
+
+    public ParentStudentRelationship(
+        Guid parentId,
+        Guid studentId,
+        InvitationInitiator initiatedBy,
+        DateTimeOffset? expiresAtUtc)
         : base(Guid.CreateVersion7())
     {
         if (parentId == Guid.Empty)
@@ -21,6 +30,8 @@ public class ParentStudentRelationship : AuditableEntity
 
         ParentId = parentId;
         StudentId = studentId;
+        InitiatedBy = initiatedBy;
+        ExpiresAtUtc = expiresAtUtc;
         Status = RelationshipStatus.Pending;
     }
 
@@ -30,18 +41,39 @@ public class ParentStudentRelationship : AuditableEntity
 
     public RelationshipStatus Status { get; private set; }
 
+    public InvitationInitiator InitiatedBy { get; private set; }
+
+    /// <summary>
+    /// The deadline for acting on a pending invitation. Active or historical
+    /// relationships retain this value for audit purposes.
+    /// </summary>
+    public DateTimeOffset? ExpiresAtUtc { get; private set; }
+
     public DateTimeOffset? RevokedAtUtc { get; private set; }
 
     public Parent Parent { get; private set; } = null!;
 
     public Student Student { get; private set; } = null!;
 
+    public bool IsExpired(DateTimeOffset now)
+        => Status == RelationshipStatus.Pending &&
+           ExpiresAtUtc.HasValue &&
+           ExpiresAtUtc.Value <= now;
+
     public void Accept()
+        => Accept(DateTimeOffset.UtcNow);
+
+    public void Accept(DateTimeOffset now)
     {
         if (Status != RelationshipStatus.Pending)
         {
             throw new InvalidOperationException(
                 "Only a pending relationship can be accepted.");
+        }
+
+        if (IsExpired(now))
+        {
+            throw new InvalidOperationException("An expired invitation cannot be accepted.");
         }
 
         Status = RelationshipStatus.Active;
@@ -73,6 +105,9 @@ public class ParentStudentRelationship : AuditableEntity
     }
 
     public void Reinvite()
+        => Reinvite(null);
+
+    public void Reinvite(DateTimeOffset? expiresAtUtc)
     {
         if (Status != RelationshipStatus.Revoked)
         {
@@ -82,5 +117,6 @@ public class ParentStudentRelationship : AuditableEntity
 
         Status = RelationshipStatus.Pending;
         RevokedAtUtc = null;
+        ExpiresAtUtc = expiresAtUtc;
     }
 }

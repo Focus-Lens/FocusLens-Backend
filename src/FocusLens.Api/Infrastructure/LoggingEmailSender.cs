@@ -53,4 +53,19 @@ public sealed class LoggingEmailSender : IEmailSender
 
         return Task.CompletedTask;
     }
+
+    public Task SendStudentParentInvitationAsync(
+        string parentEmail,
+        string studentDisplayName,
+        string invitationUrl,
+        CancellationToken cancellationToken = default)
+    {
+        _logger.LogInformation(
+            "Student-parent invitation sent to {ParentEmail} from {StudentDisplayName}: {InvitationUrl}",
+            parentEmail,
+            studentDisplayName,
+            invitationUrl);
+
+        return Task.CompletedTask;
+    }
 }

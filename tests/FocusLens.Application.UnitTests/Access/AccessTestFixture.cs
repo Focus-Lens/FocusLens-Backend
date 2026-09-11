@@ -99,6 +99,7 @@ public sealed class FakeUnitOfWork : DomainInterfaces.IUnitOfWork
 public sealed class FakeEmailSender : IEmailSender
 {
     public List<(string StudentEmail, string ParentEmail, Guid InvitationId)> Invitations { get; } = [];
+    public List<(string ParentEmail, string StudentDisplayName, string InvitationUrl)> StudentParentInvitations { get; } = [];
 
     public Task SendEmailVerificationCodeAsync(string email, string code, TimeSpan codeLifetime, CancellationToken cancellationToken = default) => Task.CompletedTask;
     public Task SendPasswordResetAsync(string email, string code, TimeSpan codeLifetime, CancellationToken cancellationToken = default) => Task.CompletedTask;
@@ -111,6 +112,22 @@ public sealed class FakeEmailSender : IEmailSender
         Invitations.Add((studentEmail, parentEmail, invitationId));
         return Task.CompletedTask;
     }
+
+    public Task SendStudentParentInvitationAsync(
+        string parentEmail,
+        string studentDisplayName,
+        string invitationUrl,
+        CancellationToken cancellationToken = default)
+    {
+        StudentParentInvitations.Add((parentEmail, studentDisplayName, invitationUrl));
+        return Task.CompletedTask;
+    }
+}
+
+public sealed class FakeInvitationUrlBuilder : IInvitationUrlBuilder
+{
+    public string CreateStudentParentInvitationUrl(string token)
+        => $"https://parent.focuslens.test/invitations/parent/{token}";
 }
 
 public static class AccessTestObjectExtensions

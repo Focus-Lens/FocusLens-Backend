@@ -25,6 +25,7 @@ public static class DependencyInjection
         services.AddScoped<ICurrentUser, CurrentUser>();
         services.AddScoped<IEmailVerificationCodeStore, EmailVerificationCodeStore>();
         services.AddScoped<IEmailSender, SmtpEmailSender>();
+        services.AddSingleton<IInvitationUrlBuilder, InvitationUrlBuilder>();
         services.AddScoped<IGoogleTokenValidator, GoogleTokenValidator>();
         services.AddSingleton<EmailTemplateRenderer>();
         services.Configure<GoogleAuthOptions>(

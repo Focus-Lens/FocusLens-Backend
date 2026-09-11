@@ -97,6 +97,27 @@ public sealed class SmtpEmailSender : IEmailSender
             cancellationToken);
     }
 
+    public Task SendStudentParentInvitationAsync(
+        string parentEmail,
+        string studentDisplayName,
+        string invitationUrl,
+        CancellationToken cancellationToken = default)
+    {
+        string encodedName = System.Net.WebUtility.HtmlEncode(studentDisplayName);
+        string encodedUrl = System.Net.WebUtility.HtmlEncode(invitationUrl);
+        string htmlBody = $"""
+            <p>{encodedName} invited you to connect on FocusLens.</p>
+            <p><a href=\"{encodedUrl}\">Review invitation</a></p>
+            <p>This invitation expires in 7 days.</p>
+            """;
+
+        return SendAsync(
+            parentEmail,
+            "You have a FocusLens invitation",
+            htmlBody,
+            cancellationToken);
+    }
+
     private async Task SendAsync(
         string email,
         string subject,

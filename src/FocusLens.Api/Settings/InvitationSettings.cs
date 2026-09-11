@@ -8,4 +8,7 @@ public sealed class InvitationSettings
 
     [Required]
     public string BaseUrl { get; set; } = string.Empty;
+
+    [Required]
+    public string StudentParentInvitationBaseUrl { get; set; } = string.Empty;
 }

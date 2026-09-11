@@ -19,4 +19,10 @@ public interface IEmailSender
         string parentEmail,
         Guid invitationId,
         CancellationToken cancellationToken = default);
+
+    Task SendStudentParentInvitationAsync(
+        string parentEmail,
+        string studentDisplayName,
+        string invitationUrl,
+        CancellationToken cancellationToken = default);
 }

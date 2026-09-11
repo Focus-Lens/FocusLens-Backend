@@ -34,12 +34,41 @@ public class ParentStudentRelationshipTests
     }
 
     [Fact]
+    public void Create_WithInitiatorAndExpiry_PreservesInvitationMetadata()
+    {
+        DateTimeOffset expiresAtUtc = DateTimeOffset.UtcNow.AddDays(7);
+
+        ParentStudentRelationship relationship = new(
+            Guid.NewGuid(),
+            Guid.NewGuid(),
+            InvitationInitiator.Student,
+            expiresAtUtc);
+
+        Assert.Equal(InvitationInitiator.Student, relationship.InitiatedBy);
+        Assert.Equal(expiresAtUtc, relationship.ExpiresAtUtc);
+        Assert.False(relationship.IsExpired(expiresAtUtc.AddSeconds(-1)));
+    }
+
+    [Fact]
+    public void Accept_WhenInvitationIsExpired_ThrowsInvalidOperationException()
+    {
+        ParentStudentRelationship relationship = new(
+            Guid.NewGuid(),
+            Guid.NewGuid(),
+            InvitationInitiator.Parent,
+            DateTimeOffset.UtcNow.AddMinutes(-1));
+
+        Assert.Throws<InvalidOperationException>(() =>
+            relationship.Accept(DateTimeOffset.UtcNow));
+    }
+
+    [Fact]
     public void Accept_WhenPending_MakesRelationshipActive()
     {
         ParentStudentRelationship relationship =
             new(Guid.NewGuid(), Guid.NewGuid());
 
-        relationship.Accept();
+        relationship.Accept(DateTimeOffset.UtcNow);
 
         Assert.Equal(RelationshipStatus.Active, relationship.Status);
         Assert.Null(relationship.RevokedAtUtc);
@@ -51,9 +80,9 @@ public class ParentStudentRelationshipTests
         ParentStudentRelationship relationship =
             new(Guid.NewGuid(), Guid.NewGuid());
 
-        relationship.Accept();
+        relationship.Accept(DateTimeOffset.UtcNow);
 
-        Assert.Throws<InvalidOperationException>(() => relationship.Accept());
+        Assert.Throws<InvalidOperationException>(() => relationship.Accept(DateTimeOffset.UtcNow));
     }
 
     [Fact]
@@ -74,7 +103,7 @@ public class ParentStudentRelationshipTests
         ParentStudentRelationship relationship =
             new(Guid.NewGuid(), Guid.NewGuid());
 
-        relationship.Accept();
+        relationship.Accept(DateTimeOffset.UtcNow);
 
         Assert.Throws<InvalidOperationException>(() => relationship.Reject());
     }
@@ -85,7 +114,7 @@ public class ParentStudentRelationshipTests
         ParentStudentRelationship relationship =
             new(Guid.NewGuid(), Guid.NewGuid());
 
-        relationship.Accept();
+        relationship.Accept(DateTimeOffset.UtcNow);
         relationship.Revoke();
 
         Assert.Equal(RelationshipStatus.Revoked, relationship.Status);
@@ -107,7 +136,7 @@ public class ParentStudentRelationshipTests
         ParentStudentRelationship relationship =
             new(Guid.NewGuid(), Guid.NewGuid());
 
-        relationship.Accept();
+        relationship.Accept(DateTimeOffset.UtcNow);
         relationship.Revoke();
 
         Assert.Throws<InvalidOperationException>(() => relationship.Revoke());

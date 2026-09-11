@@ -4,6 +4,7 @@ using FocusLens.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace FocusLens.Infrastructure.Data.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDBContextModelSnapshot : ModelSnapshot
+    [Migration("20260911150451_AddInvitationInitiatorAndExpiry")]
+    partial class AddInvitationInitiatorAndExpiry
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -38,7 +41,9 @@ namespace FocusLens.Infrastructure.Data.Migrations
                         .HasColumnType("datetimeoffset");
 
                     b.Property<int>("InitiatedBy")
-                        .HasColumnType("int");
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasDefaultValue(1);
 
                     b.Property<string>("LastModifiedBy")
                         .HasColumnType("nvarchar(max)");
@@ -66,56 +71,6 @@ namespace FocusLens.Infrastructure.Data.Migrations
                         .IsUnique();
 
                     b.ToTable("ParentStudentRelationships", (string)null);
-                });
-
-            modelBuilder.Entity("FocusLens.Domain.Access.StudentParentInvitation", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<DateTimeOffset>("CreatedAtUtc")
-                        .HasColumnType("datetimeoffset");
-
-                    b.Property<string>("CreatedBy")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<DateTimeOffset>("ExpiresAtUtc")
-                        .HasColumnType("datetimeoffset");
-
-                    b.Property<string>("LastModifiedBy")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<DateTimeOffset>("LastModifiedUtc")
-                        .HasColumnType("datetimeoffset");
-
-                    b.Property<DateTimeOffset?>("RespondedAtUtc")
-                        .HasColumnType("datetimeoffset");
-
-                    b.Property<int>("Status")
-                        .HasColumnType("int");
-
-                    b.Property<Guid>("StudentId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<string>("TargetEmailNormalized")
-                        .IsRequired()
-                        .HasMaxLength(256)
-                        .HasColumnType("nvarchar(256)");
-
-                    b.Property<string>("TokenHash")
-                        .IsRequired()
-                        .HasMaxLength(128)
-                        .HasColumnType("nvarchar(128)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("TokenHash")
-                        .IsUnique();
-
-                    b.HasIndex("StudentId", "TargetEmailNormalized", "Status");
-
-                    b.ToTable("StudentParentInvitations", (string)null);
                 });
 
             modelBuilder.Entity("FocusLens.Domain.Identity.ApplicationRole", b =>
@@ -745,17 +700,6 @@ namespace FocusLens.Infrastructure.Data.Migrations
                         .IsRequired();
 
                     b.Navigation("Parent");
-
-                    b.Navigation("Student");
-                });
-
-            modelBuilder.Entity("FocusLens.Domain.Access.StudentParentInvitation", b =>
-                {
-                    b.HasOne("FocusLens.Domain.Student", "Student")
-                        .WithMany()
-                        .HasForeignKey("StudentId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
 
                     b.Navigation("Student");
                 });

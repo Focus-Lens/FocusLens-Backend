@@ -5,6 +5,8 @@ public sealed record InvitationResponse(
     Guid ParentId,
     Guid StudentId,
     string Status,
+    string InitiatedBy,
+    DateTimeOffset? ExpiresAtUtc,
     DateTimeOffset? RevokedAtUtc,
     string? ParentEmail
 );

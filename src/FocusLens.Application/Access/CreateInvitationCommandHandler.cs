@@ -15,13 +15,17 @@ public sealed class CreateInvitationCommandHandler(
     IBaseRepository<ParentStudentRelationship> relationshipRepository,
     ICurrentUser currentUser,
     IUnitOfWork unitOfWork,
-    IEmailSender emailSender)
+    IEmailSender emailSender,
+    TimeProvider? timeProvider = null)
     : IRequestHandler<CreateInvitationCommand, Result<InvitationResponse>>
 {
     public async Task<Result<InvitationResponse>> Handle(
         CreateInvitationCommand request,
         CancellationToken cancellationToken)
     {
+        DateTimeOffset now = (timeProvider ?? TimeProvider.System).GetUtcNow();
+        DateTimeOffset expiresAtUtc = now.AddDays(7);
+
         if (currentUser.UserId is not Guid userId || userId == Guid.Empty)
         {
             return Error.Unauthorized(
@@ -87,7 +91,7 @@ public sealed class CreateInvitationCommandHandler(
         {
             if (existingRelationship.Status == RelationshipStatus.Revoked)
             {
-                existingRelationship.Reinvite();
+                existingRelationship.Reinvite(expiresAtUtc);
                 relationshipRepository.Update(existingRelationship);
                 await unitOfWork.SaveChangesAsync();
 
@@ -102,6 +106,13 @@ public sealed class CreateInvitationCommandHandler(
 
             if (existingRelationship.Status == RelationshipStatus.Pending)
             {
+                if (existingRelationship.IsExpired(now))
+                {
+                    existingRelationship.Reinvite(expiresAtUtc);
+                    relationshipRepository.Update(existingRelationship);
+                    await unitOfWork.SaveChangesAsync();
+                }
+
                 await emailSender.SendParentStudentInvitationAsync(
                     student.User.Email!,
                     parentEmail,
@@ -117,7 +128,7 @@ public sealed class CreateInvitationCommandHandler(
         }
 
         ParentStudentRelationship relationship =
-            new(parent.Id, student.Id);
+            new(parent.Id, student.Id, InvitationInitiator.Parent, expiresAtUtc);
 
         relationshipRepository.Add(relationship);
         await unitOfWork.SaveChangesAsync();

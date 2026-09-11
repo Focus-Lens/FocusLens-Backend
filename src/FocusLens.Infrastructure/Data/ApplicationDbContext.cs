@@ -34,6 +34,9 @@ namespace FocusLens.Infrastructure.Data
         public DbSet<ParentStudentRelationship> ParentStudentRelationships =>
             Set<ParentStudentRelationship>();
 
+        public DbSet<StudentParentInvitation> StudentParentInvitations =>
+            Set<StudentParentInvitation>();
+
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);
