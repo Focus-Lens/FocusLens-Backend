@@ -17,6 +17,8 @@ public sealed class RegisterParentCommandHandler
 {
     private readonly IIdentityService _identityService;
     private readonly IBaseRepository<Parent> _parentRepository;
+    private readonly IBaseRepository<LegalDocument> _legalDocumentRepository;
+    private readonly IBaseRepository<UserTermsAcceptance> _termsAcceptanceRepository;
     private readonly IUnitOfWork _unitOfWork;
     private readonly IEmailVerificationCodeStore _codeStore;
     private readonly IEmailSender _emailSender;
@@ -26,6 +28,8 @@ public sealed class RegisterParentCommandHandler
     public RegisterParentCommandHandler(
         IIdentityService identityService,
         IBaseRepository<Parent> parentRepository,
+        IBaseRepository<LegalDocument> legalDocumentRepository,
+        IBaseRepository<UserTermsAcceptance> termsAcceptanceRepository,
         IUnitOfWork unitOfWork,
         IEmailVerificationCodeStore codeStore,
         IEmailSender emailSender,
@@ -35,6 +39,8 @@ public sealed class RegisterParentCommandHandler
     {
         _identityService = identityService;
         _parentRepository = parentRepository;
+        _legalDocumentRepository = legalDocumentRepository;
+        _termsAcceptanceRepository = termsAcceptanceRepository;
         _unitOfWork = unitOfWork;
         _codeStore = codeStore;
         _emailSender = emailSender;
@@ -54,6 +60,25 @@ public sealed class RegisterParentCommandHandler
             return ApplicationErrors.Identity.EmailAlreadyRegistered;
         }
 
+        if (request.TermsId is null)
+        {
+            return ApplicationErrors.Terms.DocumentNotFound;
+        }
+
+        LegalDocument? terms = await _legalDocumentRepository.GetByIdAsync(request.TermsId.Value);
+
+        if (terms is null)
+        {
+            return ApplicationErrors.Terms.DocumentNotFound;
+        }
+
+        if (terms.Audience != LegalDocumentAudience.Parent
+            || !terms.IsPublished
+            || terms.PublishedOnUtc is null)
+        {
+            return ApplicationErrors.Terms.DocumentNotPublished;
+        }
+
         DateTimeOffset utcNow = _timeProvider.GetUtcNow();
 
         TimeSpan codeLifetime = TimeSpan.FromMinutes(
@@ -68,7 +93,7 @@ public sealed class RegisterParentCommandHandler
             LastName = request.LastName.Trim(),
             EmailConfirmed = false,
         };
-        user.AcceptTerms(_registrationOptions.TermsVersion, utcNow);
+        user.AcceptTerms(terms.Version, utcNow);
 
         string code = GenerateCode();
 
@@ -98,6 +123,10 @@ public sealed class RegisterParentCommandHandler
             }
 
             _parentRepository.Add(new Parent(user.Id));
+            _termsAcceptanceRepository.Add(new UserTermsAcceptance(
+                user.Id,
+                terms.Id,
+                utcNow));
             await _unitOfWork.SaveChangesAsync();
 
             await _codeStore.SaveAsync(

@@ -21,6 +21,7 @@ public sealed class GoogleLoginCommandHandler
     private readonly IIdentityService _identityService;
     private readonly ITokenProvider _tokenProvider;
     private readonly IBaseRepository<Student> _studentRepository;
+    private readonly IBaseRepository<Parent> _parentRepository;
     private readonly IUnitOfWork _unitOfWork;
 
     public GoogleLoginCommandHandler(
@@ -28,12 +29,14 @@ public sealed class GoogleLoginCommandHandler
         IIdentityService identityService,
         ITokenProvider tokenProvider,
         IBaseRepository<Student> studentRepository,
+        IBaseRepository<Parent> parentRepository,
         IUnitOfWork unitOfWork)
     {
         _googleTokenValidator = googleTokenValidator;
         _identityService = identityService;
         _tokenProvider = tokenProvider;
         _studentRepository = studentRepository;
+        _parentRepository = parentRepository;
         _unitOfWork = unitOfWork;
     }
 
@@ -76,9 +79,10 @@ public sealed class GoogleLoginCommandHandler
                     EmailConfirmed = true
                 };
 
-                Result<Success> createResult = await CreateGoogleStudentAsync(
+                Result<Success> createResult = await CreateGoogleAccountAsync(
                     user,
-                    googleUser.ProviderKey);
+                    googleUser.ProviderKey,
+                    request.AccountType);
 
                 if (createResult.IsError)
                 {
@@ -115,9 +119,14 @@ public sealed class GoogleLoginCommandHandler
 
         IReadOnlyCollection<string> roles = await _identityService.GetRolesAsync(user);
 
-        Student? student = await _studentRepository.FirstOrDefaultAsync(
+        Student? student = null;
+
+        if (roles.Contains(ApplicationRoles.Student, StringComparer.Ordinal))
+        {
+            student = await _studentRepository.FirstOrDefaultAsync(
             student => student.UserId == user.Id,
             student => student.Subjects);
+        }
 
         if (roles.Contains(ApplicationRoles.Student, StringComparer.Ordinal)
             && student is not null
@@ -160,9 +169,10 @@ public sealed class GoogleLoginCommandHandler
             student?.IsOnboardingCompleted);
     }
 
-    private async Task<Result<Success>> CreateGoogleStudentAsync(
+    private async Task<Result<Success>> CreateGoogleAccountAsync(
         ApplicationUser user,
-        string providerKey)
+        string providerKey,
+        LegalDocumentAudience accountType)
     {
         await _unitOfWork.BeginTransactionAsync();
 
@@ -170,7 +180,7 @@ public sealed class GoogleLoginCommandHandler
         {
             IdentityResultSummary createResult = await _identityService.CreateAsync(
                 user,
-                Guid.CreateVersion7().ToString("N") + "Aa1");
+                Guid.CreateVersion7().ToString("N") + "Aa1!");
 
             if (!createResult.Succeeded)
             {
@@ -178,9 +188,13 @@ public sealed class GoogleLoginCommandHandler
                 return createResult.ToApplicationErrors();
             }
 
+            string role = accountType == LegalDocumentAudience.Parent
+                ? ApplicationRoles.Parent
+                : ApplicationRoles.Student;
+
             IdentityResultSummary roleResult = await _identityService.AddToRoleAsync(
                 user,
-                ApplicationRoles.Student);
+                role);
 
             if (!roleResult.Succeeded)
             {
@@ -200,7 +214,15 @@ public sealed class GoogleLoginCommandHandler
                 return loginResult.ToApplicationErrors();
             }
 
-            _studentRepository.Add(new Student(user.Id));
+            if (accountType == LegalDocumentAudience.Parent)
+            {
+                _parentRepository.Add(new Parent(user.Id));
+            }
+            else
+            {
+                _studentRepository.Add(new Student(user.Id));
+            }
+
             await _unitOfWork.SaveChangesAsync();
             await _unitOfWork.CommitTransactionAsync();
 

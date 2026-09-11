@@ -4,6 +4,7 @@ using FocusLens.Infrastructure.Data;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -27,7 +28,9 @@ public sealed class CustomWebApplicationFactory
             services.RemoveAll<IEmailSender>();
 
             services.AddDbContext<ApplicationDbContext>(options =>
-                options.UseInMemoryDatabase(_databaseName));
+                options.UseInMemoryDatabase(_databaseName)
+                    .ConfigureWarnings(warnings =>
+                        warnings.Ignore(InMemoryEventId.TransactionIgnoredWarning)));
             services.AddScoped<IEmailSender, LoggingEmailSender>();
         });
     }

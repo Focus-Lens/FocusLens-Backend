@@ -11,9 +11,11 @@ namespace FocusLens.API.Controllers;
 public sealed class TermsController(ISender sender) : ApiController
 {
     [HttpGet]
-    public async Task<IActionResult> GetTerms(CancellationToken cancellationToken)
+    public async Task<IActionResult> GetTerms(
+        [FromQuery] string audience,
+        CancellationToken cancellationToken)
     {
-        var result = await sender.Send(new GetTermsQuery(), cancellationToken);
+        var result = await sender.Send(new GetTermsQuery(audience), cancellationToken);
 
         return result.Match(
             Ok,

@@ -26,5 +26,9 @@ public sealed class RegisterStudentCommandValidator
         RuleFor(command => command.AcceptTerms)
             .Equal(true)
             .WithMessage("Terms and conditions must be accepted.");
+
+        RuleFor(command => command.TermsId)
+            .NotEmpty()
+            .When(command => command.AcceptTerms);
     }
 }

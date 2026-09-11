@@ -22,6 +22,8 @@ public sealed class ApplicationUser : IdentityUser<Guid>
 
     public List<RefreshToken> RefreshTokens { get; set; } = [];
 
+    public List<UserTermsAcceptance> TermsAcceptances { get; private set; } = [];
+
     public void AcceptTerms(string termsVersion, DateTimeOffset acceptedAtUtc)
     {
         if (string.IsNullOrWhiteSpace(termsVersion))

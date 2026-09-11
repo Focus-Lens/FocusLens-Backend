@@ -44,12 +44,6 @@ public static class DependencyInjection
             ?? throw new InvalidOperationException(
                 $"Configuration section {RegistrationOptions.SectionName} was not found.");
 
-        if (string.IsNullOrWhiteSpace(registrationOptions.TermsVersion))
-        {
-            throw new InvalidOperationException(
-                "Registration terms version must be configured.");
-        }
-
         services.AddSingleton(registrationOptions);
 
         return services;

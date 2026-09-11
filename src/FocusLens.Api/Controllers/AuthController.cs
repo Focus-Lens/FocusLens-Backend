@@ -8,6 +8,7 @@ using FocusLens.Application.Features.Identity.Commands.ResendVerificationCode;
 using FocusLens.Application.Features.Identity.Commands.ResetPassword;
 using FocusLens.Application.Features.Identity.Commands.RevokeRefreshToken;
 using FocusLens.Application.Features.Identity.Commands.VerifyEmail;
+using FocusLens.Domain;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -64,12 +65,29 @@ public sealed class AuthController : ApiController
     }
 
     [AllowAnonymous]
-    [HttpPost("continue-with-google")]
-    public async Task<IActionResult> ContinueWithGoogle(
-        GoogleLoginCommand command,
+    [HttpPost("google/student")]
+    public async Task<IActionResult> ContinueWithGoogleStudent(
+        GoogleLoginRequest request,
         CancellationToken cancellationToken)
     {
-        var result = await _sender.Send(command, cancellationToken);
+        var result = await _sender.Send(
+            new GoogleLoginCommand(request.IdToken, LegalDocumentAudience.Student),
+            cancellationToken);
+
+        return result.Match(
+            Ok,
+            Problem);
+    }
+
+    [AllowAnonymous]
+    [HttpPost("google/parent")]
+    public async Task<IActionResult> ContinueWithGoogleParent(
+        GoogleLoginRequest request,
+        CancellationToken cancellationToken)
+    {
+        var result = await _sender.Send(
+            new GoogleLoginCommand(request.IdToken, LegalDocumentAudience.Parent),
+            cancellationToken);
 
         return result.Match(
             Ok,
@@ -153,4 +171,6 @@ public sealed class AuthController : ApiController
             _ => NoContent(),
             Problem);
     }
+
+    public sealed record GoogleLoginRequest(string IdToken);
 }

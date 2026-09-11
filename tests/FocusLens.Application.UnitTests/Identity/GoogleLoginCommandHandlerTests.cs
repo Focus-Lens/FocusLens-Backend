@@ -21,7 +21,7 @@ public class GoogleLoginCommandHandlerTests
         var fixture = CreateFixture();
 
         var result = await fixture.Handler.Handle(
-            new GoogleLoginCommand("valid-google-token"),
+            new GoogleLoginCommand("valid-google-token", LegalDocumentAudience.Student),
             CancellationToken.None);
 
         Assert.True(result.IsSuccess);
@@ -42,7 +42,7 @@ public class GoogleLoginCommandHandlerTests
         fixture.Students.Add(new Student(user.Id));
 
         var result = await fixture.Handler.Handle(
-            new GoogleLoginCommand("valid-google-token"),
+            new GoogleLoginCommand("valid-google-token", LegalDocumentAudience.Student),
             CancellationToken.None);
 
         Assert.True(result.IsSuccess);
@@ -69,7 +69,7 @@ public class GoogleLoginCommandHandlerTests
         fixture.Students.Add(student);
 
         var result = await fixture.Handler.Handle(
-            new GoogleLoginCommand("valid-google-token"),
+            new GoogleLoginCommand("valid-google-token", LegalDocumentAudience.Student),
             CancellationToken.None);
 
         Assert.True(result.IsSuccess);
@@ -84,14 +84,31 @@ public class GoogleLoginCommandHandlerTests
         var fixture = CreateFixture();
 
         await fixture.Handler.Handle(
-            new GoogleLoginCommand("valid-google-token"),
+            new GoogleLoginCommand("valid-google-token", LegalDocumentAudience.Student),
             CancellationToken.None);
         await fixture.Handler.Handle(
-            new GoogleLoginCommand("valid-google-token"),
+            new GoogleLoginCommand("valid-google-token", LegalDocumentAudience.Student),
             CancellationToken.None);
 
         Assert.Single(fixture.Identity.Users);
         Assert.Single(await fixture.Students.GetAllAsync());
+    }
+
+    [Fact]
+    public async Task Handle_WhenGoogleUserIsNewParent_CreatesAccountAndParent()
+    {
+        var fixture = CreateFixture();
+
+        var result = await fixture.Handler.Handle(
+            new GoogleLoginCommand("valid-google-token", LegalDocumentAudience.Parent),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.NotNull(result.Value.Tokens);
+        Assert.False(result.Value.RequiresOnboarding);
+        Assert.Single(fixture.Identity.Users);
+        Assert.Empty(await fixture.Students.GetAllAsync());
+        Assert.Single(await fixture.Parents.GetAllAsync());
     }
 
     private static TestFixture CreateFixture()
@@ -106,6 +123,7 @@ public class GoogleLoginCommandHandlerTests
         var identity = new FakeIdentityService();
         var tokenProvider = new FakeTokenProvider();
         var students = new InMemoryRepository<Student>();
+        var parents = new InMemoryRepository<Parent>();
         var unitOfWork = new FakeUnitOfWork();
 
         return new TestFixture(
@@ -114,15 +132,18 @@ public class GoogleLoginCommandHandlerTests
                 identity,
                 tokenProvider,
                 students,
+                parents,
                 unitOfWork),
             identity,
-            students);
+            students,
+            parents);
     }
 
     private sealed record TestFixture(
         GoogleLoginCommandHandler Handler,
         FakeIdentityService Identity,
-        InMemoryRepository<Student> Students);
+        InMemoryRepository<Student> Students,
+        InMemoryRepository<Parent> Parents);
 
     private sealed class FakeGoogleTokenValidator(GoogleUserInfo googleUser)
         : IGoogleTokenValidator

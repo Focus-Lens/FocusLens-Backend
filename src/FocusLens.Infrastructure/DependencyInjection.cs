@@ -66,7 +66,7 @@ namespace FocusLens.Infrastructure
                     options.Password.RequireDigit = true;
                     options.Password.RequireUppercase = true;
                     options.Password.RequireLowercase = true;
-                    options.Password.RequireNonAlphanumeric = false;
+                    options.Password.RequireNonAlphanumeric = true;
 
                     options.SignIn.RequireConfirmedEmail = false;
                     options.Lockout.AllowedForNewUsers = true;

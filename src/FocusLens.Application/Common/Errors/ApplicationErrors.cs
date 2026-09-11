@@ -71,4 +71,27 @@ public static class ApplicationErrors
             "Users_Not_Found",
             "User was not found.");
     }
+
+    public static class Terms
+    {
+        public static readonly Error InvalidAudience = Error.Validation(
+            "Terms_Invalid_Audience",
+            "Terms audience must be Student or Parent.");
+
+        public static readonly Error NotFound = Error.NotFound(
+            "Terms_Not_Found",
+            "Published terms were not found for the requested audience.");
+
+        public static readonly Error DocumentNotFound = Error.NotFound(
+            "Terms_Document_Not_Found",
+            "Terms document was not found.");
+
+        public static readonly Error DocumentNotPublished = Error.Validation(
+            "Terms_Document_Not_Published",
+            "Terms document is not published.");
+
+        public static readonly Error CurrentUserUnavailable = Error.Unauthorized(
+            "Terms_Current_User_Unavailable",
+            "Current user is required to record terms acceptance.");
+    }
 }

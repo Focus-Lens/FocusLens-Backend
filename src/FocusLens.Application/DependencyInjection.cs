@@ -17,7 +17,6 @@ namespace FocusLens.Application
 
             services.AddTransient(typeof(IPipelineBehavior<,>), typeof(UnhandledExceptionBehavior<,>));
             services.AddTransient(typeof(IPipelineBehavior<,>), typeof(ValidationBehavior<,>));
-            services.AddSingleton<ITermsProvider, CurrentTermsProvider>();
 
             return services;
         }

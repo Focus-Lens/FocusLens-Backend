@@ -9,5 +9,9 @@ public sealed class SubmitTermsDecisionCommandValidator
     {
         RuleFor(command => command.Request.Accepted)
             .NotNull();
+
+        RuleFor(command => command.Request.TermsId)
+            .NotEmpty()
+            .When(command => command.Request.Accepted == true);
     }
 }

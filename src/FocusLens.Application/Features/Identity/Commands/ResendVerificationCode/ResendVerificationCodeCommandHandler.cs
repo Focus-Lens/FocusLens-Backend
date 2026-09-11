@@ -13,8 +13,6 @@ namespace FocusLens.Application.Features.Identity.Commands.ResendVerificationCod
 public sealed class ResendVerificationCodeCommandHandler
     : IRequestHandler<ResendVerificationCodeCommand, Result<Success>>
 {
-    private static readonly TimeSpan CodeLifetime = TimeSpan.FromMinutes(10);
-
     private readonly IIdentityService _identityService;
     private readonly IEmailVerificationCodeStore _codeStore;
     private readonly IEmailSender _emailSender;
@@ -53,16 +51,15 @@ public sealed class ResendVerificationCodeCommandHandler
         }
 
         string code = GenerateCode();
+        TimeSpan codeLifetime = TimeSpan.FromMinutes(
+            _registrationOptions.EmailVerificationCodeLifetimeMinutes);
 
         await _codeStore.SaveAsync(
             user.Id,
             email,
             code,
-            _timeProvider.GetUtcNow().Add(CodeLifetime),
+            _timeProvider.GetUtcNow().Add(codeLifetime),
             cancellationToken);
-
-            TimeSpan codeLifetime = TimeSpan.FromMinutes(
-    _registrationOptions.EmailVerificationCodeLifetimeMinutes);
 
         await _emailSender.SendEmailVerificationCodeAsync(
             email,
