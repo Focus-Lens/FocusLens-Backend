@@ -34,7 +34,7 @@ public class AuthRegistrationTests
     public async Task RegisterStudent_ProvisionsStudentRoleEntityTermsAcceptanceAndTenMinuteCode()
     {
         await using var factory = new CustomWebApplicationFactory();
-        Guid termsId = await SeedRegistrationDependenciesAsync(
+        Guid currentTermsId = await SeedRegistrationDependenciesAsync(
             factory,
             LegalDocumentAudience.Student);
         using HttpClient client = factory.CreateClient();
@@ -47,7 +47,6 @@ public class AuthRegistrationTests
                 password = "Password1!",
                 firstName = "Focus",
                 lastName = "Student",
-                termsId,
                 acceptTerms = true
             });
 
@@ -64,7 +63,7 @@ public class AuthRegistrationTests
 
         UserTermsAcceptance acceptance = Assert.Single(dbContext.UserTermsAcceptances);
         Assert.Equal(user.Id, acceptance.UserId);
-        Assert.Equal(termsId, acceptance.LegalDocumentId);
+        Assert.Equal(currentTermsId, acceptance.LegalDocumentId);
 
         EmailVerificationCode code = Assert.Single(dbContext.EmailVerificationCodes);
         TimeSpan codeLifetime = code.ExpiresOnUtc - code.CreatedOnUtc;
@@ -78,7 +77,7 @@ public class AuthRegistrationTests
     public async Task RegisterParent_ProvisionsParentRoleAndEntity()
     {
         await using var factory = new CustomWebApplicationFactory();
-        Guid termsId = await SeedRegistrationDependenciesAsync(
+        Guid currentTermsId = await SeedRegistrationDependenciesAsync(
             factory,
             LegalDocumentAudience.Parent);
         using HttpClient client = factory.CreateClient();
@@ -91,7 +90,6 @@ public class AuthRegistrationTests
                 password = "Password1!",
                 firstName = "Focus",
                 lastName = "Parent",
-                termsId,
                 acceptTerms = true
             });
 
@@ -112,13 +110,17 @@ public class AuthRegistrationTests
                 && userRole.RoleId == parentRole.Id);
         Assert.Single(dbContext.Parents);
         Assert.Empty(dbContext.Students);
+
+        UserTermsAcceptance acceptance = Assert.Single(dbContext.UserTermsAcceptances);
+        Assert.Equal(user.Id, acceptance.UserId);
+        Assert.Equal(currentTermsId, acceptance.LegalDocumentId);
     }
 
     [Fact]
     public async Task RegisterParent_WhenPasswordHasNoSymbol_ReturnsBadRequest()
     {
         await using var factory = new CustomWebApplicationFactory();
-        Guid termsId = await SeedRegistrationDependenciesAsync(
+        await SeedRegistrationDependenciesAsync(
             factory,
             LegalDocumentAudience.Parent);
         using HttpClient client = factory.CreateClient();
@@ -131,18 +133,60 @@ public class AuthRegistrationTests
                 password = "Password1",
                 firstName = "Focus",
                 lastName = "Parent",
-                termsId,
                 acceptTerms = true
             });
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
 
+    [Theory]
+    [InlineData("/api/auth/register/student")]
+    [InlineData("/api/auth/register/parent")]
+    public async Task Register_WhenTermsRejected_ReturnsBadRequestAndDoesNotCreateRecords(
+        string endpoint)
+    {
+        await using var factory = new CustomWebApplicationFactory();
+        await SeedRegistrationDependenciesAsync(
+            factory,
+            endpoint.EndsWith("student", StringComparison.Ordinal)
+                ? LegalDocumentAudience.Student
+                : LegalDocumentAudience.Parent);
+        using HttpClient client = factory.CreateClient();
+
+        HttpResponseMessage response = await client.PostAsJsonAsync(
+            endpoint,
+            new
+            {
+                email = "terms-rejected@example.com",
+                password = "Password1!",
+                firstName = "Focus",
+                lastName = "User",
+                acceptTerms = false
+            });
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+
+        using IServiceScope scope = factory.Services.CreateScope();
+        ApplicationDbContext dbContext = scope.ServiceProvider
+            .GetRequiredService<ApplicationDbContext>();
+
+        Assert.Empty(dbContext.Users);
+        Assert.Empty(dbContext.Students);
+        Assert.Empty(dbContext.Parents);
+        Assert.Empty(dbContext.UserTermsAcceptances);
+    }
+
     private static async Task<Guid> SeedRegistrationDependenciesAsync(
         CustomWebApplicationFactory factory,
         LegalDocumentAudience audience)
     {
-        LegalDocument terms = new(
+        LegalDocument oldTerms = new(
+            audience,
+            "2026-08-01",
+            $"{audience} old terms",
+            isPublished: true,
+            new DateTimeOffset(2026, 8, 1, 0, 0, 0, TimeSpan.Zero));
+        LegalDocument currentTerms = new(
             audience,
             "2026-09-04",
             $"{audience} terms",
@@ -154,11 +198,11 @@ public class AuthRegistrationTests
             db.Roles.AddRange(
                 CreateRole(ApplicationRoles.Student),
                 CreateRole(ApplicationRoles.Parent));
-            db.LegalDocuments.Add(terms);
+            db.LegalDocuments.AddRange(oldTerms, currentTerms);
             return Task.CompletedTask;
         });
 
-        return terms.Id;
+        return currentTerms.Id;
     }
 
     private static ApplicationRole CreateRole(string name)

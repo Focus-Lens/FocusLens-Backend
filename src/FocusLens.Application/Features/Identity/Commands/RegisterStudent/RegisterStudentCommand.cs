@@ -8,5 +8,4 @@ public sealed record RegisterStudentCommand(
     string Password,
     string FirstName,
     string LastName,
-    Guid? TermsId,
     bool AcceptTerms) : IRequest<Result<Success>>;

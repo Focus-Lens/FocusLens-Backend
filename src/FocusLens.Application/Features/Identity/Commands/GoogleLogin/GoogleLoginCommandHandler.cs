@@ -59,6 +59,7 @@ public sealed class GoogleLoginCommandHandler
         }
 
         bool accountCreated = false;
+        string requiredRole = GetRole(request.AccountType);
 
         ApplicationUser? user = await _identityService.FindByLoginAsync(
             LoginProvider,
@@ -94,6 +95,11 @@ public sealed class GoogleLoginCommandHandler
 
             if (!accountCreated)
             {
+                if (!await HasExpectedAccountTypeAsync(user, requiredRole))
+                {
+                    return ApplicationErrors.Identity.ExternalAccountTypeMismatch;
+                }
+
                 IdentityResultSummary loginResult = await _identityService.AddLoginAsync(
                     user,
                     LoginProvider,
@@ -119,13 +125,18 @@ public sealed class GoogleLoginCommandHandler
 
         IReadOnlyCollection<string> roles = await _identityService.GetRolesAsync(user);
 
+        if (!roles.Contains(requiredRole, StringComparer.Ordinal))
+        {
+            return ApplicationErrors.Identity.ExternalAccountTypeMismatch;
+        }
+
         Student? student = null;
 
         if (roles.Contains(ApplicationRoles.Student, StringComparer.Ordinal))
         {
             student = await _studentRepository.FirstOrDefaultAsync(
-            student => student.UserId == user.Id,
-            student => student.Subjects);
+                student => student.UserId == user.Id,
+                student => student.Subjects);
         }
 
         if (roles.Contains(ApplicationRoles.Student, StringComparer.Ordinal)
@@ -188,9 +199,7 @@ public sealed class GoogleLoginCommandHandler
                 return createResult.ToApplicationErrors();
             }
 
-            string role = accountType == LegalDocumentAudience.Parent
-                ? ApplicationRoles.Parent
-                : ApplicationRoles.Student;
+            string role = GetRole(accountType);
 
             IdentityResultSummary roleResult = await _identityService.AddToRoleAsync(
                 user,
@@ -234,4 +243,18 @@ public sealed class GoogleLoginCommandHandler
             throw;
         }
     }
+
+    private async Task<bool> HasExpectedAccountTypeAsync(
+        ApplicationUser user,
+        string requiredRole)
+    {
+        IReadOnlyCollection<string> roles = await _identityService.GetRolesAsync(user);
+
+        return roles.Contains(requiredRole, StringComparer.Ordinal);
+    }
+
+    private static string GetRole(LegalDocumentAudience accountType)
+        => accountType == LegalDocumentAudience.Parent
+            ? ApplicationRoles.Parent
+            : ApplicationRoles.Student;
 }

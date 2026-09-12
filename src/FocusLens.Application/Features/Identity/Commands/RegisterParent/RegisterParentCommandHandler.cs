@@ -60,23 +60,11 @@ public sealed class RegisterParentCommandHandler
             return ApplicationErrors.Identity.EmailAlreadyRegistered;
         }
 
-        if (request.TermsId is null)
-        {
-            return ApplicationErrors.Terms.DocumentNotFound;
-        }
-
-        LegalDocument? terms = await _legalDocumentRepository.GetByIdAsync(request.TermsId.Value);
+        LegalDocument? terms = await GetCurrentPublishedTermsAsync();
 
         if (terms is null)
         {
-            return ApplicationErrors.Terms.DocumentNotFound;
-        }
-
-        if (terms.Audience != LegalDocumentAudience.Parent
-            || !terms.IsPublished
-            || terms.PublishedOnUtc is null)
-        {
-            return ApplicationErrors.Terms.DocumentNotPublished;
+            return ApplicationErrors.Terms.NotFound;
         }
 
         DateTimeOffset utcNow = _timeProvider.GetUtcNow();
@@ -152,4 +140,17 @@ public sealed class RegisterParentCommandHandler
 
     private static string GenerateCode() =>
         RandomNumberGenerator.GetInt32(0, 1_000_000).ToString("D6");
+
+    private async Task<LegalDocument?> GetCurrentPublishedTermsAsync()
+    {
+        IEnumerable<LegalDocument> publishedDocuments =
+            await _legalDocumentRepository.GetAllAsync(
+                document => document.Audience == LegalDocumentAudience.Parent
+                    && document.IsPublished
+                    && document.PublishedOnUtc != null);
+
+        return publishedDocuments
+            .OrderByDescending(document => document.PublishedOnUtc)
+            .FirstOrDefault();
+    }
 }

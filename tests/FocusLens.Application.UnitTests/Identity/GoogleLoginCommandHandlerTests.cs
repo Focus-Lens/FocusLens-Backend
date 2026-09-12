@@ -29,6 +29,9 @@ public class GoogleLoginCommandHandlerTests
         Assert.True(result.Value.RequiresOnboarding);
         Assert.Equal("registration-token", result.Value.RegistrationToken);
         Assert.Single(fixture.Identity.Users);
+        Assert.Equal(
+            new[] { ApplicationRoles.Student },
+            fixture.Identity.GetRoles(result.Value.UserId));
         Assert.Single(await fixture.Students.GetAllAsync());
     }
 
@@ -107,8 +110,74 @@ public class GoogleLoginCommandHandlerTests
         Assert.NotNull(result.Value.Tokens);
         Assert.False(result.Value.RequiresOnboarding);
         Assert.Single(fixture.Identity.Users);
+        Assert.Equal(
+            new[] { ApplicationRoles.Parent },
+            fixture.Identity.GetRoles(result.Value.UserId));
         Assert.Empty(await fixture.Students.GetAllAsync());
         Assert.Single(await fixture.Parents.GetAllAsync());
+    }
+
+    [Fact]
+    public async Task Handle_WhenExistingParentUsesParentEndpoint_ReturnsTokens()
+    {
+        var fixture = CreateFixture();
+        ApplicationUser user = fixture.Identity.AddExistingGoogleParent(
+            providerKey: "google-subject",
+            email: "student@example.com");
+        fixture.Parents.Add(new Parent(user.Id));
+
+        var result = await fixture.Handler.Handle(
+            new GoogleLoginCommand("valid-google-token", LegalDocumentAudience.Parent),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.NotNull(result.Value.Tokens);
+        Assert.Equal("access-token", result.Value.Tokens.AccessToken);
+        Assert.Equal(new[] { ApplicationRoles.Parent }, result.Value.Roles);
+    }
+
+    [Fact]
+    public async Task Handle_WhenExistingParentUsesStudentEndpoint_ReturnsMismatchWithoutTokensOrRoleChange()
+    {
+        var fixture = CreateFixture();
+        ApplicationUser user = fixture.Identity.AddExistingGoogleParent(
+            providerKey: "google-subject",
+            email: "student@example.com");
+        fixture.Parents.Add(new Parent(user.Id));
+
+        var result = await fixture.Handler.Handle(
+            new GoogleLoginCommand("valid-google-token", LegalDocumentAudience.Student),
+            CancellationToken.None);
+
+        Assert.True(result.IsError);
+        Assert.Equal(
+            "Identity_External_Account_Type_Mismatch",
+            result.TopError.Code);
+        Assert.Equal(0, fixture.TokenProvider.TokenPairRequests);
+        Assert.Equal(0, fixture.TokenProvider.OnboardingTokenRequests);
+        Assert.Equal(new[] { ApplicationRoles.Parent }, fixture.Identity.GetRoles(user));
+    }
+
+    [Fact]
+    public async Task Handle_WhenExistingStudentUsesParentEndpoint_ReturnsMismatchWithoutTokensOrRoleChange()
+    {
+        var fixture = CreateFixture();
+        ApplicationUser user = fixture.Identity.AddExistingGoogleStudent(
+            providerKey: "google-subject",
+            email: "student@example.com");
+        fixture.Students.Add(new Student(user.Id));
+
+        var result = await fixture.Handler.Handle(
+            new GoogleLoginCommand("valid-google-token", LegalDocumentAudience.Parent),
+            CancellationToken.None);
+
+        Assert.True(result.IsError);
+        Assert.Equal(
+            "Identity_External_Account_Type_Mismatch",
+            result.TopError.Code);
+        Assert.Equal(0, fixture.TokenProvider.TokenPairRequests);
+        Assert.Equal(0, fixture.TokenProvider.OnboardingTokenRequests);
+        Assert.Equal(new[] { ApplicationRoles.Student }, fixture.Identity.GetRoles(user));
     }
 
     private static TestFixture CreateFixture()
@@ -135,6 +204,7 @@ public class GoogleLoginCommandHandlerTests
                 parents,
                 unitOfWork),
             identity,
+            tokenProvider,
             students,
             parents);
     }
@@ -142,6 +212,7 @@ public class GoogleLoginCommandHandlerTests
     private sealed record TestFixture(
         GoogleLoginCommandHandler Handler,
         FakeIdentityService Identity,
+        FakeTokenProvider TokenProvider,
         InMemoryRepository<Student> Students,
         InMemoryRepository<Parent> Parents);
 
@@ -163,6 +234,12 @@ public class GoogleLoginCommandHandlerTests
 
         public IReadOnlyCollection<ApplicationUser> Users => _users.Values;
 
+        public IReadOnlyCollection<string> GetRoles(ApplicationUser user)
+            => _roles.GetValueOrDefault(user.Id) ?? [];
+
+        public IReadOnlyCollection<string> GetRoles(Guid userId)
+            => _roles.GetValueOrDefault(userId) ?? [];
+
         public ApplicationUser AddExistingGoogleStudent(string providerKey, string email)
         {
             ApplicationUser user = new()
@@ -178,6 +255,25 @@ public class GoogleLoginCommandHandlerTests
             _usersByEmail.Add(email, user.Id);
             _usersByLogin.Add(LoginKey("Google", providerKey), user.Id);
             _roles.Add(user.Id, [ApplicationRoles.Student]);
+
+            return user;
+        }
+
+        public ApplicationUser AddExistingGoogleParent(string providerKey, string email)
+        {
+            ApplicationUser user = new()
+            {
+                Email = email,
+                UserName = email,
+                FirstName = "Focus",
+                LastName = "Parent",
+                EmailConfirmed = true
+            };
+
+            _users.Add(user.Id, user);
+            _usersByEmail.Add(email, user.Id);
+            _usersByLogin.Add(LoginKey("Google", providerKey), user.Id);
+            _roles.Add(user.Id, [ApplicationRoles.Parent]);
 
             return user;
         }
@@ -270,18 +366,30 @@ public class GoogleLoginCommandHandlerTests
 
     private sealed class FakeTokenProvider : ITokenProvider
     {
+        public int TokenPairRequests { get; private set; }
+
+        public int OnboardingTokenRequests { get; private set; }
+
         public Task<TokenPair> CreateTokenPairAsync(
             ApplicationUser user,
             CancellationToken cancellationToken = default)
-            => Task.FromResult(new TokenPair(
-                "access-token",
-                DateTimeOffset.UtcNow.AddMinutes(15),
-                "refresh-token",
-                DateTimeOffset.UtcNow.AddDays(30)));
+        {
+            TokenPairRequests++;
+
+            return Task.FromResult(new TokenPair(
+                    "access-token",
+                    DateTimeOffset.UtcNow.AddMinutes(15),
+                    "refresh-token",
+                    DateTimeOffset.UtcNow.AddDays(30)));
+        }
 
         public Task<(string Token, DateTimeOffset ExpiresOnUtc)> CreateOnboardingTokenAsync(
             ApplicationUser user)
-            => Task.FromResult(("registration-token", DateTimeOffset.UtcNow.AddMinutes(15)));
+        {
+            OnboardingTokenRequests++;
+
+            return Task.FromResult(("registration-token", DateTimeOffset.UtcNow.AddMinutes(15)));
+        }
 
         public ClaimsPrincipal GetPrincipalFromExpiredToken(string accessToken)
             => new();

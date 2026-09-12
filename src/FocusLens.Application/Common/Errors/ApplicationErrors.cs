@@ -42,6 +42,10 @@ public static class ApplicationErrors
             "Identity_External_Email_Not_Verified",
             "External account email address is not verified.");
 
+        public static readonly Error ExternalAccountTypeMismatch = Error.Forbidden(
+            "Identity_External_Account_Type_Mismatch",
+            "This Google account is already registered for a different account type.");
+
         public static Error OperationFailed(string description)
             => Error.Failure("Identity_Operation_Failed", description);
     }

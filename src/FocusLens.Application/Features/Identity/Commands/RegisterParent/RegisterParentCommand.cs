@@ -8,5 +8,4 @@ public sealed record RegisterParentCommand(
     string Password,
     string FirstName,
     string LastName,
-    Guid? TermsId,
     bool AcceptTerms) : IRequest<Result<Success>>;
