@@ -7,10 +7,12 @@ internal static class UserMappings
     public static UserProfileDto ToProfileDto(
         this ApplicationUser user,
         IReadOnlyCollection<string> roles)
-        => new(
+    {
+        return new UserProfileDto(
             user.Id,
             user.Email ?? string.Empty,
             user.FirstName,
             user.LastName,
             roles);
+    }
 }

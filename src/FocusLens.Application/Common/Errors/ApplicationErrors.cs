@@ -42,8 +42,8 @@ public static class ApplicationErrors
             "Identity_External_Email_Not_Verified",
             "External account email address is not verified.");
 
-        public static Error OperationFailed(string description)
-            => Error.Failure("Identity_Operation_Failed", description);
+        public static Error OperationFailed(string description) =>
+            Error.Failure("Identity_Operation_Failed", description);
     }
 
     public static class Otp

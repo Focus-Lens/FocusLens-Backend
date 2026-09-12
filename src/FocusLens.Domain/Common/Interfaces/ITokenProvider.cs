@@ -1,7 +1,5 @@
 using System.Security.Claims;
-
 using FocusLens.Domain.Identity;
-using FocusLens.Domain.Common.Interfaces;
 
 namespace FocusLens.Domain.Common.Interfaces;
 

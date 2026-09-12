@@ -1,3 +1,4 @@
+using System.Net;
 using FocusLens.Application.Common.Interfaces;
 using FocusLens.Settings;
 using MailKit.Net.Smtp;
@@ -12,10 +13,11 @@ public sealed class SmtpEmailSender : IEmailSender
     private const string EmailVerificationTemplate = "EmailVerification.html";
     private const string PasswordResetTemplate = "PasswordReset.html";
     private const string ParentStudentInvitationTemplate = "ParentStudentInvitation.html";
+    private const string ChildSetupInvitationTemplate = "ChildSetupInvitation.html";
+    private readonly InvitationSettings _invitationSettings;
 
     private readonly MailSettings _settings;
     private readonly EmailTemplateRenderer _templateRenderer;
-    private readonly InvitationSettings _invitationSettings;
 
     public SmtpEmailSender(
         IOptions<MailSettings> settings,
@@ -83,11 +85,7 @@ public sealed class SmtpEmailSender : IEmailSender
 
         string htmlBody = await _templateRenderer.RenderAsync(
             ParentStudentInvitationTemplate,
-            new Dictionary<string, string>
-            {
-                ["{{ParentEmail}}"] = parentEmail,
-                ["{{InvitationUrl}}"] = invitationUrl
-            },
+            new Dictionary<string, string> { ["{{ParentEmail}}"] = parentEmail, ["{{InvitationUrl}}"] = invitationUrl },
             cancellationToken);
 
         await SendAsync(
@@ -103,17 +101,34 @@ public sealed class SmtpEmailSender : IEmailSender
         string invitationUrl,
         CancellationToken cancellationToken = default)
     {
-        string encodedName = System.Net.WebUtility.HtmlEncode(studentDisplayName);
-        string encodedUrl = System.Net.WebUtility.HtmlEncode(invitationUrl);
+        string encodedName = WebUtility.HtmlEncode(studentDisplayName);
+        string encodedUrl = WebUtility.HtmlEncode(invitationUrl);
         string htmlBody = $"""
-            <p>{encodedName} invited you to connect on FocusLens.</p>
-            <p><a href=\"{encodedUrl}\">Review invitation</a></p>
-            <p>This invitation expires in 7 days.</p>
-            """;
+                           <p>{encodedName} invited you to connect on FocusLens.</p>
+                           <p><a href=\"{encodedUrl}\">Review invitation</a></p>
+                           <p>This invitation expires in 7 days.</p>
+                           """;
 
         return SendAsync(
             parentEmail,
             "You have a FocusLens invitation",
+            htmlBody,
+            cancellationToken);
+    }
+
+    public async Task SendChildSetupInvitationAsync(
+        string childEmail,
+        string invitationUrl,
+        CancellationToken cancellationToken = default)
+    {
+        string htmlBody = await _templateRenderer.RenderAsync(
+            ChildSetupInvitationTemplate,
+            new Dictionary<string, string> { ["{{InvitationUrl}}"] = invitationUrl },
+            cancellationToken);
+
+        await SendAsync(
+            childEmail,
+            "Your FocusLens setup is ready",
             htmlBody,
             cancellationToken);
     }
@@ -133,31 +148,28 @@ public sealed class SmtpEmailSender : IEmailSender
         message.To.Add(MailboxAddress.Parse(email));
         message.Subject = subject;
 
-        var bodyBuilder = new BodyBuilder
-        {
-            HtmlBody = htmlBody
-        };
+        BodyBuilder bodyBuilder = new() { HtmlBody = htmlBody };
 
-        var logoPath = Path.Combine(
+        string logoPath = Path.Combine(
             Directory.GetCurrentDirectory(),
             "wwwroot",
             "images",
             "focuslens-logo.png"
         );
 
-        var mascotPath = Path.Combine(
+        string mascotPath = Path.Combine(
             Directory.GetCurrentDirectory(),
             "wwwroot",
             "images",
             "focuslens-mascot.png"
         );
 
-        var logo = bodyBuilder.LinkedResources.Add(logoPath);
+        MimeEntity logo = bodyBuilder.LinkedResources.Add(logoPath);
         logo.ContentId = "focuslens-logo";
         logo.ContentDisposition =
             new ContentDisposition(ContentDisposition.Inline);
 
-        var mascot = bodyBuilder.LinkedResources.Add(mascotPath);
+        MimeEntity mascot = bodyBuilder.LinkedResources.Add(mascotPath);
         mascot.ContentId = "focuslens-mascot";
         mascot.ContentDisposition =
             new ContentDisposition(ContentDisposition.Inline);

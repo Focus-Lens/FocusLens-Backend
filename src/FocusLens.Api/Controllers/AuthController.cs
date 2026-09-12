@@ -8,6 +8,8 @@ using FocusLens.Application.Features.Identity.Commands.ResendVerificationCode;
 using FocusLens.Application.Features.Identity.Commands.ResetPassword;
 using FocusLens.Application.Features.Identity.Commands.RevokeRefreshToken;
 using FocusLens.Application.Features.Identity.Commands.VerifyEmail;
+using FocusLens.Application.Features.Identity.Dtos;
+using FocusLens.Domain.Common.Results;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -30,7 +32,7 @@ public sealed class AuthController : ApiController
         RegisterStudentCommand command,
         CancellationToken cancellationToken)
     {
-        var result = await _sender.Send(command, cancellationToken);
+        Result<Success> result = await _sender.Send(command, cancellationToken);
 
         return result.Match(
             _ => NoContent(),
@@ -43,7 +45,7 @@ public sealed class AuthController : ApiController
         RegisterParentCommand command,
         CancellationToken cancellationToken)
     {
-        var result = await _sender.Send(command, cancellationToken);
+        Result<Success> result = await _sender.Send(command, cancellationToken);
 
         return result.Match(
             _ => NoContent(),
@@ -56,7 +58,7 @@ public sealed class AuthController : ApiController
         LoginCommand command,
         CancellationToken cancellationToken)
     {
-        var result = await _sender.Send(command, cancellationToken);
+        Result<AuthResponse> result = await _sender.Send(command, cancellationToken);
 
         return result.Match(
             Ok,
@@ -69,7 +71,7 @@ public sealed class AuthController : ApiController
         GoogleLoginCommand command,
         CancellationToken cancellationToken)
     {
-        var result = await _sender.Send(command, cancellationToken);
+        Result<AuthResponse> result = await _sender.Send(command, cancellationToken);
 
         return result.Match(
             Ok,
@@ -82,20 +84,20 @@ public sealed class AuthController : ApiController
         RefreshTokenCommand command,
         CancellationToken cancellationToken)
     {
-        var result = await _sender.Send(command, cancellationToken);
+        Result<TokenResponse> result = await _sender.Send(command, cancellationToken);
 
         return result.Match(
             Ok,
             Problem);
     }
 
-  
+
     [HttpPost("logout")]
     public async Task<IActionResult> RevokeRefreshToken(
         RevokeRefreshTokenCommand command,
         CancellationToken cancellationToken)
     {
-        var result = await _sender.Send(command, cancellationToken);
+        Result<Success> result = await _sender.Send(command, cancellationToken);
 
         return result.Match(
             _ => NoContent(),
@@ -108,7 +110,7 @@ public sealed class AuthController : ApiController
         VerifyEmailCommand command,
         CancellationToken cancellationToken)
     {
-        var result = await _sender.Send(command, cancellationToken);
+        Result<Success> result = await _sender.Send(command, cancellationToken);
 
         return result.Match(
             _ => NoContent(),
@@ -121,7 +123,7 @@ public sealed class AuthController : ApiController
         ResendVerificationCodeCommand command,
         CancellationToken cancellationToken)
     {
-        var result = await _sender.Send(command, cancellationToken);
+        Result<Success> result = await _sender.Send(command, cancellationToken);
 
         return result.Match(
             _ => NoContent(),
@@ -134,7 +136,7 @@ public sealed class AuthController : ApiController
         ForgotPasswordCommand command,
         CancellationToken cancellationToken)
     {
-        var result = await _sender.Send(command, cancellationToken);
+        Result<Success> result = await _sender.Send(command, cancellationToken);
 
         return result.Match(
             _ => NoContent(),
@@ -147,7 +149,7 @@ public sealed class AuthController : ApiController
         ResetPasswordCommand command,
         CancellationToken cancellationToken)
     {
-        var result = await _sender.Send(command, cancellationToken);
+        Result<Success> result = await _sender.Send(command, cancellationToken);
 
         return result.Match(
             _ => NoContent(),

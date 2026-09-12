@@ -29,10 +29,7 @@ public sealed class GoogleTokenValidator : IGoogleTokenValidator
             GoogleJsonWebSignature.Payload payload =
                 await GoogleJsonWebSignature.ValidateAsync(
                     idToken,
-                    new GoogleJsonWebSignature.ValidationSettings
-                    {
-                        Audience = [_options.ClientId]
-                    });
+                    new GoogleJsonWebSignature.ValidationSettings { Audience = [_options.ClientId] });
 
             return new GoogleUserInfo(
                 payload.Subject,

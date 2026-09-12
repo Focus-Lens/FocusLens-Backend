@@ -10,7 +10,7 @@ public class TermsTests
     [Fact]
     public async Task GetTerms_ReturnsCurrentTerms()
     {
-        await using var factory = new CustomWebApplicationFactory();
+        await using CustomWebApplicationFactory factory = new();
         using HttpClient client = factory.CreateClient();
 
         JsonElement terms = await client.GetFromJsonAsync<JsonElement>("/api/terms");
@@ -24,7 +24,7 @@ public class TermsTests
     [InlineData(false)]
     public async Task SubmitDecision_ReturnsDecision(bool accepted)
     {
-        await using var factory = new CustomWebApplicationFactory();
+        await using CustomWebApplicationFactory factory = new();
         using HttpClient client = factory.CreateClient();
 
         HttpResponseMessage response = await client.PostAsJsonAsync(
@@ -42,7 +42,7 @@ public class TermsTests
     [Fact]
     public async Task SubmitDecision_WhenAcceptedIsMissing_ReturnsBadRequest()
     {
-        await using var factory = new CustomWebApplicationFactory();
+        await using CustomWebApplicationFactory factory = new();
         using HttpClient client = factory.CreateClient();
         using StringContent content = new("{}", Encoding.UTF8, "application/json");
 

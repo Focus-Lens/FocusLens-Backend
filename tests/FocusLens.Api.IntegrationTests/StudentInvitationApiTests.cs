@@ -69,15 +69,13 @@ public class StudentInvitationApiTests
         Parent parent = new(parentUserId);
         Student student = new(studentUserId);
         ParentStudentRelationship relationship = new(parent.Id, student.Id);
-        var factory = new CustomWebApplicationFactory();
+        CustomWebApplicationFactory factory = new();
 
         await factory.SeedAsync(db =>
         {
             db.Users.Add(new ApplicationUser
             {
-                Id = parentUserId,
-                Email = "parent@example.com",
-                UserName = "parent@example.com"
+                Id = parentUserId, Email = "parent@example.com", UserName = "parent@example.com"
             });
             db.Parents.Add(parent);
             db.Students.Add(student);

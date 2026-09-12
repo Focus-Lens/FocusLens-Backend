@@ -118,6 +118,116 @@ namespace FocusLens.Infrastructure.Data.Migrations
                     b.ToTable("StudentParentInvitations", (string)null);
                 });
 
+            modelBuilder.Entity("FocusLens.Domain.ChildSetup.ChildSetupDraft", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid?>("ClaimedByStudentId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("CreatedBy")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateOnly?>("DateOfBirth")
+                        .HasColumnType("date");
+
+                    b.Property<string>("FirstName")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("Grade")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<string>("LastModifiedBy")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTimeOffset>("LastModifiedUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("LastName")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<Guid>("ParentId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.PrimitiveCollection<string>("StudyPriorities")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)")
+                        .HasColumnName("StudyPriorities");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ClaimedByStudentId");
+
+                    b.HasIndex("ParentId");
+
+                    b.ToTable("ChildSetupDrafts", (string)null);
+                });
+
+            modelBuilder.Entity("FocusLens.Domain.ChildSetup.ChildSetupInvitation", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("ChildSetupDraftId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset?>("ClaimedAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("CreatedBy")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTimeOffset>("ExpiresAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("LastModifiedBy")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTimeOffset>("LastModifiedUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<string>("TargetEmailNormalized")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<string>("TokenHash")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("nvarchar(128)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TokenHash")
+                        .IsUnique();
+
+                    b.HasIndex("ChildSetupDraftId", "TargetEmailNormalized", "Status");
+
+                    b.ToTable("ChildSetupInvitations", (string)null);
+                });
+
             modelBuilder.Entity("FocusLens.Domain.Identity.ApplicationRole", b =>
                 {
                     b.Property<Guid>("Id")
@@ -321,9 +431,13 @@ namespace FocusLens.Infrastructure.Data.Migrations
                     b.Property<string>("CreatedBy")
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<string>("Goal")
-                        .HasMaxLength(50)
-                        .HasColumnType("nvarchar(50)");
+                    b.Property<DateOnly?>("DateOfBirth")
+                        .HasColumnType("date");
+
+                    b.PrimitiveCollection<string>("Goals")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)")
+                        .HasColumnName("Goals");
 
                     b.Property<string>("Grade")
                         .HasMaxLength(50)
@@ -343,6 +457,11 @@ namespace FocusLens.Infrastructure.Data.Migrations
                     b.Property<string>("PreferredName")
                         .HasMaxLength(100)
                         .HasColumnType("nvarchar(100)");
+
+                    b.PrimitiveCollection<string>("StudyPriorities")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)")
+                        .HasColumnName("StudyPriorities");
 
                     b.Property<Guid>("UserId")
                         .HasColumnType("uniqueidentifier");
@@ -760,6 +879,94 @@ namespace FocusLens.Infrastructure.Data.Migrations
                     b.Navigation("Student");
                 });
 
+            modelBuilder.Entity("FocusLens.Domain.ChildSetup.ChildSetupDraft", b =>
+                {
+                    b.HasOne("FocusLens.Domain.Student", null)
+                        .WithMany()
+                        .HasForeignKey("ClaimedByStudentId")
+                        .OnDelete(DeleteBehavior.NoAction);
+
+                    b.HasOne("FocusLens.Domain.Parent", null)
+                        .WithMany()
+                        .HasForeignKey("ParentId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.OwnsOne("FocusLens.Domain.Students.StudyTimeGoal", "StudyTimeGoal", b1 =>
+                        {
+                            b1.Property<Guid>("ChildSetupDraftId")
+                                .HasColumnType("uniqueidentifier");
+
+                            b1.Property<string>("Days")
+                                .IsRequired()
+                                .HasColumnType("nvarchar(max)")
+                                .HasColumnName("StudyTimeGoalDays");
+
+                            b1.Property<string>("Period")
+                                .IsRequired()
+                                .HasMaxLength(20)
+                                .HasColumnType("nvarchar(20)")
+                                .HasColumnName("StudyTimeGoalPeriod");
+
+                            b1.Property<DateOnly?>("StartDate")
+                                .HasColumnType("date")
+                                .HasColumnName("StudyTimeGoalStartDate");
+
+                            b1.Property<int>("TargetMinutes")
+                                .HasColumnType("int")
+                                .HasColumnName("StudyTimeGoalTargetMinutes");
+
+                            b1.HasKey("ChildSetupDraftId");
+
+                            b1.ToTable("ChildSetupDrafts");
+
+                            b1.WithOwner()
+                                .HasForeignKey("ChildSetupDraftId");
+                        });
+
+                    b.OwnsMany("FocusLens.Domain.ChildSetup.ChildSetupSubject", "Subjects", b1 =>
+                        {
+                            b1.Property<Guid>("Id")
+                                .HasColumnType("uniqueidentifier");
+
+                            b1.Property<Guid>("ChildSetupDraftId")
+                                .HasColumnType("uniqueidentifier");
+
+                            b1.Property<string>("CustomName")
+                                .HasMaxLength(200)
+                                .HasColumnType("nvarchar(200)");
+
+                            b1.Property<string>("Type")
+                                .IsRequired()
+                                .HasMaxLength(50)
+                                .HasColumnType("nvarchar(50)");
+
+                            b1.HasKey("Id");
+
+                            b1.HasIndex("ChildSetupDraftId");
+
+                            b1.ToTable("ChildSetupSubjects", (string)null);
+
+                            b1.WithOwner()
+                                .HasForeignKey("ChildSetupDraftId");
+                        });
+
+                    b.Navigation("StudyTimeGoal");
+
+                    b.Navigation("Subjects");
+                });
+
+            modelBuilder.Entity("FocusLens.Domain.ChildSetup.ChildSetupInvitation", b =>
+                {
+                    b.HasOne("FocusLens.Domain.ChildSetup.ChildSetupDraft", "ChildSetupDraft")
+                        .WithMany()
+                        .HasForeignKey("ChildSetupDraftId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("ChildSetupDraft");
+                });
+
             modelBuilder.Entity("FocusLens.Domain.Identity.RefreshToken", b =>
                 {
                     b.HasOne("FocusLens.Domain.Identity.ApplicationUser", null)
@@ -788,6 +995,36 @@ namespace FocusLens.Infrastructure.Data.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
+                    b.OwnsOne("FocusLens.Domain.Students.StudyTimeGoal", "StudyTimeGoal", b1 =>
+                        {
+                            b1.Property<Guid>("StudentId")
+                                .HasColumnType("uniqueidentifier");
+
+                            b1.Property<string>("Days")
+                                .IsRequired()
+                                .HasColumnType("nvarchar(max)")
+                                .HasColumnName("StudyTimeGoalDays");
+
+                            b1.Property<string>("Period")
+                                .IsRequired()
+                                .HasMaxLength(20)
+                                .HasColumnType("nvarchar(20)");
+
+                            b1.Property<DateOnly?>("StartDate")
+                                .HasColumnType("date")
+                                .HasColumnName("StudyTimeGoalStartDate");
+
+                            b1.Property<int>("TargetMinutes")
+                                .HasColumnType("int");
+
+                            b1.HasKey("StudentId");
+
+                            b1.ToTable("Students");
+
+                            b1.WithOwner()
+                                .HasForeignKey("StudentId");
+                        });
+
                     b.OwnsMany("FocusLens.Domain.Students.StudentSubject", "Subjects", b1 =>
                         {
                             b1.Property<Guid>("Id")
@@ -814,6 +1051,8 @@ namespace FocusLens.Infrastructure.Data.Migrations
                             b1.WithOwner()
                                 .HasForeignKey("StudentId");
                         });
+
+                    b.Navigation("StudyTimeGoal");
 
                     b.Navigation("Subjects");
 

@@ -1,6 +1,8 @@
 using FocusLens.Application.Features.Users.Commands.ChangePassword;
 using FocusLens.Application.Features.Users.Commands.UpdateCurrentUser;
+using FocusLens.Application.Features.Users.Dtos;
 using FocusLens.Application.Features.Users.Queries.GetCurrentUser;
+using FocusLens.Domain.Common.Results;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -22,7 +24,7 @@ public sealed class UsersController : ApiController
     public async Task<IActionResult> GetCurrentUser(
         CancellationToken cancellationToken)
     {
-        var result = await _sender.Send(
+        Result<UserProfileDto> result = await _sender.Send(
             new GetCurrentUserQuery(),
             cancellationToken);
 
@@ -36,7 +38,7 @@ public sealed class UsersController : ApiController
         UpdateCurrentUserCommand command,
         CancellationToken cancellationToken)
     {
-        var result = await _sender.Send(command, cancellationToken);
+        Result<UserProfileDto> result = await _sender.Send(command, cancellationToken);
 
         return result.Match(
             Ok,
@@ -48,7 +50,7 @@ public sealed class UsersController : ApiController
         ChangePasswordCommand command,
         CancellationToken cancellationToken)
     {
-        var result = await _sender.Send(command, cancellationToken);
+        Result<Success> result = await _sender.Send(command, cancellationToken);
 
         return result.Match(
             _ => NoContent(),

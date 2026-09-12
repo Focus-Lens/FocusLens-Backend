@@ -1,5 +1,4 @@
 using FocusLens.Contracts;
-
 using MediatR;
 
 namespace FocusLens.Application.Parents;

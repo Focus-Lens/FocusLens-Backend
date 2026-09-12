@@ -25,4 +25,9 @@ public interface IEmailSender
         string studentDisplayName,
         string invitationUrl,
         CancellationToken cancellationToken = default);
+
+    Task SendChildSetupInvitationAsync(
+        string childEmail,
+        string invitationUrl,
+        CancellationToken cancellationToken = default);
 }

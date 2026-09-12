@@ -1,5 +1,4 @@
 using System.Security.Cryptography;
-
 using FocusLens.Application.Common.Errors;
 using FocusLens.Application.Common.Interfaces;
 using FocusLens.Application.Features.Identity.Options;
@@ -16,13 +15,13 @@ namespace FocusLens.Application.Features.Identity.Commands.RegisterStudent;
 public sealed class RegisterStudentCommandHandler
     : IRequestHandler<RegisterStudentCommand, Result<Success>>
 {
-    private readonly IIdentityService _identityService;
-    private readonly IBaseRepository<Student> _studentRepository;
-    private readonly IUnitOfWork _unitOfWork;
     private readonly IEmailVerificationCodeStore _codeStore;
     private readonly IEmailSender _emailSender;
-    private readonly TimeProvider _timeProvider;
+    private readonly IIdentityService _identityService;
     private readonly RegistrationOptions _registrationOptions;
+    private readonly IBaseRepository<Student> _studentRepository;
+    private readonly TimeProvider _timeProvider;
+    private readonly IUnitOfWork _unitOfWork;
 
     public RegisterStudentCommandHandler(
         IIdentityService identityService,
@@ -56,7 +55,7 @@ public sealed class RegisterStudentCommandHandler
         DateTimeOffset utcNow = _timeProvider.GetUtcNow();
 
         TimeSpan codeLifetime = TimeSpan.FromMinutes(
-    _registrationOptions.EmailVerificationCodeLifetimeMinutes);
+            _registrationOptions.EmailVerificationCodeLifetimeMinutes);
 
         ApplicationUser user = new()
         {
@@ -120,6 +119,5 @@ public sealed class RegisterStudentCommandHandler
         return Result.Success;
     }
 
-    private static string GenerateCode()
-        => RandomNumberGenerator.GetInt32(0, 1_000_000).ToString("D6");
+    private static string GenerateCode() => RandomNumberGenerator.GetInt32(0, 1_000_000).ToString("D6");
 }

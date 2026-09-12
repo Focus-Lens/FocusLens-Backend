@@ -8,7 +8,7 @@ public class AuthRouteTests
     [Fact]
     public async Task GoogleLoginRoute_IsReplaced()
     {
-        await using var factory = new CustomWebApplicationFactory();
+        await using CustomWebApplicationFactory factory = new();
         using HttpClient client = factory.CreateClient();
         using StringContent content = new("""{"idToken":"token"}""", Encoding.UTF8, "application/json");
 
@@ -20,7 +20,7 @@ public class AuthRouteTests
     [Fact]
     public async Task ContinueWithGoogleRoute_Exists()
     {
-        await using var factory = new CustomWebApplicationFactory();
+        await using CustomWebApplicationFactory factory = new();
         using HttpClient client = factory.CreateClient();
         using StringContent content = new("{}", Encoding.UTF8, "application/json");
 

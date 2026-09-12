@@ -19,8 +19,8 @@ public sealed class GoogleLoginCommandHandler
 
     private readonly IGoogleTokenValidator _googleTokenValidator;
     private readonly IIdentityService _identityService;
-    private readonly ITokenProvider _tokenProvider;
     private readonly IBaseRepository<Student> _studentRepository;
+    private readonly ITokenProvider _tokenProvider;
     private readonly IUnitOfWork _unitOfWork;
 
     public GoogleLoginCommandHandler(
@@ -125,7 +125,8 @@ public sealed class GoogleLoginCommandHandler
         {
             if (accountCreated)
             {
-                var registrationToken = await _tokenProvider.CreateOnboardingTokenAsync(user);
+                (string Token, DateTimeOffset ExpiresOnUtc) registrationToken =
+                    await _tokenProvider.CreateOnboardingTokenAsync(user);
 
                 return new AuthResponse(
                     user.Id,
@@ -133,11 +134,11 @@ public sealed class GoogleLoginCommandHandler
                     user.FirstName,
                     user.LastName,
                     roles,
-                    Tokens: null,
-                    RequiresOnboarding: true,
-                    RegistrationToken: registrationToken.Token,
-                    RegistrationTokenExpiresOnUtc: registrationToken.ExpiresOnUtc,
-                    AccountCreated: true);
+                    null,
+                    true,
+                    registrationToken.Token,
+                    registrationToken.ExpiresOnUtc,
+                    true);
             }
 
             TokenPair incompleteOnboardingTokenPair = await _tokenProvider.CreateTokenPairAsync(
@@ -147,7 +148,7 @@ public sealed class GoogleLoginCommandHandler
             return user.ToAuthResponse(
                 roles,
                 incompleteOnboardingTokenPair,
-                isOnboardingCompleted: false);
+                false);
         }
 
         TokenPair tokenPair = await _tokenProvider.CreateTokenPairAsync(

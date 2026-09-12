@@ -1,5 +1,6 @@
 using FocusLens.Application.StudySessions;
 using FocusLens.Contracts.StudySessions;
+using FocusLens.Domain.Common.Results;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -15,10 +16,12 @@ public sealed class StudySessionsController(ISender sender) : ApiController
     public async Task<IActionResult> Create(
         [FromBody] CreateStudySessionRequest request,
         CancellationToken cancellationToken
-    ) =>
-        ToActionResult(
+    )
+    {
+        return ToActionResult(
             await sender.Send(new CreateStudySessionCommand(request), cancellationToken)
         );
+    }
 
     [HttpGet("{sessionId:guid}")]
     public async Task<IActionResult> Get(Guid sessionId, CancellationToken cancellationToken)
@@ -31,23 +34,29 @@ public sealed class StudySessionsController(ISender sender) : ApiController
     }
 
     [HttpPut("{sessionId:guid}/mode")]
-    public async Task<IActionResult> SetMode(Guid sessionId, [FromBody] SetStudySessionModeRequest request, CancellationToken cancellationToken)
+    public async Task<IActionResult> SetMode(Guid sessionId, [FromBody] SetStudySessionModeRequest request,
+        CancellationToken cancellationToken)
     {
-        var result = await sender.Send(new SetStudySessionModeCommand(sessionId, request), cancellationToken);
+        Result<Success> result =
+            await sender.Send(new SetStudySessionModeCommand(sessionId, request), cancellationToken);
         return result.Match(_ => NoContent(), Problem);
     }
 
     [HttpPut("{sessionId:guid}/subject")]
-    public async Task<IActionResult> SetSubject(Guid sessionId, [FromBody] SetStudySessionSubjectRequest request, CancellationToken cancellationToken)
+    public async Task<IActionResult> SetSubject(Guid sessionId, [FromBody] SetStudySessionSubjectRequest request,
+        CancellationToken cancellationToken)
     {
-        var result = await sender.Send(new SetStudySessionSubjectCommand(sessionId, request), cancellationToken);
+        Result<Success> result =
+            await sender.Send(new SetStudySessionSubjectCommand(sessionId, request), cancellationToken);
         return result.Match(_ => NoContent(), Problem);
     }
 
     [HttpPut("{sessionId:guid}/duration")]
-    public async Task<IActionResult> SetDuration(Guid sessionId, [FromBody] SetStudySessionDurationRequest request, CancellationToken cancellationToken)
+    public async Task<IActionResult> SetDuration(Guid sessionId, [FromBody] SetStudySessionDurationRequest request,
+        CancellationToken cancellationToken)
     {
-        var result = await sender.Send(new SetStudySessionDurationCommand(sessionId, request), cancellationToken);
+        Result<Success> result = await sender.Send(new SetStudySessionDurationCommand(sessionId, request),
+            cancellationToken);
         return result.Match(_ => NoContent(), Problem);
     }
 
@@ -56,39 +65,45 @@ public sealed class StudySessionsController(ISender sender) : ApiController
         Guid sessionId,
         [FromBody] SetStudySessionSelectionRequest request,
         CancellationToken cancellationToken
-    ) =>
-        ToActionResult(
+    )
+    {
+        return ToActionResult(
             await sender.Send(
                 new SetStudySessionSelectionCommand(sessionId, request),
                 cancellationToken
             )
         );
+    }
 
     [HttpPut("{sessionId:guid}/selection")]
     public async Task<IActionResult> UpdateSelection(
         Guid sessionId,
         [FromBody] SetStudySessionSelectionRequest request,
         CancellationToken cancellationToken
-    ) =>
-        ToActionResult(
+    )
+    {
+        return ToActionResult(
             await sender.Send(
                 new UpdateStudySessionSelectionCommand(sessionId, request),
                 cancellationToken
             )
         );
+    }
 
     [HttpPost("{sessionId:guid}/sections")]
     public async Task<IActionResult> ReceiveSections(
         Guid sessionId,
         [FromBody] ReceiveStudySessionSectionsRequest request,
         CancellationToken cancellationToken
-    ) =>
-        ToActionResult(
+    )
+    {
+        return ToActionResult(
             await sender.Send(
                 new ReceiveStudySessionSectionsCommand(sessionId, request),
                 cancellationToken
             )
         );
+    }
 
     [HttpPut("{sessionId:guid}/material")]
     [Consumes("multipart/form-data")]
@@ -100,7 +115,7 @@ public sealed class StudySessionsController(ISender sender) : ApiController
     {
         if (file.Length == 0)
         {
-            return Problem([FocusLens.Domain.Common.Results.Error.Validation("StudyMaterials.EmptyFile", "The uploaded file is empty.")]);
+            return Problem([Error.Validation("StudyMaterials.EmptyFile", "The uploaded file is empty.")]);
         }
 
         return ToActionResult(await sender.Send(new ChangeStudySessionMaterialCommand(
@@ -114,21 +129,25 @@ public sealed class StudySessionsController(ISender sender) : ApiController
     [HttpPost("{sessionId:guid}/start")]
     public async Task<IActionResult> Start(Guid sessionId, CancellationToken cancellationToken)
     {
-        var result = await sender.Send(new StartStudySessionCommand(sessionId), cancellationToken);
+        Result<Success> result = await sender.Send(new StartStudySessionCommand(sessionId), cancellationToken);
         return result.Match(_ => NoContent(), Problem);
     }
 
     [HttpPost("{sessionId:guid}/pause")]
-    public async Task<IActionResult> Pause(Guid sessionId, CancellationToken cancellationToken) =>
-        ToActionResult(
+    public async Task<IActionResult> Pause(Guid sessionId, CancellationToken cancellationToken)
+    {
+        return ToActionResult(
             await sender.Send(new PauseStudySessionCommand(sessionId), cancellationToken)
         );
+    }
 
     [HttpPost("{sessionId:guid}/resume")]
-    public async Task<IActionResult> Resume(Guid sessionId, CancellationToken cancellationToken) =>
-        ToActionResult(
+    public async Task<IActionResult> Resume(Guid sessionId, CancellationToken cancellationToken)
+    {
+        return ToActionResult(
             await sender.Send(new ResumeStudySessionCommand(sessionId), cancellationToken)
         );
+    }
 
     [HttpPost("{sessionId:guid}/end")]
     public async Task<IActionResult> End(Guid sessionId, CancellationToken cancellationToken) =>
@@ -139,13 +158,15 @@ public sealed class StudySessionsController(ISender sender) : ApiController
         Guid sessionId,
         [FromBody] UpdateStudySessionProgressRequest request,
         CancellationToken cancellationToken
-    ) =>
-        ToActionResult(
+    )
+    {
+        return ToActionResult(
             await sender.Send(
                 new UpdateStudySessionProgressCommand(sessionId, request),
                 cancellationToken
             )
         );
+    }
 
     [HttpPost("{sessionId:guid}/upload-material")]
     [Consumes("multipart/form-data")]
@@ -159,12 +180,12 @@ public sealed class StudySessionsController(ISender sender) : ApiController
         if (file.Length == 0)
         {
             return Problem(
-                new List<FocusLens.Domain.Common.Results.Error>
+                new List<Error>
                 {
-                    FocusLens.Domain.Common.Results.Error.Validation(
+                    Error.Validation(
                         "StudyMaterials.EmptyFile",
                         "The uploaded file is empty."
-                    ),
+                    )
                 }
             );
         }
@@ -180,11 +201,11 @@ public sealed class StudySessionsController(ISender sender) : ApiController
     private static async Task<byte[]> ReadFileAsync(IFormFile file, CancellationToken cancellationToken)
     {
         await using Stream input = file.OpenReadStream();
-        using var buffer = new MemoryStream();
+        using MemoryStream buffer = new();
         await input.CopyToAsync(buffer, cancellationToken);
         return buffer.ToArray();
     }
 
-    private ActionResult ToActionResult<TResponse>(FocusLens.Domain.Common.Results.Result<TResponse> result)
-        => result.IsSuccess ? Ok(result.Value) : Problem(result.Errors);
+    private ActionResult ToActionResult<TResponse>(Result<TResponse> result) =>
+        result.IsSuccess ? Ok(result.Value) : Problem(result.Errors);
 }

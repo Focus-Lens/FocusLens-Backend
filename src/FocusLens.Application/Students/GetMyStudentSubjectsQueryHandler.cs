@@ -1,9 +1,9 @@
-using ICurrentUser = FocusLens.Application.Common.Interfaces.ICurrentUser;
 using FocusLens.Application.Common.Mappings;
 using FocusLens.Contracts.Students;
 using FocusLens.Domain;
 using FocusLens.Domain.Common.Interfaces;
 using MediatR;
+using ICurrentUser = FocusLens.Application.Common.Interfaces.ICurrentUser;
 
 namespace FocusLens.Application.Students;
 
@@ -26,11 +26,11 @@ public sealed class GetMyStudentSubjectsQueryHandler(
             item => item.Subjects);
 
         return student?.Subjects
-            .Select(subject => new StudentSubjectResponse(
-                subject.Id,
-                StudentEnumMapper.ToContract(subject.Type),
-                subject.CustomName))
-            .ToArray()
-            ?? [];
+                   .Select(subject => new StudentSubjectResponse(
+                       subject.Id,
+                       StudentEnumMapper.ToContract(subject.Type),
+                       subject.CustomName))
+                   .ToArray()
+               ?? [];
     }
 }

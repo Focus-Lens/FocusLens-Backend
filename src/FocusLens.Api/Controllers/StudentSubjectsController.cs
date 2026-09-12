@@ -1,5 +1,6 @@
 using FocusLens.Application.Students;
 using FocusLens.Contracts.Students;
+using FocusLens.Domain.Common.Results;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -12,15 +13,15 @@ namespace FocusLens.API.Controllers;
 public sealed class StudentSubjectsController(ISender sender) : ApiController
 {
     [HttpGet]
-    public async Task<IActionResult> Get(CancellationToken cancellationToken)
-        => Ok(await sender.Send(new GetMyStudentSubjectsQuery(), cancellationToken));
+    public async Task<IActionResult> Get(CancellationToken cancellationToken) =>
+        Ok(await sender.Send(new GetMyStudentSubjectsQuery(), cancellationToken));
 
     [HttpPost]
     public async Task<IActionResult> CreateCustom(
         [FromBody] CreateCustomStudentSubjectRequest request,
         CancellationToken cancellationToken)
     {
-        var result = await sender.Send(
+        Result<CustomStudentSubjectResponse> result = await sender.Send(
             new CreateCustomStudentSubjectCommand(request),
             cancellationToken);
 

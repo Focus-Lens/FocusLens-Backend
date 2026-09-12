@@ -1,7 +1,4 @@
-using ContractStudentSubjectType = FocusLens.Contracts.Students.StudentSubjectType;
-using ICurrentUser = FocusLens.Application.Common.Interfaces.ICurrentUser;
 using FocusLens.Application.Common.Errors;
-using FocusLens.Application.Common.Interfaces;
 using FocusLens.Application.Common.Mappings;
 using FocusLens.Application.Features.Identity.Dtos;
 using FocusLens.Contracts.Students;
@@ -9,10 +6,16 @@ using FocusLens.Domain;
 using FocusLens.Domain.Common.Constants;
 using FocusLens.Domain.Common.Interfaces;
 using FocusLens.Domain.Common.Results;
-using FocusLens.Domain.Students;
 using FocusLens.Domain.Identity;
 using FocusLens.Domain.Interfaces;
+using FocusLens.Domain.Students;
 using MediatR;
+using ContractStudentSubjectType = FocusLens.Contracts.Students.StudentSubjectType;
+using ICurrentUser = FocusLens.Application.Common.Interfaces.ICurrentUser;
+using DomainStudentGoal = FocusLens.Domain.Students.StudentGoal;
+using DomainStudyPriority = FocusLens.Domain.Students.StudyPriority;
+using DomainStudyTimeGoal = FocusLens.Domain.Students.StudyTimeGoal;
+using DomainStudyTimeGoalPeriod = FocusLens.Domain.Students.StudyTimeGoalPeriod;
 
 namespace FocusLens.Application.Students;
 
@@ -50,14 +53,48 @@ public sealed class CompleteStudentOnboardingCommandHandler(
             .Select(MapSubject)
             .ToList();
 
+        DomainStudentGoal[] goals = (request.Request.Goals ?? [])
+            .Select(StudentEnumMapper.ToDomain)
+            .ToArray();
+
         student.CompleteOnboarding(
-            request.Request.Goal is null
-                ? null
-                : StudentEnumMapper.ToDomain(request.Request.Goal.Value),
+            goals,
             request.Request.Grade is null
                 ? null
                 : StudentEnumMapper.ToDomain(request.Request.Grade.Value),
             subjects);
+
+        student.SetDateOfBirth(request.Request.DateOfBirth);
+
+        DomainStudyPriority[] priorities =
+            (request.Request.StudyPriorities ?? [])
+            .Select(priority =>
+                Enum.Parse<DomainStudyPriority>(priority.ToString()))
+            .ToArray();
+
+        student.ReplaceStudyPriorities(priorities);
+
+        DomainStudyTimeGoal? studyTimeGoal = null;
+
+        if (request.Request.StudyTimeGoal is not null)
+        {
+            Result<DomainStudyTimeGoal> studyTimeGoalResult =
+                DomainStudyTimeGoal.Create(
+                    Enum.Parse<DomainStudyTimeGoalPeriod>(
+                        request.Request.StudyTimeGoal.Period.ToString()),
+                    request.Request.StudyTimeGoal.TargetMinutes,
+                    request.Request.StudyTimeGoal.Days ?? [],
+                    request.Request.StudyTimeGoal.StartDate);
+
+            if (studyTimeGoalResult.IsError)
+            {
+                return studyTimeGoalResult.TopError;
+            }
+
+            studyTimeGoal = studyTimeGoalResult.Value;
+        }
+
+        student.SetStudyTimeGoal(studyTimeGoal);
 
         await unitOfWork.SaveChangesAsync();
 

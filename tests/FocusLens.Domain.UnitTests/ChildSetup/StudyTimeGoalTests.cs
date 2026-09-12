@@ -1,0 +1,132 @@
+using FocusLens.Domain.Students;
+
+namespace FocusLens.Domain.UnitTests.ChildSetup;
+
+public class StudyTimeGoalTests
+{
+    [Fact]
+    public void Create_WithPositiveDailyTargetAndDays_CreatesGoal()
+    {
+        DateOnly startDate = new(2026, 9, 14);
+
+        var result = StudyTimeGoal.Create(
+            StudyTimeGoalPeriod.Daily,
+            60,
+            [DayOfWeek.Monday, DayOfWeek.Wednesday, DayOfWeek.Friday],
+            startDate);
+
+        Assert.True(result.IsSuccess);
+
+        StudyTimeGoal goal = result.Value;
+
+        Assert.Equal(StudyTimeGoalPeriod.Daily, goal.Period);
+        Assert.Equal(60, goal.TargetMinutes);
+        Assert.Equal(
+            [DayOfWeek.Monday, DayOfWeek.Wednesday, DayOfWeek.Friday],
+            goal.Days);
+        Assert.Equal(startDate, goal.StartDate);
+    }
+
+    [Fact]
+    public void Create_WithZeroTarget_ReturnsError()
+    {
+        var result = StudyTimeGoal.Create(
+            StudyTimeGoalPeriod.Daily,
+            0,
+            [DayOfWeek.Monday],
+            null);
+
+        Assert.True(result.IsError);
+    }
+
+    [Fact]
+    public void Create_WithNegativeTarget_ReturnsError()
+    {
+        var result = StudyTimeGoal.Create(
+            StudyTimeGoalPeriod.Weekly,
+            -10,
+            [],
+            null);
+
+        Assert.True(result.IsError);
+    }
+
+    [Fact]
+    public void Create_WithInvalidPeriod_ReturnsError()
+    {
+        var result = StudyTimeGoal.Create(
+            (StudyTimeGoalPeriod)999,
+            60,
+            [],
+            null);
+
+        Assert.True(result.IsError);
+    }
+
+    [Fact]
+    public void Create_WithDailyGoalAndNoDays_ReturnsError()
+    {
+        var result = StudyTimeGoal.Create(
+            StudyTimeGoalPeriod.Daily,
+            60,
+            [],
+            null);
+
+        Assert.True(result.IsError);
+    }
+
+    [Fact]
+    public void Create_WithWeeklyGoalAndDays_ReturnsError()
+    {
+        var result = StudyTimeGoal.Create(
+            StudyTimeGoalPeriod.Weekly,
+            60,
+            [DayOfWeek.Monday],
+            null);
+
+        Assert.True(result.IsError);
+    }
+
+    [Fact]
+    public void Create_WithDuplicateDays_ReturnsError()
+    {
+        var result = StudyTimeGoal.Create(
+            StudyTimeGoalPeriod.Daily,
+            60,
+            [DayOfWeek.Monday, DayOfWeek.Monday],
+            null);
+
+        Assert.True(result.IsError);
+    }
+
+    [Fact]
+    public void Create_WithInvalidDay_ReturnsError()
+    {
+        var result = StudyTimeGoal.Create(
+            StudyTimeGoalPeriod.Daily,
+            60,
+            [(DayOfWeek)999],
+            null);
+
+        Assert.True(result.IsError);
+    }
+
+    [Fact]
+    public void Create_WithWeeklyGoalAndNoDays_CreatesGoal()
+    {
+        var result = StudyTimeGoal.Create(
+            StudyTimeGoalPeriod.Weekly,
+            480,
+            [],
+            null);
+
+        Assert.True(result.IsSuccess);
+
+        StudyTimeGoal goal = result.Value;
+
+        Assert.Equal(StudyTimeGoalPeriod.Weekly, goal.Period);
+        Assert.Equal(480, goal.TargetMinutes);
+        Assert.Empty(goal.Days);
+        Assert.Null(goal.StartDate);
+    }
+}

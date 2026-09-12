@@ -1,4 +1,3 @@
-using FocusLens.Domain;
 using FocusLens.Domain.Access;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;

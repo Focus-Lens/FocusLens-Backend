@@ -1,4 +1,5 @@
 using FluentValidation;
+using FluentValidation.Results;
 using FocusLens.Domain.Common.Results;
 using MediatR;
 
@@ -27,14 +28,17 @@ public sealed class ValidationBehavior<TRequest, TResponse>
 
         ValidationContext<TRequest> context = new(request);
 
-        List<Error> errors = [.. (await Task.WhenAll(
+        List<Error> errors =
+        [
+            .. (await Task.WhenAll(
                 _validators.Select(validator => validator.ValidateAsync(context, cancellationToken))))
             .SelectMany(result => result.Errors)
             .Where(failure => failure is not null)
             .Select(failure => Error.Validation(
                 failure.ErrorCode,
                 failure.ErrorMessage))
-            .Distinct()];
+            .Distinct()
+        ];
 
         if (errors.Count == 0)
         {
@@ -46,11 +50,11 @@ public sealed class ValidationBehavior<TRequest, TResponse>
         if (responseType.IsGenericType
             && responseType.GetGenericTypeDefinition() == typeof(Result<>))
         {
-            return (TResponse)Activator.CreateInstance(responseType, [null, errors, false])!;
+            return (TResponse)Activator.CreateInstance(responseType, null, errors, false)!;
         }
 
         throw new ValidationException(
-            errors.Select(error => new FluentValidation.Results.ValidationFailure(
+            errors.Select(error => new ValidationFailure(
                 error.Code,
                 error.Description)));
     }

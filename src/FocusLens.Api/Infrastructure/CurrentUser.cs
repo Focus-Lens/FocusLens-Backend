@@ -1,5 +1,4 @@
 using System.Security.Claims;
-
 using FocusLens.Application.Common.Interfaces;
 
 namespace FocusLens.API.Infrastructure;

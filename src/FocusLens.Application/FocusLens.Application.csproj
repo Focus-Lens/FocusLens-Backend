@@ -1,20 +1,20 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
-  <PropertyGroup>
-    <TargetFramework>net10.0</TargetFramework>
-    <ImplicitUsings>enable</ImplicitUsings>
-    <Nullable>enable</Nullable>
-  </PropertyGroup>
+    <PropertyGroup>
+        <TargetFramework>net10.0</TargetFramework>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <Nullable>enable</Nullable>
+    </PropertyGroup>
 
-  <ItemGroup>
-    <PackageReference Include="FluentValidation" />
-    <PackageReference Include="FluentValidation.DependencyInjectionExtensions" />
-    <PackageReference Include="MediatR" />
-  </ItemGroup>
+    <ItemGroup>
+        <PackageReference Include="FluentValidation"/>
+        <PackageReference Include="FluentValidation.DependencyInjectionExtensions"/>
+        <PackageReference Include="MediatR"/>
+    </ItemGroup>
 
-<ItemGroup>
-  <ProjectReference Include="../FocusLens.Domain/FocusLens.Domain.csproj" />
-  <ProjectReference Include="..\FocusLens.Contracts\FocusLens.Contracts.csproj" />
-</ItemGroup>
+    <ItemGroup>
+        <ProjectReference Include="../FocusLens.Domain/FocusLens.Domain.csproj"/>
+        <ProjectReference Include="..\FocusLens.Contracts\FocusLens.Contracts.csproj"/>
+    </ItemGroup>
 
 </Project>

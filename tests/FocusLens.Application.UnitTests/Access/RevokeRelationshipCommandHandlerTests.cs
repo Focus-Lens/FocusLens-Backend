@@ -22,9 +22,9 @@ public class RevokeRelationshipCommandHandlerTests
         relationship.SetPrivateProperty("Student", student);
         relationship.Accept();
 
-        var unitOfWork = new FakeUnitOfWork();
+        FakeUnitOfWork unitOfWork = new();
 
-        var handler = new RevokeRelationshipCommandHandler(
+        RevokeRelationshipCommandHandler handler = new(
             new InMemoryRepository<ParentStudentRelationship>(relationship),
             new FakeCurrentUser(parentUserId),
             unitOfWork);
@@ -54,9 +54,9 @@ public class RevokeRelationshipCommandHandlerTests
         relationship.SetPrivateProperty("Student", student);
         relationship.Accept();
 
-        var unitOfWork = new FakeUnitOfWork();
+        FakeUnitOfWork unitOfWork = new();
 
-        var handler = new RevokeRelationshipCommandHandler(
+        RevokeRelationshipCommandHandler handler = new(
             new InMemoryRepository<ParentStudentRelationship>(relationship),
             new FakeCurrentUser(studentUserId),
             unitOfWork);
@@ -87,9 +87,9 @@ public class RevokeRelationshipCommandHandlerTests
         relationship.SetPrivateProperty("Student", student);
         relationship.Accept();
 
-        var unitOfWork = new FakeUnitOfWork();
+        FakeUnitOfWork unitOfWork = new();
 
-        var handler = new RevokeRelationshipCommandHandler(
+        RevokeRelationshipCommandHandler handler = new(
             new InMemoryRepository<ParentStudentRelationship>(relationship),
             new FakeCurrentUser(otherUserId),
             unitOfWork);
@@ -119,9 +119,9 @@ public class RevokeRelationshipCommandHandlerTests
         relationship.SetPrivateProperty("Parent", parent);
         relationship.SetPrivateProperty("Student", student);
 
-        var unitOfWork = new FakeUnitOfWork();
+        FakeUnitOfWork unitOfWork = new();
 
-        var handler = new RevokeRelationshipCommandHandler(
+        RevokeRelationshipCommandHandler handler = new(
             new InMemoryRepository<ParentStudentRelationship>(relationship),
             new FakeCurrentUser(parentUserId),
             unitOfWork);
@@ -141,9 +141,9 @@ public class RevokeRelationshipCommandHandlerTests
     public async Task Handle_WithMissingRelationship_ReturnsNotFound()
     {
         Guid parentUserId = Guid.NewGuid();
-        var unitOfWork = new FakeUnitOfWork();
+        FakeUnitOfWork unitOfWork = new();
 
-        var handler = new RevokeRelationshipCommandHandler(
+        RevokeRelationshipCommandHandler handler = new(
             new InMemoryRepository<ParentStudentRelationship>(),
             new FakeCurrentUser(parentUserId),
             unitOfWork);

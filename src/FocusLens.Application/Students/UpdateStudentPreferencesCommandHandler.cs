@@ -1,16 +1,15 @@
-using ContractStudentGoal = FocusLens.Contracts.Students.StudentGoal;
-using ContractStudentGrade = FocusLens.Contracts.Students.StudentGrade;
-using ContractStudentSubjectType = FocusLens.Contracts.Students.StudentSubjectType;
-using ICurrentUser = FocusLens.Application.Common.Interfaces.ICurrentUser;
 using FocusLens.Application.Common.Mappings;
 using FocusLens.Contracts.Students;
 using FocusLens.Domain;
 using FocusLens.Domain.Common.Interfaces;
 using FocusLens.Domain.Common.Results;
 using FocusLens.Domain.Students;
-
-
 using MediatR;
+using ContractStudentGrade = FocusLens.Contracts.Students.StudentGrade;
+using ContractStudentSubjectType = FocusLens.Contracts.Students.StudentSubjectType;
+using DomainStudyPriority = FocusLens.Domain.Students.StudyPriority;
+using DomainStudyTimeGoalPeriod = FocusLens.Domain.Students.StudyTimeGoalPeriod;
+using ICurrentUser = FocusLens.Application.Common.Interfaces.ICurrentUser;
 
 namespace FocusLens.Application.Students;
 
@@ -47,9 +46,24 @@ public sealed class UpdateStudentPreferencesCommandHandler(
             return Error.NotFound("Students.NotFound", "The student profile was not found.");
         }
 
-        if (!TryUpdateGoal(student, request.Request, out Error? goalError))
+        if (!TryUpdateGoals(student, request.Request, out Error? goalError))
         {
             return goalError!.Value;
+        }
+
+        if (!TryUpdateDateOfBirth(student, request.Request, out Error? dateOfBirthError))
+        {
+            return dateOfBirthError!.Value;
+        }
+
+        if (!TryUpdateStudyPriorities(student, request.Request, out Error? studyPrioritiesError))
+        {
+            return studyPrioritiesError!.Value;
+        }
+
+        if (!TryUpdateStudyTimeGoal(student, request.Request, out Error? studyTimeGoalError))
+        {
+            return studyTimeGoalError!.Value;
         }
 
         if (!TryUpdateGrade(student, request.Request, out Error? gradeError))
@@ -73,30 +87,170 @@ public sealed class UpdateStudentPreferencesCommandHandler(
     }
 
     private static bool HasChanges(UpdateStudentPreferencesRequest request)
-        => request.GoalProvided || request.GradeProvided || request.PreferredNameProvided || request.SubjectsProvided;
+    {
+        return request.DateOfBirthProvided
+               || request.GoalsProvided
+               || request.StudyPrioritiesProvided
+               || request.StudyTimeGoalProvided
+               || request.GradeProvided
+               || request.PreferredNameProvided
+               || request.SubjectsProvided;
+    }
 
-    private static bool TryUpdateGoal(Student student, UpdateStudentPreferencesRequest request, out Error? error)
+    private static bool TryUpdateGoals(
+        Student student,
+        UpdateStudentPreferencesRequest request,
+        out Error? error)
     {
         error = null;
-        if (!request.GoalProvided) return true;
-        if (request.Goal is null) { student.SetGoal(null); return true; }
 
-        ContractStudentGoal goal = request.Goal.Value;
-        if (!Enum.IsDefined(goal))
+        if (!request.GoalsProvided)
         {
-            error = Error.Validation("Students.InvalidGoal", "Goal is invalid.");
+            return true;
+        }
+
+        if (request.Goals is null)
+        {
+            student.ReplaceGoals([]);
+            return true;
+        }
+
+        if (request.Goals.Any(goal => !Enum.IsDefined(goal)))
+        {
+            error = Error.Validation(
+                "Students.InvalidGoal",
+                "A goal is invalid.");
             return false;
         }
 
-        student.SetGoal(StudentEnumMapper.ToDomain(goal));
+        student.ReplaceGoals(
+            request.Goals.Select(StudentEnumMapper.ToDomain));
+
+        return true;
+    }
+
+    private static bool TryUpdateDateOfBirth(
+        Student student,
+        UpdateStudentPreferencesRequest request,
+        out Error? error)
+    {
+        error = null;
+
+        if (!request.DateOfBirthProvided)
+        {
+            return true;
+        }
+
+        student.SetDateOfBirth(request.DateOfBirth);
+        return true;
+    }
+
+    private static bool TryUpdateStudyPriorities(
+        Student student,
+        UpdateStudentPreferencesRequest request,
+        out Error? error)
+    {
+        error = null;
+
+        if (!request.StudyPrioritiesProvided)
+        {
+            return true;
+        }
+
+        if (request.StudyPriorities is null)
+        {
+            student.ReplaceStudyPriorities([]);
+            return true;
+        }
+
+        if (request.StudyPriorities.Any(priority => !Enum.IsDefined(priority)))
+        {
+            error = Error.Validation(
+                "Students.InvalidStudyPriority",
+                "A study priority is invalid.");
+            return false;
+        }
+
+        if (request.StudyPriorities.Distinct().Count()
+            != request.StudyPriorities.Count)
+        {
+            error = Error.Validation(
+                "Students.DuplicateStudyPriorities",
+                "Study priorities must be unique.");
+            return false;
+        }
+
+        student.ReplaceStudyPriorities(
+            request.StudyPriorities.Select(priority => Enum.Parse<DomainStudyPriority>(priority.ToString())));
+
+        return true;
+    }
+
+    private static bool TryUpdateStudyTimeGoal(
+        Student student,
+        UpdateStudentPreferencesRequest request,
+        out Error? error)
+    {
+        error = null;
+
+        if (!request.StudyTimeGoalProvided)
+        {
+            return true;
+        }
+
+        if (request.StudyTimeGoal is null)
+        {
+            student.SetStudyTimeGoal(null);
+            return true;
+        }
+
+        if (!Enum.IsDefined(request.StudyTimeGoal.Period))
+        {
+            error = Error.Validation(
+                "Students.InvalidStudyTimeGoalPeriod",
+                "Study time goal period is invalid.");
+            return false;
+        }
+
+        if (request.StudyTimeGoal.TargetMinutes <= 0)
+        {
+            error = Error.Validation(
+                "Students.InvalidStudyTimeGoal",
+                "Study time goal must be greater than zero.");
+            return false;
+        }
+
+        Result<StudyTimeGoal> result = StudyTimeGoal.Create(
+            Enum.Parse<DomainStudyTimeGoalPeriod>(
+                request.StudyTimeGoal.Period.ToString()),
+            request.StudyTimeGoal.TargetMinutes,
+            request.StudyTimeGoal.Days ?? [],
+            request.StudyTimeGoal.StartDate);
+
+        if (result.IsError)
+        {
+            error = result.TopError;
+            return false;
+        }
+
+        student.SetStudyTimeGoal(result.Value);
+
         return true;
     }
 
     private static bool TryUpdateGrade(Student student, UpdateStudentPreferencesRequest request, out Error? error)
     {
         error = null;
-        if (!request.GradeProvided) return true;
-        if (request.Grade is null) { student.SetGrade(null); return true; }
+        if (!request.GradeProvided)
+        {
+            return true;
+        }
+
+        if (request.Grade is null)
+        {
+            student.SetGrade(null);
+            return true;
+        }
 
         ContractStudentGrade grade = request.Grade.Value;
         if (!Enum.IsDefined(grade))
@@ -109,10 +263,15 @@ public sealed class UpdateStudentPreferencesCommandHandler(
         return true;
     }
 
-    private static bool TryUpdateSubjects(Student student, UpdateStudentPreferencesRequest request, out Error? error)
+    private static bool TryUpdateSubjects(Student student, UpdateStudentPreferencesRequest request,
+        out Error? error)
     {
         error = null;
-        if (!request.SubjectsProvided) return true;
+        if (!request.SubjectsProvided)
+        {
+            return true;
+        }
+
         if (request.Subjects is null)
         {
             error = Error.Validation("Students.InvalidSubjects", "Subjects must be an array.");
@@ -120,16 +279,24 @@ public sealed class UpdateStudentPreferencesCommandHandler(
         }
 
         IReadOnlyCollection<StudentSubjectRequest> requests = request.Subjects;
-        if (!AreValidSubjects(requests, out error)) return false;
+        if (!AreValidSubjects(requests, out error))
+        {
+            return false;
+        }
 
         student.ReplaceSubjects(requests.Select(MapSubject));
         return true;
     }
 
-    private static bool TryUpdatePreferredName(Student student, UpdateStudentPreferencesRequest request, out Error? error)
+    private static bool TryUpdatePreferredName(Student student, UpdateStudentPreferencesRequest request,
+        out Error? error)
     {
         error = null;
-        if (!request.PreferredNameProvided) return true;
+        if (!request.PreferredNameProvided)
+        {
+            return true;
+        }
+
         if (request.PreferredName is null)
         {
             student.SetPreferredName(null);
@@ -145,7 +312,8 @@ public sealed class UpdateStudentPreferencesCommandHandler(
 
         if (preferredName.Length > 100)
         {
-            error = Error.Validation("Students.PreferredNameTooLong", "Preferred name cannot exceed 100 characters.");
+            error = Error.Validation("Students.PreferredNameTooLong",
+                "Preferred name cannot exceed 100 characters.");
             return false;
         }
 
@@ -172,7 +340,8 @@ public sealed class UpdateStudentPreferencesCommandHandler(
 
             if (subject.Type == ContractStudentSubjectType.Other && subject.CustomName!.Length > 200)
             {
-                error = Error.Validation("Students.CustomSubjectTooLong", "A custom subject name cannot exceed 200 characters.");
+                error = Error.Validation("Students.CustomSubjectTooLong",
+                    "A custom subject name cannot exceed 200 characters.");
                 return false;
             }
 
@@ -198,8 +367,9 @@ public sealed class UpdateStudentPreferencesCommandHandler(
     }
 
     private static StudentSubject MapSubject(StudentSubjectRequest subject)
-        => subject.Type == ContractStudentSubjectType.Other
+    {
+        return subject.Type == ContractStudentSubjectType.Other
             ? StudentSubject.Custom(subject.CustomName!)
             : StudentSubject.Predefined(StudentEnumMapper.ToDomain(subject.Type));
-
+    }
 }

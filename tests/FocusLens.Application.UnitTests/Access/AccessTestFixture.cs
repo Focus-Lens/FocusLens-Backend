@@ -1,6 +1,5 @@
 using System.Linq.Expressions;
 using System.Reflection;
-
 using FocusLens.Application.Common.Interfaces;
 using DomainInterfaces = FocusLens.Domain.Common.Interfaces;
 
@@ -11,31 +10,36 @@ public sealed class InMemoryRepository<T> : DomainInterfaces.IBaseRepository<T> 
     private readonly List<T> _entities = [];
 
     public InMemoryRepository(params T[] entities)
-        => _entities.AddRange(entities);
+    {
+        _entities.AddRange(entities);
+    }
 
     public Task<T?> GetByIdAsync(
         Guid id,
         params Expression<Func<T, object>>[] includes)
-        => Task.FromResult(
-            _entities.AsQueryable().FirstOrDefault(
-                entity => GetId(entity) == id));
+    {
+        return Task.FromResult(
+            _entities.AsQueryable().FirstOrDefault(entity => GetId(entity) == id));
+    }
 
     public Task<IEnumerable<T>> GetAllAsync(
-        params Expression<Func<T, object>>[] includes)
-        => Task.FromResult<IEnumerable<T>>(_entities.ToList());
+        params Expression<Func<T, object>>[] includes) =>
+        Task.FromResult<IEnumerable<T>>(_entities.ToList());
 
     public Task<IEnumerable<T>> GetAllAsync(
         Expression<Func<T, bool>> criteria,
         params Expression<Func<T, object>>[] includes)
-        => Task.FromResult<IEnumerable<T>>(
+    {
+        return Task.FromResult<IEnumerable<T>>(
             _entities.AsQueryable().Where(criteria).ToList());
+    }
 
     public IQueryable<T> GetAll() => _entities.AsQueryable();
 
     public Task<T?> FirstOrDefaultAsync(
         Expression<Func<T, bool>> criteria,
-        params Expression<Func<T, object>>[] includes)
-        => Task.FromResult(_entities.AsQueryable().FirstOrDefault(criteria));
+        params Expression<Func<T, object>>[] includes) =>
+        Task.FromResult(_entities.AsQueryable().FirstOrDefault(criteria));
 
     public void Add(T entity) => _entities.Add(entity);
 
@@ -55,8 +59,7 @@ public sealed class InMemoryRepository<T> : DomainInterfaces.IBaseRepository<T> 
         return Task.CompletedTask;
     }
 
-    public void DeleteRange(IEnumerable<T> entities)
-        => _entities.RemoveAll(entity => entities.Contains(entity));
+    public void DeleteRange(IEnumerable<T> entities) => _entities.RemoveAll(entity => entities.Contains(entity));
 
     public void Delete(T entity) => _entities.Remove(entity);
 
@@ -91,18 +94,33 @@ public sealed class FakeUnitOfWork : DomainInterfaces.IUnitOfWork
     }
 
     public Task BeginTransactionAsync() => Task.CompletedTask;
+
     public Task CommitTransactionAsync() => Task.CompletedTask;
+
     public Task RollbackTransactionAsync() => Task.CompletedTask;
+
     public void Dispose() { }
 }
 
 public sealed class FakeEmailSender : IEmailSender
 {
     public List<(string StudentEmail, string ParentEmail, Guid InvitationId)> Invitations { get; } = [];
-    public List<(string ParentEmail, string StudentDisplayName, string InvitationUrl)> StudentParentInvitations { get; } = [];
 
-    public Task SendEmailVerificationCodeAsync(string email, string code, TimeSpan codeLifetime, CancellationToken cancellationToken = default) => Task.CompletedTask;
-    public Task SendPasswordResetAsync(string email, string code, TimeSpan codeLifetime, CancellationToken cancellationToken = default) => Task.CompletedTask;
+    public List<(string ParentEmail, string StudentDisplayName, string InvitationUrl)> StudentParentInvitations
+    {
+        get;
+    } = [];
+
+    public List<(string ChildEmail, string InvitationUrl)> ChildSetupInvitations { get; } = [];
+
+    public Task SendEmailVerificationCodeAsync(string email, string code, TimeSpan codeLifetime,
+        CancellationToken cancellationToken = default) =>
+        Task.CompletedTask;
+
+    public Task SendPasswordResetAsync(string email, string code, TimeSpan codeLifetime,
+        CancellationToken cancellationToken = default) =>
+        Task.CompletedTask;
+
     public Task SendParentStudentInvitationAsync(
         string studentEmail,
         string parentEmail,
@@ -110,6 +128,15 @@ public sealed class FakeEmailSender : IEmailSender
         CancellationToken cancellationToken = default)
     {
         Invitations.Add((studentEmail, parentEmail, invitationId));
+        return Task.CompletedTask;
+    }
+
+    public Task SendChildSetupInvitationAsync(
+        string childEmail,
+        string invitationUrl,
+        CancellationToken cancellationToken = default)
+    {
+        ChildSetupInvitations.Add((childEmail, invitationUrl));
         return Task.CompletedTask;
     }
 
@@ -126,8 +153,11 @@ public sealed class FakeEmailSender : IEmailSender
 
 public sealed class FakeInvitationUrlBuilder : IInvitationUrlBuilder
 {
-    public string CreateStudentParentInvitationUrl(string token)
-        => $"https://parent.focuslens.test/invitations/parent/{token}";
+    public string CreateStudentParentInvitationUrl(string token) =>
+        $"https://parent.focuslens.test/invitations/parent/{token}";
+
+    public string CreateChildSetupInvitationUrl(string token) =>
+        $"https://child.focuslens.test/invitations/child-setup/{token}";
 }
 
 public static class AccessTestObjectExtensions

@@ -30,8 +30,8 @@ public sealed class CancelStudentParentInvitationCommandHandler(
         }
 
         Student? student = await studentRepository.FirstOrDefaultAsync(item => item.UserId == userId);
-        StudentParentInvitation? invitation = await invitationRepository.FirstOrDefaultAsync(
-            item => item.Id == request.InvitationId);
+        StudentParentInvitation? invitation =
+            await invitationRepository.FirstOrDefaultAsync(item => item.Id == request.InvitationId);
 
         if (student is null || invitation is null)
         {
@@ -45,7 +45,8 @@ public sealed class CancelStudentParentInvitationCommandHandler(
 
         if (invitation.Status != ParentInvitationStatus.Pending || invitation.IsExpired(timeProvider.GetUtcNow()))
         {
-            return Error.Conflict("Access.InvitationNoLongerPending", "Only a pending invitation can be cancelled.");
+            return Error.Conflict("Access.InvitationNoLongerPending",
+                "Only a pending invitation can be cancelled.");
         }
 
         invitation.Cancel(timeProvider.GetUtcNow());

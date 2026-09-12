@@ -1,5 +1,4 @@
 using FocusLens.Contracts.Students;
-
 using MediatR;
 
 namespace FocusLens.Application.Students;

@@ -4,8 +4,11 @@ public sealed record StudentDetailsResponse(
     Guid Id,
     Guid UserId,
     string? PreferredName,
-    StudentGoal? Goal,
+    DateOnly? DateOfBirth,
+    IReadOnlyCollection<StudentGoal> Goals,
     StudentGrade? Grade,
     IReadOnlyCollection<StudentSubjectResponse> Subjects,
+    IReadOnlyCollection<StudyPriority> StudyPriorities,
+    StudyTimeGoalResponse? StudyTimeGoal,
     bool OnboardingCompleted
 );

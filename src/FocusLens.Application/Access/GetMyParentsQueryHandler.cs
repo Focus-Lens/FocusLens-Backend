@@ -1,11 +1,9 @@
-using ICurrentUser = FocusLens.Application.Common.Interfaces.ICurrentUser;
-using FocusLens.Domain.Common.Interfaces;
+using FocusLens.Contracts.Access;
 using FocusLens.Domain;
 using FocusLens.Domain.Access;
-using FocusLens.Application.Common.Interfaces;
-using FocusLens.Contracts;
-
+using FocusLens.Domain.Common.Interfaces;
 using MediatR;
+using ICurrentUser = FocusLens.Application.Common.Interfaces.ICurrentUser;
 
 namespace FocusLens.Application.Access;
 
@@ -14,9 +12,9 @@ public sealed class GetMyParentsQueryHandler(
     IBaseRepository<ParentStudentRelationship> relationshipRepository,
     IBaseRepository<Parent> parentRepository,
     ICurrentUser currentUser)
-    : IRequestHandler<GetMyParentsQuery, IReadOnlyList<ParentResponse>>
+    : IRequestHandler<GetMyParentsQuery, IReadOnlyList<StudentParentSummaryResponse>>
 {
-    public async Task<IReadOnlyList<ParentResponse>> Handle(
+    public async Task<IReadOnlyList<StudentParentSummaryResponse>> Handle(
         GetMyParentsQuery request,
         CancellationToken cancellationToken)
     {
@@ -25,8 +23,7 @@ public sealed class GetMyParentsQueryHandler(
             return [];
         }
 
-        Student? student = await studentRepository.FirstOrDefaultAsync(
-            student => student.UserId == userId);
+        Student? student = await studentRepository.FirstOrDefaultAsync(student => student.UserId == userId);
 
         if (student is null)
         {
@@ -34,10 +31,9 @@ public sealed class GetMyParentsQueryHandler(
         }
 
         IEnumerable<ParentStudentRelationship> relationships =
-            await relationshipRepository.GetAllAsync(
-                relationship =>
-                    relationship.StudentId == student.Id &&
-                    relationship.Status == RelationshipStatus.Active);
+            await relationshipRepository.GetAllAsync(relationship =>
+                relationship.StudentId == student.Id &&
+                relationship.Status == RelationshipStatus.Active);
 
         Guid[] parentIds = relationships
             .Select(relationship => relationship.ParentId)
@@ -50,12 +46,15 @@ public sealed class GetMyParentsQueryHandler(
 
         IEnumerable<Parent> parents =
             await parentRepository.GetAllAsync(
-                parent => parentIds.Contains(parent.Id));
+                parent => parentIds.Contains(parent.Id),
+                parent => parent.User);
 
         return parents
-            .Select(parent => new ParentResponse(
+            .Select(parent => new StudentParentSummaryResponse(
                 parent.Id,
-                parent.UserId))
+                parent.User.FirstName,
+                parent.User.LastName,
+                parent.User.Email))
             .ToList();
     }
 }

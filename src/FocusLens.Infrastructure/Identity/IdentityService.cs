@@ -14,26 +14,24 @@ public sealed class IdentityService : IIdentityService
         _userManager = userManager;
     }
 
-    public async Task<ApplicationUser?> FindByIdAsync(Guid userId)
-        => await _userManager.FindByIdAsync(userId.ToString());
+    public async Task<ApplicationUser?> FindByIdAsync(Guid userId) =>
+        await _userManager.FindByIdAsync(userId.ToString());
 
-    public async Task<ApplicationUser?> FindByEmailAsync(string email)
-        => await _userManager.FindByEmailAsync(email);
+    public async Task<ApplicationUser?> FindByEmailAsync(string email) => await _userManager.FindByEmailAsync(email);
 
-    public async Task<bool> CheckPasswordAsync(ApplicationUser user, string password)
-        => await _userManager.CheckPasswordAsync(user, password);
+    public async Task<bool> CheckPasswordAsync(ApplicationUser user, string password) =>
+        await _userManager.CheckPasswordAsync(user, password);
 
-    public async Task<bool> IsEmailConfirmedAsync(ApplicationUser user)
-        => await _userManager.IsEmailConfirmedAsync(user);
+    public async Task<bool> IsEmailConfirmedAsync(ApplicationUser user) =>
+        await _userManager.IsEmailConfirmedAsync(user);
 
-    public async Task<bool> IsLockedOutAsync(ApplicationUser user)
-        => await _userManager.IsLockedOutAsync(user);
+    public async Task<bool> IsLockedOutAsync(ApplicationUser user) => await _userManager.IsLockedOutAsync(user);
 
-    public async Task<IReadOnlyCollection<string>> GetRolesAsync(ApplicationUser user)
-        => [.. await _userManager.GetRolesAsync(user)];
+    public async Task<IReadOnlyCollection<string>> GetRolesAsync(ApplicationUser user) =>
+        [.. await _userManager.GetRolesAsync(user)];
 
-    public async Task<bool> IsInRoleAsync(ApplicationUser user, string role)
-        => await _userManager.IsInRoleAsync(user, role);
+    public async Task<bool> IsInRoleAsync(ApplicationUser user, string role) =>
+        await _userManager.IsInRoleAsync(user, role);
 
     public async Task<IdentityResultSummary> CreateAsync(ApplicationUser user, string password)
     {
@@ -48,11 +46,11 @@ public sealed class IdentityService : IIdentityService
 
     public async Task<IdentityResultSummary> AddToRoleAsync(
         ApplicationUser user,
-        string role)
-        => ToSummary(await _userManager.AddToRoleAsync(user, role));
+        string role) =>
+        ToSummary(await _userManager.AddToRoleAsync(user, role));
 
-    public async Task<IdentityResultSummary> UpdateAsync(ApplicationUser user)
-        => ToSummary(await _userManager.UpdateAsync(user));
+    public async Task<IdentityResultSummary> UpdateAsync(ApplicationUser user) =>
+        ToSummary(await _userManager.UpdateAsync(user));
 
     public async Task<IdentityResultSummary> ConfirmEmailAsync(ApplicationUser user)
     {
@@ -93,29 +91,35 @@ public sealed class IdentityService : IIdentityService
         ApplicationUser user,
         string currentPassword,
         string newPassword)
-        => ToSummary(await _userManager.ChangePasswordAsync(
+    {
+        return ToSummary(await _userManager.ChangePasswordAsync(
             user,
             currentPassword,
             newPassword));
+    }
 
     public async Task<ApplicationUser?> FindByLoginAsync(
         string loginProvider,
-        string providerKey)
-        => await _userManager.FindByLoginAsync(loginProvider, providerKey);
+        string providerKey) =>
+        await _userManager.FindByLoginAsync(loginProvider, providerKey);
 
     public async Task<IdentityResultSummary> AddLoginAsync(
         ApplicationUser user,
         string loginProvider,
         string providerKey,
         string displayName)
-        => ToSummary(await _userManager.AddLoginAsync(
+    {
+        return ToSummary(await _userManager.AddLoginAsync(
             user,
             new UserLoginInfo(loginProvider, providerKey, displayName)));
+    }
 
     private static IdentityResultSummary ToSummary(IdentityResult result)
-        => result.Succeeded
+    {
+        return result.Succeeded
             ? IdentityResultSummary.Success
             : new IdentityResultSummary(
                 false,
                 [.. result.Errors.Select(error => error.Description)]);
+    }
 }

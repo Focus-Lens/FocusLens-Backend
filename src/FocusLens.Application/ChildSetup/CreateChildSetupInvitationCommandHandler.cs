@@ -1,0 +1,151 @@
+using System.Net.Mail;
+using System.Security.Cryptography;
+using System.Text;
+using FocusLens.Application.Common.Interfaces;
+using FocusLens.Contracts.ChildSetup;
+using FocusLens.Domain;
+using FocusLens.Domain.ChildSetup;
+using FocusLens.Domain.Common.Interfaces;
+using FocusLens.Domain.Common.Results;
+using MediatR;
+using ICurrentUser = FocusLens.Application.Common.Interfaces.ICurrentUser;
+
+namespace FocusLens.Application.ChildSetup;
+
+public sealed class CreateChildSetupInvitationCommandHandler(
+    IBaseRepository<Parent> parentRepository,
+    IBaseRepository<ChildSetupDraft> childSetupDraftRepository,
+    IBaseRepository<ChildSetupInvitation> invitationRepository,
+    ICurrentUser currentUser,
+    IUnitOfWork unitOfWork,
+    IEmailSender emailSender,
+    IInvitationUrlBuilder invitationUrlBuilder,
+    TimeProvider timeProvider
+) : IRequestHandler<CreateChildSetupInvitationCommand, Result<ChildSetupInvitationResponse>>
+{
+    private static readonly TimeSpan InvitationLifetime = TimeSpan.FromDays(7);
+
+    public async Task<Result<ChildSetupInvitationResponse>> Handle(
+        CreateChildSetupInvitationCommand request,
+        CancellationToken cancellationToken
+    )
+    {
+        if (currentUser.UserId is not Guid userId || userId == Guid.Empty)
+        {
+            return Error.Unauthorized(
+                "Parents.CurrentUserUnavailable",
+                "The current user could not be identified."
+            );
+        }
+
+        Parent? parent = await parentRepository.FirstOrDefaultAsync(item => item.UserId == userId);
+
+        if (parent is null)
+        {
+            return Error.NotFound(
+                "Parents.NotFound",
+                "The current user does not have a parent profile."
+            );
+        }
+
+        if (request.DraftId == Guid.Empty)
+        {
+            return Error.Validation(
+                "ChildSetup.InvalidDraftId",
+                "The child setup draft ID is invalid."
+            );
+        }
+
+        string childEmail = request.Request.ChildEmail?.Trim() ?? string.Empty;
+
+        if (!IsValidEmail(childEmail))
+        {
+            return Error.Validation(
+                "ChildSetup.ChildEmailInvalid",
+                "A valid child email is required."
+            );
+        }
+
+        ChildSetupDraft? draft = await childSetupDraftRepository.GetByIdAsync(
+            request.DraftId,
+            item => item.Subjects
+        );
+
+        if (draft is null || draft.ParentId != parent.Id)
+        {
+            return Error.NotFound(
+                "ChildSetup.NotFound",
+                "The child setup draft could not be found."
+            );
+        }
+
+        if (draft.Status != ChildSetupStatus.Draft)
+        {
+            return Error.Conflict(
+                "ChildSetup.DraftAlreadyInvited",
+                "This child setup has already been invited."
+            );
+        }
+
+        if (!IsComplete(draft))
+        {
+            return Error.Validation(
+                "ChildSetup.Incomplete",
+                "Complete the child setup before sending an invitation."
+            );
+        }
+
+        string normalizedEmail = childEmail.ToUpperInvariant();
+        string token = CreateToken();
+        string tokenHash = HashToken(token);
+        DateTimeOffset expiresAtUtc = timeProvider.GetUtcNow().Add(InvitationLifetime);
+
+        ChildSetupInvitation invitation = new(draft.Id, normalizedEmail, tokenHash, expiresAtUtc);
+
+        invitationRepository.Add(invitation);
+        draft.MarkInvited();
+
+        await unitOfWork.SaveChangesAsync();
+
+        string invitationUrl = invitationUrlBuilder.CreateChildSetupInvitationUrl(token);
+
+        await emailSender.SendChildSetupInvitationAsync(
+            childEmail,
+            invitationUrl,
+            cancellationToken
+        );
+
+        return new ChildSetupInvitationResponse(
+            invitation.Id,
+            invitation.Status.ToString(),
+            invitation.ExpiresAtUtc
+        );
+    }
+
+    private static bool IsComplete(ChildSetupDraft draft)
+    {
+        return !string.IsNullOrWhiteSpace(draft.FirstName)
+               && !string.IsNullOrWhiteSpace(draft.LastName)
+               && draft.Grade is not null
+               && draft.Subjects.Count > 0
+               && draft.StudyPriorities.Count > 0
+               && draft.StudyTimeGoal is not null;
+    }
+
+    private static bool IsValidEmail(string email)
+    {
+        try
+        {
+            return new MailAddress(email).Address.Equals(email, StringComparison.OrdinalIgnoreCase);
+        }
+        catch (FormatException)
+        {
+            return false;
+        }
+    }
+
+    private static string CreateToken() => Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
+
+    private static string HashToken(string token) =>
+        Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(token)));
+}

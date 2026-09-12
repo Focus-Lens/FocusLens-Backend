@@ -1,3 +1,4 @@
+using FocusLens.Domain;
 using FocusLens.Domain.StudySessions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
@@ -26,7 +27,7 @@ public sealed class StudySessionConfiguration : IEntityTypeConfiguration<StudySe
 
         builder.HasIndex(session => new { session.StudentId, session.Status });
 
-        builder.HasOne<FocusLens.Domain.Student>()
+        builder.HasOne<Student>()
             .WithMany()
             .HasForeignKey(session => session.StudentId)
             .OnDelete(DeleteBehavior.Cascade);

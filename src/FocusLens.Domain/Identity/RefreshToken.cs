@@ -5,18 +5,6 @@ namespace FocusLens.Domain.Identity;
 
 public sealed class RefreshToken : AuditableEntity
 {
-    public string Token { get; private set; } = string.Empty;
-
-    public Guid UserId { get; private set; }
-
-    public DateTimeOffset ExpiresOnUtc { get; private set; }
-
-    public DateTimeOffset? RevokedOnUtc { get; private set; }
-
-    public bool IsExpired => ExpiresOnUtc <= DateTimeOffset.UtcNow;
-
-    public bool IsActive => RevokedOnUtc is null && !IsExpired;
-
     private RefreshToken()
     {
     }
@@ -32,6 +20,18 @@ public sealed class RefreshToken : AuditableEntity
         UserId = userId;
         ExpiresOnUtc = expiresOnUtc;
     }
+
+    public string Token { get; private set; } = string.Empty;
+
+    public Guid UserId { get; private set; }
+
+    public DateTimeOffset ExpiresOnUtc { get; }
+
+    public DateTimeOffset? RevokedOnUtc { get; private set; }
+
+    public bool IsExpired => ExpiresOnUtc <= DateTimeOffset.UtcNow;
+
+    public bool IsActive => RevokedOnUtc is null && !IsExpired;
 
     public static Result<RefreshToken> Create(
         Guid id,
@@ -83,6 +83,5 @@ public sealed class RefreshToken : AuditableEntity
         return Result.Success;
     }
 
-    public Result<Success> Revoke()
-        => Revoke(DateTimeOffset.UtcNow);
+    public Result<Success> Revoke() => Revoke(DateTimeOffset.UtcNow);
 }

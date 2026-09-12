@@ -1,9 +1,7 @@
 using FocusLens.Application;
 using FocusLens.Infrastructure;
 using FocusLens.Infrastructure.Data;
-
 using Scalar.AspNetCore;
-
 using Serilog;
 
 namespace FocusLens.API;
@@ -12,7 +10,7 @@ public class Program
 {
     public static async Task Main(string[] args)
     {
-        var builder = WebApplication.CreateBuilder(args);
+        WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
 
         // API services
         builder.Services.AddApiServices(builder.Configuration);
@@ -26,9 +24,8 @@ public class Program
             .AddInfrastructure(builder.Configuration);
 
         // Serilog
-        builder.Host.UseSerilog(
-            (context, configuration) =>
-                configuration.ReadFrom.Configuration(context.Configuration)
+        builder.Host.UseSerilog((context, configuration) =>
+            configuration.ReadFrom.Configuration(context.Configuration)
         );
 
         // CORS
@@ -46,7 +43,7 @@ public class Program
             );
         });
 
-        var app = builder.Build();
+        WebApplication app = builder.Build();
 
         // Development
         if (app.Environment.IsDevelopment())
@@ -79,11 +76,7 @@ public class Program
         app.MapControllers();
 
         // Simple health check
-        app.MapGet("/health", () => Results.Ok(new
-        {
-            status = "Healthy",
-            application = "FocusLens.Api"
-        }));
+        app.MapGet("/health", () => Results.Ok(new { status = "Healthy", application = "FocusLens.Api" }));
 
         app.Run();
     }

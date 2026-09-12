@@ -10,6 +10,8 @@ public sealed class SubmitTermsDecisionCommandHandler
     public Task<Result<TermsDecisionResponse>> Handle(
         SubmitTermsDecisionCommand request,
         CancellationToken cancellationToken)
-        => Task.FromResult<Result<TermsDecisionResponse>>(
+    {
+        return Task.FromResult<Result<TermsDecisionResponse>>(
             new TermsDecisionResponse(request.Request.Accepted!.Value));
+    }
 }

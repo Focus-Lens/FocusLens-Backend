@@ -1,7 +1,7 @@
-using FocusLens.Domain.Common.Interfaces;
 using FocusLens.Application.Common.Errors;
 using FocusLens.Application.Common.Interfaces;
 using FocusLens.Application.Common.Models;
+using FocusLens.Domain.Common.Interfaces;
 using FocusLens.Domain.Common.Results;
 using FocusLens.Domain.Identity;
 using FocusLens.Domain.Interfaces;
@@ -12,8 +12,8 @@ namespace FocusLens.Application.Features.Identity.Commands.VerifyEmail;
 public sealed class VerifyEmailCommandHandler
     : IRequestHandler<VerifyEmailCommand, Result<Success>>
 {
-    private readonly IIdentityService _identityService;
     private readonly IEmailVerificationCodeStore _codeStore;
+    private readonly IIdentityService _identityService;
     private readonly TimeProvider _timeProvider;
 
     public VerifyEmailCommandHandler(

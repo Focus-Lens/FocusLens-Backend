@@ -1,6 +1,6 @@
-using FocusLens.Contracts.Students;
+using FocusLens.Contracts.Access;
 using MediatR;
 
 namespace FocusLens.Application.Access;
 
-public sealed record GetMyStudentsQuery : IRequest<IReadOnlyList<StudentResponse>>;
+public sealed record GetMyStudentsQuery : IRequest<IReadOnlyList<ParentStudentSummaryResponse>>;

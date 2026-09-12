@@ -4,12 +4,7 @@ namespace FocusLens.Domain.Common;
 
 public abstract class Entity
 {
-    public Guid Id { get; private set; }
-
     private readonly List<DomainEvent> _domainEvents = [];
-
-    [NotMapped]
-    public IReadOnlyCollection<DomainEvent> DomainEvents => _domainEvents.AsReadOnly();
 
     protected Entity()
     {
@@ -20,18 +15,13 @@ public abstract class Entity
         Id = id == Guid.Empty ? Guid.NewGuid() : id;
     }
 
-    public void AddDomainEvent(DomainEvent domainEvent)
-    {
-        _domainEvents.Add(domainEvent);
-    }
+    public Guid Id { get; private set; }
 
-    public void RemoveDomainEvent(DomainEvent domainEvent)
-    {
-        _domainEvents.Remove(domainEvent);
-    }
+    [NotMapped] public IReadOnlyCollection<DomainEvent> DomainEvents => _domainEvents.AsReadOnly();
 
-    public void ClearDomainEvents()
-    {
-        _domainEvents.Clear();
-    }
+    public void AddDomainEvent(DomainEvent domainEvent) => _domainEvents.Add(domainEvent);
+
+    public void RemoveDomainEvent(DomainEvent domainEvent) => _domainEvents.Remove(domainEvent);
+
+    public void ClearDomainEvents() => _domainEvents.Clear();
 }

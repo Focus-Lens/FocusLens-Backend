@@ -9,6 +9,6 @@ public sealed class GetTermsQueryHandler(ITermsProvider termsProvider)
 {
     public Task<Result<TermsResponse>> Handle(
         GetTermsQuery request,
-        CancellationToken cancellationToken)
-        => Task.FromResult<Result<TermsResponse>>(termsProvider.GetCurrentTerms());
+        CancellationToken cancellationToken) =>
+        Task.FromResult<Result<TermsResponse>>(termsProvider.GetCurrentTerms());
 }

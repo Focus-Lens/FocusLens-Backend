@@ -3,8 +3,8 @@ using FocusLens.Domain.Common;
 namespace FocusLens.Domain.Access;
 
 /// <summary>
-/// A student-owned invitation for a parent who may not have a FocusLens
-/// account yet. The raw link token is never persisted.
+///     A student-owned invitation for a parent who may not have a FocusLens
+///     account yet. The raw link token is never persisted.
 /// </summary>
 public sealed class StudentParentInvitation : AuditableEntity
 {
@@ -53,17 +53,13 @@ public sealed class StudentParentInvitation : AuditableEntity
 
     public Student Student { get; private set; } = null!;
 
-    public bool IsExpired(DateTimeOffset now)
-        => Status == ParentInvitationStatus.Pending && ExpiresAtUtc <= now;
+    public bool IsExpired(DateTimeOffset now) => Status == ParentInvitationStatus.Pending && ExpiresAtUtc <= now;
 
-    public void Accept(DateTimeOffset now)
-        => Respond(ParentInvitationStatus.Accepted, now);
+    public void Accept(DateTimeOffset now) => Respond(ParentInvitationStatus.Accepted, now);
 
-    public void Decline(DateTimeOffset now)
-        => Respond(ParentInvitationStatus.Declined, now);
+    public void Decline(DateTimeOffset now) => Respond(ParentInvitationStatus.Declined, now);
 
-    public void Cancel(DateTimeOffset now)
-        => Respond(ParentInvitationStatus.Cancelled, now);
+    public void Cancel(DateTimeOffset now) => Respond(ParentInvitationStatus.Cancelled, now);
 
     public void Renew(string tokenHash, DateTimeOffset expiresAtUtc)
     {

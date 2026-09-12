@@ -15,13 +15,13 @@ namespace FocusLens.Application.Features.Identity.Commands.RegisterParent;
 public sealed class RegisterParentCommandHandler
     : IRequestHandler<RegisterParentCommand, Result<Success>>
 {
-    private readonly IIdentityService _identityService;
-    private readonly IBaseRepository<Parent> _parentRepository;
-    private readonly IUnitOfWork _unitOfWork;
     private readonly IEmailVerificationCodeStore _codeStore;
     private readonly IEmailSender _emailSender;
-    private readonly TimeProvider _timeProvider;
+    private readonly IIdentityService _identityService;
+    private readonly IBaseRepository<Parent> _parentRepository;
     private readonly RegistrationOptions _registrationOptions;
+    private readonly TimeProvider _timeProvider;
+    private readonly IUnitOfWork _unitOfWork;
 
     public RegisterParentCommandHandler(
         IIdentityService identityService,
@@ -66,7 +66,7 @@ public sealed class RegisterParentCommandHandler
             UserName = email,
             FirstName = request.FirstName.Trim(),
             LastName = request.LastName.Trim(),
-            EmailConfirmed = false,
+            EmailConfirmed = false
         };
         user.AcceptTerms(_registrationOptions.TermsVersion, utcNow);
 
@@ -121,6 +121,5 @@ public sealed class RegisterParentCommandHandler
         return Result.Success;
     }
 
-    private static string GenerateCode() =>
-        RandomNumberGenerator.GetInt32(0, 1_000_000).ToString("D6");
+    private static string GenerateCode() => RandomNumberGenerator.GetInt32(0, 1_000_000).ToString("D6");
 }

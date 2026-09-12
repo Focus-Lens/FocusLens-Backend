@@ -1,5 +1,4 @@
 using System.Security.Cryptography;
-
 using FocusLens.Application.Common.Errors;
 using FocusLens.Application.Common.Interfaces;
 using FocusLens.Application.Features.Identity.Options;
@@ -14,12 +13,12 @@ public sealed class ResendVerificationCodeCommandHandler
     : IRequestHandler<ResendVerificationCodeCommand, Result<Success>>
 {
     private static readonly TimeSpan CodeLifetime = TimeSpan.FromMinutes(10);
-
-    private readonly IIdentityService _identityService;
     private readonly IEmailVerificationCodeStore _codeStore;
     private readonly IEmailSender _emailSender;
-    private readonly TimeProvider _timeProvider;
+
+    private readonly IIdentityService _identityService;
     private readonly RegistrationOptions _registrationOptions;
+    private readonly TimeProvider _timeProvider;
 
     public ResendVerificationCodeCommandHandler(
         IIdentityService identityService,
@@ -61,8 +60,8 @@ public sealed class ResendVerificationCodeCommandHandler
             _timeProvider.GetUtcNow().Add(CodeLifetime),
             cancellationToken);
 
-            TimeSpan codeLifetime = TimeSpan.FromMinutes(
-    _registrationOptions.EmailVerificationCodeLifetimeMinutes);
+        TimeSpan codeLifetime = TimeSpan.FromMinutes(
+            _registrationOptions.EmailVerificationCodeLifetimeMinutes);
 
         await _emailSender.SendEmailVerificationCodeAsync(
             email,
@@ -73,6 +72,5 @@ public sealed class ResendVerificationCodeCommandHandler
         return Result.Success;
     }
 
-    private static string GenerateCode()
-        => RandomNumberGenerator.GetInt32(0, 1_000_000).ToString("D6");
+    private static string GenerateCode() => RandomNumberGenerator.GetInt32(0, 1_000_000).ToString("D6");
 }
