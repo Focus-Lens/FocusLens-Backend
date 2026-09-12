@@ -2,6 +2,7 @@
 using FocusLens.Domain.Common.Interfaces;
 using FocusLens.Domain.Identity;
 using FocusLens.Domain.Interfaces;
+using FocusLens.Domain.StudySessions;
 using FocusLens.Infrastructure.Authentication;
 using FocusLens.Infrastructure.Data;
 using FocusLens.Infrastructure.Data.Interceptors;
@@ -46,7 +47,12 @@ namespace FocusLens.Infrastructure
             services.AddScoped<IUnitOfWork, UnitOfWork>();
             services.Configure<StudyMaterialStorageOptions>(
                 configuration.GetRequiredSection(StudyMaterialStorageOptions.SectionName));
+            services.Configure<StudySessionImageStorageOptions>(
+                configuration.GetSection(StudySessionImageStorageOptions.SectionName));
+            services.Configure<StudySessionImageUploadOptions>(
+                configuration.GetSection(StudySessionImageUploadOptions.SectionName));
             services.AddScoped<IStudyMaterialFileStore, LocalStudyMaterialFileStore>();
+            services.AddScoped<IStudySessionImageFileStore, LocalStudySessionImageFileStore>();
             services.AddScoped<IStudyMaterialPdfProcessor, PdfSharpStudyMaterialPdfProcessor>();
 
             services.AddDbContext<ApplicationDbContext>(

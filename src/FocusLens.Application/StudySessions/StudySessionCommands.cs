@@ -57,3 +57,8 @@ public sealed record UploadStudyMaterialCommand(
     byte[] Content,
     StudyMaterialSource Source)
     : IRequest<Result<StudyMaterialResponse>>;
+
+public sealed record UploadStudySessionImagesCommand(
+    Guid SessionId,
+    IReadOnlyCollection<StudySessionImageUploadFile> Files)
+    : IRequest<Result<StudySessionImagesUploadResponse>>;

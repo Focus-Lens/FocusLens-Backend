@@ -6,6 +6,7 @@ using FocusLens.Domain;
 using FocusLens.Domain.Common.Interfaces;
 using FocusLens.Domain.Common.Results;
 using FocusLens.Domain.StudySessions;
+using Microsoft.Extensions.Options;
 using ContractStudyMaterialSource = FocusLens.Contracts.StudySessions.StudyMaterialSource;
 using DomainStudyMaterialSource = FocusLens.Domain.StudySessions.StudyMaterialSource;
 using StudySessionMode = FocusLens.Domain.StudySessions.StudySessionMode;
@@ -50,6 +51,159 @@ public sealed class StudySessionMaterialReplacementTests
         Assert.DoesNotContain(fixture.OldSelection!.DerivedStorageReference!, fixture.FileStore.DeletedReferences);
     }
 
+    [Fact]
+    public async Task UploadImages_WithMultipleValidImages_PersistsMetadataAndReturnsResponse()
+    {
+        Fixture fixture = Fixture.Create(false);
+
+        Result<StudySessionImagesUploadResponse> result = await fixture.Handler.Handle(
+            new UploadStudySessionImagesCommand(fixture.Session.Id,
+            [
+                UploadFile("front.png", [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]),
+                UploadFile("back.jpg", [0xFF, 0xD8, 0xFF, 0xE0])
+            ]),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(2, result.Value.Images.Count);
+        Assert.Equal(2, fixture.Images.GetAll().Count());
+        Assert.All(result.Value.Images, image => Assert.Equal(fixture.Session.Id, image.StudySessionId));
+        Assert.Contains(result.Value.Images, image => image.ContentType == "image/png");
+        Assert.Contains(result.Value.Images, image => image.ContentType == "image/jpeg");
+    }
+
+    [Fact]
+    public async Task UploadImages_WhenSecondFileHasInvalidContent_DeletesPreviouslySavedImage()
+    {
+        Fixture fixture = Fixture.Create(false);
+
+        Result<StudySessionImagesUploadResponse> result = await fixture.Handler.Handle(
+            new UploadStudySessionImagesCommand(fixture.Session.Id,
+            [
+                UploadFile("front.png", [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]),
+                UploadFile("notes.txt", [0x25, 0x50, 0x44, 0x46])
+            ]),
+            CancellationToken.None);
+
+        Assert.True(result.IsError);
+        Assert.Equal("StudySessionImages.UnsupportedFormat", result.TopError.Code);
+        Assert.Equal(["images/1.png"], fixture.ImageFileStore.DeletedReferences);
+        Assert.Empty(fixture.Images.GetAll());
+    }
+
+    [Fact]
+    public async Task UploadImages_WhenPersistenceFails_DeletesImagesCreatedByRequest()
+    {
+        Fixture fixture = Fixture.Create(false, true);
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => fixture.Handler.Handle(
+            new UploadStudySessionImagesCommand(fixture.Session.Id,
+            [
+                UploadFile("front.webp", [0x52, 0x49, 0x46, 0x46, 0, 0, 0, 0, 0x57, 0x45, 0x42, 0x50])
+            ]),
+            CancellationToken.None));
+
+        Assert.Equal(["images/1.webp"], fixture.ImageFileStore.DeletedReferences);
+    }
+
+    [Fact]
+    public async Task UploadImages_WhenRequestIsCanceledAfterImageIsStored_DeletesImagesCreatedByRequest()
+    {
+        Fixture fixture = Fixture.Create(false);
+        using CancellationTokenSource cancellation = new();
+        fixture.ImageFileStore.CancelAfterSaveCount = 1;
+        fixture.ImageFileStore.Cancellation = cancellation;
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => fixture.Handler.Handle(
+            new UploadStudySessionImagesCommand(fixture.Session.Id,
+            [
+                UploadFile("front.png", [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]),
+                UploadFile("back.jpg", [0xFF, 0xD8, 0xFF, 0xE0])
+            ]),
+            cancellation.Token));
+
+        Assert.Equal(["images/1.png"], fixture.ImageFileStore.SavedReferences);
+        Assert.Equal(["images/1.png"], fixture.ImageFileStore.DeletedReferences);
+        Assert.Empty(fixture.Images.GetAll());
+    }
+
+    [Fact]
+    public async Task UploadImages_WhenSessionBelongsToAnotherStudent_ReturnsNotFound()
+    {
+        Fixture fixture = Fixture.Create(false, currentUserOwnsSession: false);
+
+        Result<StudySessionImagesUploadResponse> result = await fixture.Handler.Handle(
+            new UploadStudySessionImagesCommand(fixture.Session.Id,
+            [
+                UploadFile("front.png", [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A])
+            ]),
+            CancellationToken.None);
+
+        Assert.True(result.IsError);
+        Assert.Equal("StudySessions.NotFound", result.TopError.Code);
+        Assert.Empty(fixture.ImageFileStore.SavedReferences);
+    }
+
+    [Fact]
+    public async Task UploadImages_WhenSessionDoesNotExist_ReturnsNotFound()
+    {
+        Fixture fixture = Fixture.Create(false);
+
+        Result<StudySessionImagesUploadResponse> result = await fixture.Handler.Handle(
+            new UploadStudySessionImagesCommand(Guid.NewGuid(),
+            [
+                UploadFile("front.png", [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A])
+            ]),
+            CancellationToken.None);
+
+        Assert.True(result.IsError);
+        Assert.Equal("StudySessions.NotFound", result.TopError.Code);
+        Assert.Empty(fixture.ImageFileStore.SavedReferences);
+    }
+
+    [Fact]
+    public async Task UploadImages_WhenCollectionIsEmpty_ReturnsValidationError()
+    {
+        Fixture fixture = Fixture.Create(false);
+
+        Result<StudySessionImagesUploadResponse> result = await fixture.Handler.Handle(
+            new UploadStudySessionImagesCommand(fixture.Session.Id, []),
+            CancellationToken.None);
+
+        Assert.True(result.IsError);
+        Assert.Equal("StudySessionImages.FilesRequired", result.TopError.Code);
+    }
+
+    [Fact]
+    public async Task UploadImages_WhenIndividualFileIsEmpty_ReturnsValidationError()
+    {
+        Fixture fixture = Fixture.Create(false);
+
+        Result<StudySessionImagesUploadResponse> result = await fixture.Handler.Handle(
+            new UploadStudySessionImagesCommand(fixture.Session.Id, [UploadFile("empty.png", [])]),
+            CancellationToken.None);
+
+        Assert.True(result.IsError);
+        Assert.Equal("StudySessionImages.EmptyFile", result.TopError.Code);
+    }
+
+    [Fact]
+    public async Task UploadImages_WhenTooManyFiles_ReturnsValidationError()
+    {
+        Fixture fixture = Fixture.Create(false);
+
+        Result<StudySessionImagesUploadResponse> result = await fixture.Handler.Handle(
+            new UploadStudySessionImagesCommand(fixture.Session.Id,
+                Enumerable.Range(0, 11)
+                    .Select(index => UploadFile($"{index}.png", [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]))
+                    .ToArray()),
+            CancellationToken.None);
+
+        Assert.True(result.IsError);
+        Assert.Equal("StudySessionImages.TooManyFiles", result.TopError.Code);
+        Assert.Empty(fixture.ImageFileStore.SavedReferences);
+    }
+
     private sealed record Fixture(
         StudySessionCommandHandler Handler,
         StudySession Session,
@@ -57,13 +211,17 @@ public sealed class StudySessionMaterialReplacementTests
         StudySessionSelection? OldSelection,
         InMemoryRepository<StudyMaterial> Materials,
         InMemoryRepository<StudySessionSelection> Selections,
+        InMemoryRepository<StudySessionImage> Images,
         RecordingFileStore FileStore,
+        RecordingImageFileStore ImageFileStore,
         RecordingUnitOfWork UnitOfWork)
     {
-        public static Fixture Create(bool withSelection, bool failSave = false)
+        public static Fixture Create(bool withSelection, bool failSave = false, bool currentUserOwnsSession = true)
         {
             Guid userId = Guid.NewGuid();
             Student student = new(userId);
+            Guid currentUserId = currentUserOwnsSession ? userId : Guid.NewGuid();
+            Student currentStudent = currentUserOwnsSession ? student : new Student(currentUserId);
             StudySession session = StudySession.Create(student.Id, StudySessionMode.Digital).Value;
             StudyMaterial material = StudyMaterial.Create(student.Id, "old.pdf", 10, 5, "original/old.pdf",
                 DomainStudyMaterialSource.Upload).Value;
@@ -80,23 +238,35 @@ public sealed class StudySessionMaterialReplacementTests
             InMemoryRepository<StudySessionSelection> selections = selection is null
                 ? new InMemoryRepository<StudySessionSelection>()
                 : new InMemoryRepository<StudySessionSelection>(selection);
+            InMemoryRepository<StudySessionImage> images = new();
             RecordingFileStore fileStore = new();
+            RecordingImageFileStore imageFileStore = new();
             RecordingUnitOfWork unitOfWork = new(failSave);
             StudySessionCommandHandler handler = new(
-                new InMemoryRepository<Student>(student),
+                currentUserOwnsSession
+                    ? new InMemoryRepository<Student>(student)
+                    : new InMemoryRepository<Student>(student, currentStudent),
                 new InMemoryRepository<StudySession>(session),
                 materials,
                 selections,
                 new InMemoryRepository<StudyMaterialSection>(),
                 new InMemoryRepository<StudySessionSelectedSection>(),
+                images,
                 fileStore,
+                imageFileStore,
                 new StubPdfProcessor(),
-                new StubCurrentUser(userId),
-                unitOfWork);
+                new StubCurrentUser(currentUserId),
+                unitOfWork,
+                Options.Create(new StudySessionImageUploadOptions()));
 
-            return new Fixture(handler, session, material, selection, materials, selections, fileStore, unitOfWork);
+            return new Fixture(handler, session, material, selection, materials, selections, images, fileStore,
+                imageFileStore, unitOfWork);
         }
     }
+
+    private static StudySessionImageUploadFile UploadFile(string fileName, byte[] content) =>
+        new(fileName, "application/octet-stream", content.Length,
+            _ => Task.FromResult<Stream>(new MemoryStream(content)));
 
     private sealed class RecordingFileStore : IStudyMaterialFileStore
     {
@@ -115,6 +285,39 @@ public sealed class StudySessionMaterialReplacementTests
 
         public Task DeleteAsync(string storageReference, CancellationToken cancellationToken)
         {
+            DeletedReferences.Add(storageReference);
+            return Task.CompletedTask;
+        }
+    }
+
+    private sealed class RecordingImageFileStore : IStudySessionImageFileStore
+    {
+        private int _saveCount;
+
+        public List<string> SavedReferences { get; } = [];
+
+        public List<string> DeletedReferences { get; } = [];
+
+        public int? CancelAfterSaveCount { get; set; }
+
+        public CancellationTokenSource? Cancellation { get; set; }
+
+        public Task<string> SaveAsync(Guid studentId, string extension, Stream content,
+            CancellationToken cancellationToken)
+        {
+            string reference = $"images/{++_saveCount}{extension}";
+            SavedReferences.Add(reference);
+            if (SavedReferences.Count == CancelAfterSaveCount)
+            {
+                Cancellation?.Cancel();
+            }
+
+            return Task.FromResult(reference);
+        }
+
+        public Task DeleteAsync(string storageReference, CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
             DeletedReferences.Add(storageReference);
             return Task.CompletedTask;
         }

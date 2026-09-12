@@ -49,4 +49,16 @@ internal static class StudySessionMappings
             selection.SelectedSections.Select(section => section.StudyMaterialSectionId).ToArray(),
             selection.EstimatedStudyTimeMinutes);
     }
+
+    public static StudySessionImageResponse ToResponse(this StudySessionImage image)
+    {
+        return new StudySessionImageResponse(
+            image.Id,
+            image.StudySessionId,
+            image.OriginalFileName,
+            image.ContentType,
+            image.FileSizeBytes,
+            image.StorageReference,
+            image.CreatedAtUtc);
+    }
 }

@@ -38,3 +38,15 @@ public sealed record StudySessionSelectionResponse(
     int ToPage,
     IReadOnlyCollection<Guid> SelectedSectionIds,
     int EstimatedStudyTimeMinutes);
+
+public sealed record StudySessionImageResponse(
+    Guid Id,
+    Guid StudySessionId,
+    string OriginalFileName,
+    string ContentType,
+    long FileSizeBytes,
+    string StorageReference,
+    DateTimeOffset UploadedAtUtc);
+
+public sealed record StudySessionImagesUploadResponse(
+    IReadOnlyCollection<StudySessionImageResponse> Images);

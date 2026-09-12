@@ -3,6 +3,7 @@ using FocusLens.Contracts.StudySessions;
 using FocusLens.Domain.Common.Results;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.Mvc;
 
 namespace FocusLens.API.Controllers;
@@ -131,6 +132,42 @@ public sealed class StudySessionsController(ISender sender) : ApiController
     {
         Result<Success> result = await sender.Send(new StartStudySessionCommand(sessionId), cancellationToken);
         return result.Match(_ => NoContent(), Problem);
+    }
+
+    [HttpPost("{sessionId:guid}/images")]
+    [Consumes("multipart/form-data")]
+    [RequestSizeLimit(50 * 1024 * 1024)]
+    [RequestFormLimits(MultipartBodyLengthLimit = 50 * 1024 * 1024)]
+    public async Task<IActionResult> UploadImages(
+        Guid sessionId,
+        [FromForm] List<IFormFile>? files,
+        CancellationToken cancellationToken)
+    {
+        if (files is null || files.Count == 0)
+        {
+            return Problem([Error.Validation("StudySessionImages.FilesRequired", "At least one image file is required.")]);
+        }
+
+        if (files.Any(file => file.Length == 0))
+        {
+            return Problem([Error.Validation("StudySessionImages.EmptyFile", "The uploaded image is empty.")]);
+        }
+
+        StudySessionImageUploadFile[] uploadFiles = files
+            .Select(file => new StudySessionImageUploadFile(
+                file.FileName,
+                file.ContentType,
+                file.Length,
+                cancellation =>
+                {
+                    cancellation.ThrowIfCancellationRequested();
+                    return Task.FromResult<Stream>(file.OpenReadStream());
+                }))
+            .ToArray();
+
+        return ToActionResult(await sender.Send(
+            new UploadStudySessionImagesCommand(sessionId, uploadFiles),
+            cancellationToken));
     }
 
     [HttpPost("{sessionId:guid}/pause")]

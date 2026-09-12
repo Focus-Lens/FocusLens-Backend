@@ -5,6 +5,7 @@ using FocusLens.Domain.Common.Results;
 using FocusLens.Domain.Students;
 using FocusLens.Domain.StudySessions;
 using MediatR;
+using Microsoft.Extensions.Options;
 using ICurrentUser = FocusLens.Application.Common.Interfaces.ICurrentUser;
 using DomainStudyMaterialSource = FocusLens.Domain.StudySessions.StudyMaterialSource;
 using DomainStudySessionMode = FocusLens.Domain.StudySessions.StudySessionMode;
@@ -19,10 +20,13 @@ public sealed class StudySessionCommandHandler(
     IBaseRepository<StudySessionSelection> selectionRepository,
     IBaseRepository<StudyMaterialSection> sectionRepository,
     IBaseRepository<StudySessionSelectedSection> selectedSectionRepository,
+    IBaseRepository<StudySessionImage> imageRepository,
     IStudyMaterialFileStore fileStore,
+    IStudySessionImageFileStore imageFileStore,
     IStudyMaterialPdfProcessor pdfProcessor,
     ICurrentUser currentUser,
     IUnitOfWork unitOfWork,
+    IOptions<StudySessionImageUploadOptions> imageUploadOptions,
     TimeProvider timeProvider = null!)
     : IRequestHandler<CreateStudySessionCommand, Result<StudySessionResponse>>,
         IRequestHandler<SetStudySessionModeCommand, Result<Success>>,
@@ -34,6 +38,7 @@ public sealed class StudySessionCommandHandler(
         IRequestHandler<ChangeStudySessionMaterialCommand, Result<StudyMaterialResponse>>,
         IRequestHandler<StartStudySessionCommand, Result<Success>>,
         IRequestHandler<UploadStudyMaterialCommand, Result<StudyMaterialResponse>>,
+        IRequestHandler<UploadStudySessionImagesCommand, Result<StudySessionImagesUploadResponse>>,
         IRequestHandler<PauseStudySessionCommand, Result<StudySessionResponse>>,
         IRequestHandler<ResumeStudySessionCommand, Result<StudySessionResponse>>,
         IRequestHandler<EndStudySessionCommand, Result<StudySessionResponse>>,
@@ -292,6 +297,79 @@ public sealed class StudySessionCommandHandler(
             request.Content, request.Source, false, cancellationToken);
     }
 
+    public async Task<Result<StudySessionImagesUploadResponse>> Handle(UploadStudySessionImagesCommand request,
+        CancellationToken cancellationToken)
+    {
+        Result<StudySession> sessionResult = await GetSessionAsync(request.SessionId);
+        if (sessionResult.IsError)
+        {
+            return sessionResult.TopError;
+        }
+
+        if (request.Files.Count == 0)
+        {
+            return Error.Validation("StudySessionImages.FilesRequired", "At least one image file is required.");
+        }
+
+        StudySessionImageUploadOptions options = imageUploadOptions.Value;
+        if (request.Files.Count > options.MaxImagesPerRequest)
+        {
+            return Error.Validation("StudySessionImages.TooManyFiles",
+                $"Upload no more than {options.MaxImagesPerRequest} images in one request.");
+        }
+
+        List<PendingStudySessionImage> pendingImages = [];
+        List<string> createdStorageReferences = [];
+        try
+        {
+            foreach (StudySessionImageUploadFile file in request.Files)
+            {
+                Result<ImageFormat> formatResult = await ValidateImageAsync(file, options, cancellationToken);
+                if (formatResult.IsError)
+                {
+                    await DeleteCreatedImagesAsync(createdStorageReferences);
+                    return formatResult.TopError;
+                }
+
+                await using Stream content = await file.OpenReadAsync(cancellationToken);
+                string storageReference = await imageFileStore.SaveAsync(
+                    sessionResult.Value.StudentId,
+                    formatResult.Value.Extension,
+                    content,
+                    cancellationToken);
+                createdStorageReferences.Add(storageReference);
+                pendingImages.Add(new PendingStudySessionImage(file, formatResult.Value, storageReference));
+            }
+
+            List<StudySessionImage> images = [];
+            foreach (PendingStudySessionImage pendingImage in pendingImages)
+            {
+                Result<StudySessionImage> imageResult = StudySessionImage.Create(
+                    sessionResult.Value.Id,
+                    pendingImage.File.FileName,
+                    pendingImage.Format.ContentType,
+                    pendingImage.File.FileSizeBytes,
+                    pendingImage.StorageReference);
+                if (imageResult.IsError)
+                {
+                    await DeleteCreatedImagesAsync(createdStorageReferences);
+                    return imageResult.TopError;
+                }
+
+                images.Add(imageResult.Value);
+            }
+
+            await imageRepository.AddRangeAsync(images);
+            await unitOfWork.SaveChangesAsync();
+            return new StudySessionImagesUploadResponse(images.Select(image => image.ToResponse()).ToArray());
+        }
+        catch
+        {
+            await DeleteCreatedImagesAsync(createdStorageReferences);
+            throw;
+        }
+    }
+
     private async Task<Result<StudySessionSelectionResponse>> CreateSelectionAsync(StudySession session,
         SetStudySessionSelectionRequest request, CancellationToken cancellationToken)
     {
@@ -545,5 +623,81 @@ public sealed class StudySessionCommandHandler(
 
         await unitOfWork.SaveChangesAsync();
         return Result.Success;
+    }
+
+    private static async Task<Result<ImageFormat>> ValidateImageAsync(
+        StudySessionImageUploadFile file,
+        StudySessionImageUploadOptions options,
+        CancellationToken cancellationToken)
+    {
+        if (file.FileSizeBytes <= 0)
+        {
+            return Error.Validation("StudySessionImages.EmptyFile", "The uploaded image is empty.");
+        }
+
+        if (file.FileSizeBytes > options.MaxImageSizeBytes)
+        {
+            return Error.Validation("StudySessionImages.FileTooLarge",
+                $"Each image must be {options.MaxImageSizeBytes} bytes or smaller.");
+        }
+
+        await using Stream content = await file.OpenReadAsync(cancellationToken);
+        byte[] header = new byte[12];
+        int bytesRead = await content.ReadAsync(header, cancellationToken);
+        if (bytesRead >= 3 && header[0] == 0xFF && header[1] == 0xD8 && header[2] == 0xFF)
+        {
+            return ImageFormat.Jpeg;
+        }
+
+        if (bytesRead >= 8
+            && header[0] == 0x89
+            && header[1] == 0x50
+            && header[2] == 0x4E
+            && header[3] == 0x47
+            && header[4] == 0x0D
+            && header[5] == 0x0A
+            && header[6] == 0x1A
+            && header[7] == 0x0A)
+        {
+            return ImageFormat.Png;
+        }
+
+        if (bytesRead >= 12
+            && header[0] == 0x52
+            && header[1] == 0x49
+            && header[2] == 0x46
+            && header[3] == 0x46
+            && header[8] == 0x57
+            && header[9] == 0x45
+            && header[10] == 0x42
+            && header[11] == 0x50)
+        {
+            return ImageFormat.WebP;
+        }
+
+        return Error.Validation("StudySessionImages.UnsupportedFormat",
+            "Only JPEG, PNG, and WebP images are supported.");
+    }
+
+    private async Task DeleteCreatedImagesAsync(IEnumerable<string> storageReferences)
+    {
+        foreach (string storageReference in storageReferences)
+        {
+            await imageFileStore.DeleteAsync(storageReference, CancellationToken.None);
+        }
+    }
+
+    private sealed record PendingStudySessionImage(
+        StudySessionImageUploadFile File,
+        ImageFormat Format,
+        string StorageReference);
+
+    private sealed record ImageFormat(string ContentType, string Extension)
+    {
+        public static readonly ImageFormat Jpeg = new("image/jpeg", ".jpg");
+
+        public static readonly ImageFormat Png = new("image/png", ".png");
+
+        public static readonly ImageFormat WebP = new("image/webp", ".webp");
     }
 }

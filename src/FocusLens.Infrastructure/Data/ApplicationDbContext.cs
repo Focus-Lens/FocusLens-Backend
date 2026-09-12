@@ -27,6 +27,8 @@ namespace FocusLens.Infrastructure.Data
 
         public DbSet<StudySessionSelection> StudySessionSelections => Set<StudySessionSelection>();
 
+        public DbSet<StudySessionImage> StudySessionImages => Set<StudySessionImage>();
+
         public DbSet<StudyMaterialSection> StudyMaterialSections => Set<StudyMaterialSection>();
 
         public DbSet<StudySessionCompletedSection> StudySessionCompletedSections =>

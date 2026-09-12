@@ -1,9 +1,12 @@
 using System.Net;
 using System.Net.Http.Headers;
 using System.Text;
+using System.Text.Json;
+using FocusLens.Infrastructure.Data;
 using FocusLens.Domain;
 using FocusLens.Domain.Students;
 using FocusLens.Domain.StudySessions;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace FocusLens.Api.IntegrationTests;
 
@@ -65,6 +68,38 @@ public sealed class StudySessionSetupApiTests
         await AssertNoContentAsync(response);
     }
 
+    [Fact]
+    public async Task UploadImages_WithMultipleValidImages_ReturnsMetadataAndDoesNotMarkSessionReady()
+    {
+        await using CustomWebApplicationFactory factory = new();
+        (Guid userId, StudySession session, _) = await SeedSessionAsync(factory);
+        using HttpClient client = CreateStudentClient(factory, userId);
+        using MultipartFormDataContent form = new();
+        form.Add(ImageContent([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]), "files", "front.png");
+        form.Add(ImageContent([0xFF, 0xD8, 0xFF, 0xE0]), "files", "back.jpg");
+
+        HttpResponseMessage response = await client.PostAsync(
+            $"/api/study-sessions/{session.Id}/images",
+            form);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        using JsonDocument document = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        JsonElement images = document.RootElement.GetProperty("images");
+        Assert.Equal(2, images.GetArrayLength());
+        Assert.All(images.EnumerateArray(), image =>
+        {
+            Assert.Equal(session.Id, image.GetProperty("studySessionId").GetGuid());
+            Assert.False(Path.IsPathRooted(image.GetProperty("storageReference").GetString()!));
+        });
+
+        using IServiceScope scope = factory.Services.CreateScope();
+        ApplicationDbContext dbContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        Assert.Equal(2, dbContext.StudySessionImages.Count(image => image.StudySessionId == session.Id));
+        StudySession persisted = dbContext.StudySessions.Single(item => item.Id == session.Id);
+        Assert.Equal(StudySessionStatus.Draft, persisted.Status);
+        Assert.Null(persisted.StudyMaterialId);
+    }
+
     private static async Task<(Guid UserId, StudySession Session, StudentSubject Subject)> SeedSessionAsync(
         CustomWebApplicationFactory factory,
         bool readyToStart = false)
@@ -111,6 +146,13 @@ public sealed class StudySessionSetupApiTests
     }
 
     private static StringContent JsonContent(string json) => new(json, Encoding.UTF8, "application/json");
+
+    private static ByteArrayContent ImageContent(byte[] bytes)
+    {
+        ByteArrayContent content = new(bytes);
+        content.Headers.ContentType = new MediaTypeHeaderValue("application/octet-stream");
+        return content;
+    }
 
     private static async Task AssertNoContentAsync(HttpResponseMessage response)
     {
