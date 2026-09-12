@@ -18,7 +18,7 @@ public sealed class StudySession : AuditableEntity
         Status = StudySessionStatus.Draft;
     }
 
-    public Guid StudentId { get; private set; }
+    public Guid StudentId { get; }
 
     public StudySessionMode Mode { get; private set; }
 
@@ -80,8 +80,7 @@ public sealed class StudySession : AuditableEntity
         return Result.Success;
     }
 
-    public Result<Success> SetSubject(StudentSubject? subject) =>
-        SetSubjectId(subject?.Id ?? Guid.Empty);
+    public Result<Success> SetSubject(StudentSubject? subject) => SetSubjectId(subject?.Id ?? Guid.Empty);
 
     public Result<Success> SetSubjectId(Guid subjectId)
     {
@@ -188,6 +187,7 @@ public sealed class StudySession : AuditableEntity
         {
             return selectionResult;
         }
+
         _completedSections.Clear();
         MarkDraft();
         return Result.Success;
@@ -363,10 +363,12 @@ public sealed class StudySession : AuditableEntity
         return remaining > TimeSpan.Zero ? remaining : TimeSpan.Zero;
     }
 
-    private Result<Success> EnsureConfigurable() =>
-        Status is StudySessionStatus.Draft or StudySessionStatus.Ready
+    private Result<Success> EnsureConfigurable()
+    {
+        return Status is StudySessionStatus.Draft or StudySessionStatus.Ready
             ? Result.Success
             : StudySessionErrors.NotConfigurable;
+    }
 
     private void MarkDraft()
     {

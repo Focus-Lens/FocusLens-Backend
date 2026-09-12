@@ -86,5 +86,4 @@ public sealed class StudyMaterial : AuditableEntity
             storageReference.Trim(),
             source);
     }
-
 }

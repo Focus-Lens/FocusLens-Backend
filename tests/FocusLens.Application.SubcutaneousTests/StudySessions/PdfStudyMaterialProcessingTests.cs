@@ -15,14 +15,14 @@ public class PdfStudyMaterialProcessingTests
         string rootPath = Path.Combine(Path.GetTempPath(), $"focuslens-study-materials-{Guid.NewGuid():N}");
         try
         {
-            var fileStore = new LocalStudyMaterialFileStore(
+            LocalStudyMaterialFileStore fileStore = new(
                 Options.Create(new StudyMaterialStorageOptions { RootPath = rootPath }),
                 new TestHostEnvironment());
-            var processor = new PdfSharpStudyMaterialPdfProcessor();
-            byte[] originalPdf = CreatePdf(pageCount: 5);
+            PdfSharpStudyMaterialPdfProcessor processor = new();
+            byte[] originalPdf = CreatePdf(5);
             Guid studentId = Guid.NewGuid();
 
-            await using var originalContent = new MemoryStream(originalPdf);
+            await using MemoryStream originalContent = new(originalPdf);
             string originalReference = await fileStore.SaveOriginalAsync(
                 studentId,
                 "book.pdf",
@@ -62,8 +62,10 @@ public class PdfStudyMaterialProcessingTests
             Assert.False(Path.IsPathRooted(secondDerivedReference));
             Assert.Contains("/derived/", secondDerivedReference);
 
-            await using Stream originalAgain = await fileStore.OpenReadAsync(originalReference, CancellationToken.None);
-            await using Stream derived = await fileStore.OpenReadAsync(secondSelection.DerivedStorageReference!, CancellationToken.None);
+            await using Stream originalAgain =
+                await fileStore.OpenReadAsync(originalReference, CancellationToken.None);
+            await using Stream derived = await fileStore.OpenReadAsync(secondSelection.DerivedStorageReference!,
+                CancellationToken.None);
 
             Assert.Equal(5, await processor.GetPageCountAsync(originalAgain, CancellationToken.None));
             Assert.Equal(2, await processor.GetPageCountAsync(derived, CancellationToken.None));
@@ -74,7 +76,7 @@ public class PdfStudyMaterialProcessingTests
         {
             if (Directory.Exists(rootPath))
             {
-                Directory.Delete(rootPath, recursive: true);
+                Directory.Delete(rootPath, true);
             }
         }
     }
@@ -99,8 +101,8 @@ public class PdfStudyMaterialProcessingTests
             document.AddPage();
         }
 
-        using var output = new MemoryStream();
-        document.Save(output, closeStream: false);
+        using MemoryStream output = new();
+        document.Save(output);
         return output.ToArray();
     }
 

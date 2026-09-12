@@ -27,7 +27,8 @@ public sealed class StudySessionPageRange
 
         if (toPage < fromPage)
         {
-            return Error.Validation("StudySessions.ToPageInvalid", "To page must be greater than or equal to from page.");
+            return Error.Validation("StudySessions.ToPageInvalid",
+                "To page must be greater than or equal to from page.");
         }
 
         return new StudySessionPageRange(fromPage, toPage);

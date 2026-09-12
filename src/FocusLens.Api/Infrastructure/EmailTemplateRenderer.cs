@@ -1,7 +1,5 @@
 using System.Text.Encodings.Web;
 
-using Microsoft.AspNetCore.Hosting;
-
 namespace FocusLens.API.Infrastructure;
 
 public sealed class EmailTemplateRenderer

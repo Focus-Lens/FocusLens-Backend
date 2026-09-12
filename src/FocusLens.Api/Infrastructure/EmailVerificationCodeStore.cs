@@ -1,6 +1,5 @@
 using System.Security.Cryptography;
 using System.Text;
-
 using FocusLens.Application.Common.Interfaces;
 using FocusLens.Application.Common.Models;
 using FocusLens.Infrastructure.Data;
@@ -37,9 +36,9 @@ public sealed class EmailVerificationCodeStore : IEmailVerificationCodeStore
         List<EmailVerificationCode> activeCodes = await _dbContext
             .EmailVerificationCodes
             .Where(storedCode => storedCode.Email == normalizedEmail
-                && storedCode.Purpose == purposeValue
-                && storedCode.UsedOnUtc == null
-                && storedCode.ExpiresOnUtc > utcNow)
+                                 && storedCode.Purpose == purposeValue
+                                 && storedCode.UsedOnUtc == null
+                                 && storedCode.ExpiresOnUtc > utcNow)
             .ToListAsync(cancellationToken);
 
         foreach (EmailVerificationCode activeCode in activeCodes)
@@ -75,8 +74,8 @@ public sealed class EmailVerificationCodeStore : IEmailVerificationCodeStore
         EmailVerificationCode? persistedCode = await _dbContext
             .EmailVerificationCodes
             .Where(storedCode => storedCode.Email == normalizedEmail
-                && storedCode.Purpose == purposeValue
-                && storedCode.CodeHash == hash)
+                                 && storedCode.Purpose == purposeValue
+                                 && storedCode.CodeHash == hash)
             .OrderByDescending(storedCode => storedCode.CreatedOnUtc)
             .FirstOrDefaultAsync(cancellationToken);
 
@@ -126,10 +125,10 @@ public sealed class EmailVerificationCodeStore : IEmailVerificationCodeStore
         EmailVerificationCode? persistedCode = await _dbContext
             .EmailVerificationCodes
             .Where(storedCode => storedCode.Email == normalizedEmail
-                && storedCode.Purpose == purposeValue
-                && storedCode.CodeHash == hash
-                && storedCode.UsedOnUtc == null
-                && storedCode.ExpiresOnUtc > utcNow)
+                                 && storedCode.Purpose == purposeValue
+                                 && storedCode.CodeHash == hash
+                                 && storedCode.UsedOnUtc == null
+                                 && storedCode.ExpiresOnUtc > utcNow)
             .OrderByDescending(storedCode => storedCode.CreatedOnUtc)
             .FirstOrDefaultAsync(cancellationToken);
 
@@ -143,8 +142,7 @@ public sealed class EmailVerificationCodeStore : IEmailVerificationCodeStore
         await _dbContext.SaveChangesAsync(cancellationToken);
     }
 
-    private static string NormalizeEmail(string email)
-        => email.Trim().ToUpperInvariant();
+    private static string NormalizeEmail(string email) => email.Trim().ToUpperInvariant();
 
     private static string HashCode(string normalizedEmail, string code)
     {

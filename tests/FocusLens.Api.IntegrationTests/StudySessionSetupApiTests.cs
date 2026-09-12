@@ -2,8 +2,8 @@ using System.Net;
 using System.Net.Http.Headers;
 using System.Text;
 using FocusLens.Domain;
-using FocusLens.Domain.StudySessions;
 using FocusLens.Domain.Students;
+using FocusLens.Domain.StudySessions;
 
 namespace FocusLens.Api.IntegrationTests;
 
@@ -55,7 +55,7 @@ public sealed class StudySessionSetupApiTests
     public async Task Start_ReturnsNoContent()
     {
         await using CustomWebApplicationFactory factory = new();
-        (Guid userId, StudySession session, _) = await SeedSessionAsync(factory, readyToStart: true);
+        (Guid userId, StudySession session, _) = await SeedSessionAsync(factory, true);
         using HttpClient client = CreateStudentClient(factory, userId);
 
         HttpResponseMessage response = await client.PostAsync(
@@ -110,8 +110,7 @@ public sealed class StudySessionSetupApiTests
         return client;
     }
 
-    private static StringContent JsonContent(string json)
-        => new(json, Encoding.UTF8, "application/json");
+    private static StringContent JsonContent(string json) => new(json, Encoding.UTF8, "application/json");
 
     private static async Task AssertNoContentAsync(HttpResponseMessage response)
     {

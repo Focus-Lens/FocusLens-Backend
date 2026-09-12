@@ -1,5 +1,3 @@
-using FocusLens.Domain.Common.Results;
-
 namespace FocusLens.Domain.Common.Results.Abstractions;
 
 public interface IResult

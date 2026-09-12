@@ -1,3 +1,4 @@
+using FocusLens.Domain;
 using FocusLens.Domain.StudySessions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
@@ -18,7 +19,7 @@ public sealed class StudyMaterialConfiguration : IEntityTypeConfiguration<StudyM
         builder.Property(material => material.Source).HasConversion<string>().HasMaxLength(30).IsRequired();
 
         builder.HasIndex(material => material.StudentId);
-        builder.HasOne<FocusLens.Domain.Student>()
+        builder.HasOne<Student>()
             .WithMany()
             .HasForeignKey(material => material.StudentId)
             .OnDelete(DeleteBehavior.Cascade);

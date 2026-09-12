@@ -44,8 +44,8 @@ public class ParentStudentRelationship : AuditableEntity
     public InvitationInitiator InitiatedBy { get; private set; }
 
     /// <summary>
-    /// The deadline for acting on a pending invitation. Active or historical
-    /// relationships retain this value for audit purposes.
+    ///     The deadline for acting on a pending invitation. Active or historical
+    ///     relationships retain this value for audit purposes.
     /// </summary>
     public DateTimeOffset? ExpiresAtUtc { get; private set; }
 
@@ -56,12 +56,13 @@ public class ParentStudentRelationship : AuditableEntity
     public Student Student { get; private set; } = null!;
 
     public bool IsExpired(DateTimeOffset now)
-        => Status == RelationshipStatus.Pending &&
-           ExpiresAtUtc.HasValue &&
-           ExpiresAtUtc.Value <= now;
+    {
+        return Status == RelationshipStatus.Pending &&
+               ExpiresAtUtc.HasValue &&
+               ExpiresAtUtc.Value <= now;
+    }
 
-    public void Accept()
-        => Accept(DateTimeOffset.UtcNow);
+    public void Accept() => Accept(DateTimeOffset.UtcNow);
 
     public void Accept(DateTimeOffset now)
     {
@@ -104,8 +105,7 @@ public class ParentStudentRelationship : AuditableEntity
         RevokedAtUtc = DateTimeOffset.UtcNow;
     }
 
-    public void Reinvite()
-        => Reinvite(null);
+    public void Reinvite() => Reinvite(null);
 
     public void Reinvite(DateTimeOffset? expiresAtUtc)
     {

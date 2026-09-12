@@ -43,17 +43,19 @@ public sealed class ResolveStudentParentInvitationQueryHandler(
         }
 
         string displayName = invitation.Student.PreferredName
-            ?? $"{invitation.Student.User.FirstName} {invitation.Student.User.LastName}".Trim();
+                             ?? $"{invitation.Student.User.FirstName} {invitation.Student.User.LastName}".Trim();
 
         return new ResolveStudentParentInvitationResponse(
             invitation.Status.ToString(),
             displayName,
             invitation.ExpiresAtUtc,
-            RequiresSignIn: true);
+            true);
     }
 
     private static Error InvalidInvitation()
-        => Error.NotFound(
+    {
+        return Error.NotFound(
             "Access.InvitationInvalidOrExpired",
             "This invitation link is invalid or has expired.");
+    }
 }

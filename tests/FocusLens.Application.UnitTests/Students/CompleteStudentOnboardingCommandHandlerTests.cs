@@ -11,6 +11,7 @@ using FocusLens.Domain.Interfaces;
 using ContractStudentGoal = FocusLens.Contracts.Students.StudentGoal;
 using ContractStudentGrade = FocusLens.Contracts.Students.StudentGrade;
 using ContractStudentSubjectType = FocusLens.Contracts.Students.StudentSubjectType;
+using StudentGoal = FocusLens.Domain.Students.StudentGoal;
 
 namespace FocusLens.Application.UnitTests.Students;
 
@@ -23,7 +24,7 @@ public class CompleteStudentOnboardingCommandHandlerTests
 
         AuthResponse result = (await CreateHandler(student).Handle(
             new CompleteStudentOnboardingCommand(
-                new CompleteStudentOnboardingRequest(null, null, null)),
+                new CompleteStudentOnboardingRequest(null, null, null, null, null, null)),
             CancellationToken.None)).Value;
 
         Assert.False(student.IsOnboardingCompleted);
@@ -40,24 +41,43 @@ public class CompleteStudentOnboardingCommandHandlerTests
         AuthResponse result = (await CreateHandler(student).Handle(
             new CompleteStudentOnboardingCommand(
                 new CompleteStudentOnboardingRequest(
-                    ContractStudentGoal.FocusBetter,
+                    new DateOnly(2010, 5, 12),
+                    new[] { ContractStudentGoal.FocusBetter },
                     ContractStudentGrade.Grade10,
-                    [new StudentSubjectRequest(ContractStudentSubjectType.Math, null)])),
+                    [new StudentSubjectRequest(ContractStudentSubjectType.Math, null)],
+                    new[] { StudyPriority.StayFocused, StudyPriority.ExamPreparation },
+                    new StudyTimeGoalRequest(
+                        StudyTimeGoalPeriod.Daily,
+                        60,
+                        [DayOfWeek.Monday],
+                        null))),
             CancellationToken.None)).Value;
 
         Assert.True(student.IsOnboardingCompleted);
+        Assert.Equal(new DateOnly(2010, 5, 12), student.DateOfBirth);
+        Assert.Equal([StudentGoal.FocusBetter], student.Goals);
+        Assert.Equal(
+            [
+                Domain.Students.StudyPriority.StayFocused,
+                Domain.Students.StudyPriority.ExamPreparation
+            ],
+            student.StudyPriorities);
+        Assert.Equal(Domain.Students.StudyTimeGoalPeriod.Daily, student.StudyTimeGoal!.Period);
+        Assert.Equal(60, student.StudyTimeGoal.TargetMinutes);
         Assert.False(result.RequiresOnboarding);
         Assert.Equal("completed", result.OnboardingStatus);
         Assert.NotNull(result.Tokens);
     }
 
     private static CompleteStudentOnboardingCommandHandler CreateHandler(Student student)
-        => new(
+    {
+        return new CompleteStudentOnboardingCommandHandler(
             new InMemoryRepository<Student>(student),
             new FakeCurrentUser(student.UserId),
             new FakeUnitOfWork(),
             new TestIdentityService(student.UserId),
             new TestTokenProvider());
+    }
 
     private sealed class TestIdentityService(Guid userId) : IIdentityService
     {
@@ -70,35 +90,83 @@ public class CompleteStudentOnboardingCommandHandlerTests
             LastName = "Student"
         };
 
-        public Task<ApplicationUser?> FindByIdAsync(Guid id) => Task.FromResult<ApplicationUser?>(id == _user.Id ? _user : null);
+        public Task<ApplicationUser?> FindByIdAsync(Guid id) =>
+            Task.FromResult<ApplicationUser?>(id == _user.Id ? _user : null);
+
         public Task<ApplicationUser?> FindByEmailAsync(string email) => Task.FromResult<ApplicationUser?>(null);
+
         public Task<bool> CheckPasswordAsync(ApplicationUser user, string password) => Task.FromResult(true);
+
         public Task<bool> IsEmailConfirmedAsync(ApplicationUser user) => Task.FromResult(true);
+
         public Task<bool> IsLockedOutAsync(ApplicationUser user) => Task.FromResult(false);
-        public Task<IReadOnlyCollection<string>> GetRolesAsync(ApplicationUser user) => Task.FromResult<IReadOnlyCollection<string>>([ApplicationRoles.Student]);
-        public Task<bool> IsInRoleAsync(ApplicationUser user, string role) => Task.FromResult(role == ApplicationRoles.Student);
-        public Task<IdentityResultSummary> CreateAsync(ApplicationUser user, string password) => Task.FromResult(IdentityResultSummary.Success);
-        public Task<IdentityResultSummary> UpdateAsync(ApplicationUser user) => Task.FromResult(IdentityResultSummary.Success);
-        public Task<IdentityResultSummary> AddToRoleAsync(ApplicationUser user, string role) => Task.FromResult(IdentityResultSummary.Success);
-        public Task<IdentityResultSummary> ConfirmEmailAsync(ApplicationUser user) => Task.FromResult(IdentityResultSummary.Success);
-        public Task<IdentityResultSummary> SetPasswordAsync(ApplicationUser user, string newPassword) => Task.FromResult(IdentityResultSummary.Success);
-        public Task<IdentityResultSummary> ChangePasswordAsync(ApplicationUser user, string currentPassword, string newPassword) => Task.FromResult(IdentityResultSummary.Success);
-        public Task<ApplicationUser?> FindByLoginAsync(string loginProvider, string providerKey) => Task.FromResult<ApplicationUser?>(null);
-        public Task<IdentityResultSummary> AddLoginAsync(ApplicationUser user, string loginProvider, string providerKey, string displayName) => Task.FromResult(IdentityResultSummary.Success);
+
+        public Task<IReadOnlyCollection<string>> GetRolesAsync(ApplicationUser user) =>
+            Task.FromResult<IReadOnlyCollection<string>>([ApplicationRoles.Student]);
+
+        public Task<bool> IsInRoleAsync(ApplicationUser user, string role) =>
+            Task.FromResult(role == ApplicationRoles.Student);
+
+        public Task<IdentityResultSummary> CreateAsync(ApplicationUser user, string password) =>
+            Task.FromResult(IdentityResultSummary.Success);
+
+        public Task<IdentityResultSummary> UpdateAsync(ApplicationUser user) =>
+            Task.FromResult(IdentityResultSummary.Success);
+
+        public Task<IdentityResultSummary> AddToRoleAsync(ApplicationUser user, string role) =>
+            Task.FromResult(IdentityResultSummary.Success);
+
+        public Task<IdentityResultSummary> ConfirmEmailAsync(ApplicationUser user) =>
+            Task.FromResult(IdentityResultSummary.Success);
+
+        public Task<IdentityResultSummary> SetPasswordAsync(ApplicationUser user, string newPassword) =>
+            Task.FromResult(IdentityResultSummary.Success);
+
+        public Task<IdentityResultSummary> ChangePasswordAsync(ApplicationUser user, string currentPassword,
+            string newPassword) =>
+            Task.FromResult(IdentityResultSummary.Success);
+
+        public Task<ApplicationUser?> FindByLoginAsync(string loginProvider, string providerKey) =>
+            Task.FromResult<ApplicationUser?>(null);
+
+        public Task<IdentityResultSummary> AddLoginAsync(ApplicationUser user, string loginProvider,
+            string providerKey, string displayName) =>
+            Task.FromResult(IdentityResultSummary.Success);
     }
 
     private sealed class TestTokenProvider : ITokenProvider
     {
-        public Task<TokenPair> CreateTokenPairAsync(ApplicationUser user, CancellationToken cancellationToken = default)
-            => Task.FromResult(new TokenPair("access-token", DateTimeOffset.UtcNow.AddMinutes(15), "refresh-token", DateTimeOffset.UtcNow.AddDays(30)));
-        public Task<(string Token, DateTimeOffset ExpiresOnUtc)> CreateOnboardingTokenAsync(ApplicationUser user)
-            => Task.FromResult(("registration-token", DateTimeOffset.UtcNow.AddMinutes(15)));
+        public Task<TokenPair> CreateTokenPairAsync(ApplicationUser user,
+            CancellationToken cancellationToken = default)
+        {
+            return Task.FromResult(new TokenPair("access-token", DateTimeOffset.UtcNow.AddMinutes(15),
+                "refresh-token", DateTimeOffset.UtcNow.AddDays(30)));
+        }
+
+        public Task<(string Token, DateTimeOffset ExpiresOnUtc)> CreateOnboardingTokenAsync(ApplicationUser user) =>
+            Task.FromResult(("registration-token", DateTimeOffset.UtcNow.AddMinutes(15)));
+
         public ClaimsPrincipal GetPrincipalFromExpiredToken(string accessToken) => new();
+
         public string GenerateRefreshToken() => "refresh-token";
-        public Task<RefreshToken> PersistRefreshTokenAsync(Guid userId, string refreshToken, CancellationToken cancellationToken = default) => throw new NotSupportedException();
-        public Task<RefreshToken?> GetRefreshTokenAsync(string refreshToken, CancellationToken cancellationToken = default) => Task.FromResult<RefreshToken?>(null);
-        public Task<TokenPair?> RotateRefreshTokenAsync(ApplicationUser user, string refreshToken, CancellationToken cancellationToken = default) => Task.FromResult<TokenPair?>(null);
-        public Task<bool> RevokeRefreshTokenAsync(string refreshToken, CancellationToken cancellationToken = default) => Task.FromResult(false);
-        public Task RevokeAllRefreshTokensAsync(Guid userId, CancellationToken cancellationToken = default) => Task.CompletedTask;
+
+        public Task<RefreshToken> PersistRefreshTokenAsync(Guid userId, string refreshToken,
+            CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
+        public Task<RefreshToken?> GetRefreshTokenAsync(string refreshToken,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult<RefreshToken?>(null);
+
+        public Task<TokenPair?> RotateRefreshTokenAsync(ApplicationUser user, string refreshToken,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult<TokenPair?>(null);
+
+        public Task<bool> RevokeRefreshTokenAsync(string refreshToken,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult(false);
+
+        public Task RevokeAllRefreshTokensAsync(Guid userId, CancellationToken cancellationToken = default) =>
+            Task.CompletedTask;
     }
 }

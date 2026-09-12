@@ -22,15 +22,14 @@ public abstract class ApiController : ControllerBase
     }
 
     private ActionResult Problem(Error error)
-        => Problem(
+    {
+        return Problem(
             statusCode: GetStatusCode(error),
             title: GetTitle(error),
             detail: error.Description,
             type: GetType(error),
-            extensions: new Dictionary<string, object?>
-            {
-                ["errors"] = new[] { error }
-            });
+            extensions: new Dictionary<string, object?> { ["errors"] = new[] { error } });
+    }
 
     private ActionResult ValidationProblem(List<Error> errors)
     {
@@ -43,7 +42,8 @@ public abstract class ApiController : ControllerBase
     }
 
     private static int GetStatusCode(Error error)
-        => error.Type switch
+    {
+        return error.Type switch
         {
             ErrorKind.Validation => StatusCodes.Status400BadRequest,
             ErrorKind.Unauthorized => StatusCodes.Status401Unauthorized,
@@ -54,9 +54,11 @@ public abstract class ApiController : ControllerBase
             ErrorKind.Failure => StatusCodes.Status400BadRequest,
             _ => StatusCodes.Status500InternalServerError
         };
+    }
 
     private static string GetTitle(Error error)
-        => error.Type switch
+    {
+        return error.Type switch
         {
             ErrorKind.Validation => "Validation error",
             ErrorKind.Unauthorized => "Unauthorized",
@@ -67,9 +69,11 @@ public abstract class ApiController : ControllerBase
             ErrorKind.Failure => "Failure",
             _ => "Error"
         };
+    }
 
     private static string GetType(Error error)
-        => error.Type switch
+    {
+        return error.Type switch
         {
             ErrorKind.Validation => "https://tools.ietf.org/html/rfc9110#section-15.5.1",
             ErrorKind.Unauthorized => "https://tools.ietf.org/html/rfc9110#section-15.5.2",
@@ -80,4 +84,5 @@ public abstract class ApiController : ControllerBase
             ErrorKind.Failure => "https://tools.ietf.org/html/rfc9110#section-15.5.1",
             _ => "https://tools.ietf.org/html/rfc9110#section-15.6.1"
         };
+    }
 }

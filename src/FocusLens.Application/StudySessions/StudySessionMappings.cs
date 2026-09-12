@@ -8,7 +8,8 @@ namespace FocusLens.Application.StudySessions;
 internal static class StudySessionMappings
 {
     public static StudySessionResponse ToResponse(this StudySession session, DateTimeOffset utcNow)
-        => new(
+    {
+        return new StudySessionResponse(
             session.Id,
             session.StudentId,
             (ContractStudySessionMode)session.Mode,
@@ -24,18 +25,22 @@ internal static class StudySessionMappings
             session.SelectedSubjectId,
             session.FocusDurationMinutes,
             session.EstimatedStudyTimeMinutes);
+    }
 
     public static StudyMaterialResponse ToResponse(this StudyMaterial material)
-        => new(
+    {
+        return new StudyMaterialResponse(
             material.Id,
             material.FileName,
             material.FileSizeBytes,
             material.PageCount,
             material.StorageReference,
             (ContractStudyMaterialSource)material.Source);
+    }
 
     public static StudySessionSelectionResponse ToResponse(this StudySessionSelection selection)
-        => new(
+    {
+        return new StudySessionSelectionResponse(
             selection.Id,
             selection.StudySessionId,
             selection.StudyMaterialId,
@@ -43,4 +48,5 @@ internal static class StudySessionMappings
             selection.ToPage,
             selection.SelectedSections.Select(section => section.StudyMaterialSectionId).ToArray(),
             selection.EstimatedStudyTimeMinutes);
+    }
 }

@@ -17,7 +17,7 @@ public class StudentsApiTests
     public async Task CompleteOnboarding_WhenAllFieldsAreSkipped_LeavesOnboardingIncomplete()
     {
         Guid userId = Guid.NewGuid();
-        await using var factory = new CustomWebApplicationFactory();
+        await using CustomWebApplicationFactory factory = new();
         await factory.SeedAsync(db =>
         {
             SeedStudentIdentity(db, userId);
@@ -38,7 +38,7 @@ public class StudentsApiTests
     public async Task CompleteOnboarding_WhenAllFieldsAreProvided_MarksOnboardingComplete()
     {
         Guid userId = Guid.NewGuid();
-        await using var factory = new CustomWebApplicationFactory();
+        await using CustomWebApplicationFactory factory = new();
         await factory.SeedAsync(db =>
         {
             SeedStudentIdentity(db, userId);
@@ -48,7 +48,7 @@ public class StudentsApiTests
 
         using HttpClient client = CreateStudentClient(factory, userId);
         using StringContent content = new(
-            """{"goal":"FocusBetter","grade":"Grade10","subjects":[{"type":"Math","customName":null}]}""",
+            """{"goals":["FocusBetter"],"grade":"Grade10","subjects":[{"type":"Math","customName":null}],"studyPriorities":["StayFocused","ExamPreparation"],"studyTimeGoal":{"period":"Daily","targetMinutes":60,"days":["Monday","Tuesday","Wednesday","Thursday","Friday"],"startDate":null},"dateOfBirth":"2010-05-12"}""",
             Encoding.UTF8,
             "application/json");
 
@@ -64,11 +64,11 @@ public class StudentsApiTests
         Guid userId = Guid.NewGuid();
         Student student = new(userId);
         student.CompleteOnboarding(
-            StudentGoal.FocusBetter,
+            new[] { StudentGoal.FocusBetter },
             StudentGrade.Grade10,
             [StudentSubject.Predefined(StudentSubjectType.Math)]);
 
-        await using var factory = new CustomWebApplicationFactory();
+        await using CustomWebApplicationFactory factory = new();
         await factory.SeedAsync(db =>
         {
             db.Students.Add(student);
@@ -77,7 +77,7 @@ public class StudentsApiTests
 
         using HttpClient client = CreateStudentClient(factory, userId);
         using StringContent content = new(
-            """{"preferredName":"  كريم  ","goal":null,"subjects":[]}""",
+            """{"preferredName":"  كريم  ","goals":null,"subjects":[]}""",
             Encoding.UTF8,
             "application/json");
 
@@ -87,7 +87,7 @@ public class StudentsApiTests
         using JsonDocument document = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
         JsonElement root = document.RootElement;
         Assert.Equal("كريم", root.GetProperty("preferredName").GetString());
-        Assert.Equal(JsonValueKind.Null, root.GetProperty("goal").ValueKind);
+        Assert.Equal(0, root.GetProperty("goals").GetArrayLength());
         Assert.Equal("Grade10", root.GetProperty("grade").GetString());
         Assert.Equal(0, root.GetProperty("subjects").GetArrayLength());
         Assert.False(root.GetProperty("onboardingCompleted").GetBoolean());
@@ -97,7 +97,7 @@ public class StudentsApiTests
     public async Task UpdatePreferences_WhenPreferredNameIsWhitespace_ReturnsBadRequest()
     {
         Guid userId = Guid.NewGuid();
-        await using var factory = new CustomWebApplicationFactory();
+        await using CustomWebApplicationFactory factory = new();
         await factory.SeedAsync(db =>
         {
             db.Students.Add(new Student(userId));
@@ -119,7 +119,7 @@ public class StudentsApiTests
     public async Task GetMe_WithNoParentRelationship_ReturnsStudentProfile()
     {
         Guid userId = Guid.NewGuid();
-        await using var factory = new CustomWebApplicationFactory();
+        await using CustomWebApplicationFactory factory = new();
         await factory.SeedAsync(db =>
         {
             db.Students.Add(new Student(userId));
@@ -144,10 +144,9 @@ public class StudentsApiTests
 
     private static void SeedStudentIdentity(ApplicationDbContext db, Guid userId)
     {
-        var role = new ApplicationRole
+        ApplicationRole role = new()
         {
-            Name = ApplicationRoles.Student,
-            NormalizedName = ApplicationRoles.Student.ToUpperInvariant()
+            Name = ApplicationRoles.Student, NormalizedName = ApplicationRoles.Student.ToUpperInvariant()
         };
 
         db.Users.Add(new ApplicationUser
@@ -159,11 +158,7 @@ public class StudentsApiTests
             LastName = "Student"
         });
         db.Roles.Add(role);
-        db.UserRoles.Add(new IdentityUserRole<Guid>
-        {
-            UserId = userId,
-            RoleId = role.Id
-        });
+        db.UserRoles.Add(new IdentityUserRole<Guid> { UserId = userId, RoleId = role.Id });
     }
 
     private static async Task<bool> GetOnboardingCompletedAsync(HttpClient client)

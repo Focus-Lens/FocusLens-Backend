@@ -1,5 +1,4 @@
 using System.Text.Json.Serialization;
-
 using FocusLens.API.Infrastructure;
 using FocusLens.Application.Common.Interfaces;
 using FocusLens.Application.Features.Identity.Options;
@@ -39,10 +38,10 @@ public static class DependencyInjection
             .ValidateOnStart();
 
         RegistrationOptions registrationOptions = configuration
-            .GetRequiredSection(RegistrationOptions.SectionName)
-            .Get<RegistrationOptions>()
-            ?? throw new InvalidOperationException(
-                $"Configuration section {RegistrationOptions.SectionName} was not found.");
+                                                      .GetRequiredSection(RegistrationOptions.SectionName)
+                                                      .Get<RegistrationOptions>()
+                                                  ?? throw new InvalidOperationException(
+                                                      $"Configuration section {RegistrationOptions.SectionName} was not found.");
 
         services.AddSingleton(registrationOptions);
 

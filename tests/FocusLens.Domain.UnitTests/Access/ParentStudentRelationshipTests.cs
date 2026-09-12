@@ -164,7 +164,6 @@ public class ParentStudentRelationshipTests
         ParentStudentRelationship relationship =
             new(Guid.NewGuid(), Guid.NewGuid());
 
-        Assert.Throws<InvalidOperationException>(
-            () => relationship.Reinvite());
+        Assert.Throws<InvalidOperationException>(() => relationship.Reinvite());
     }
 }

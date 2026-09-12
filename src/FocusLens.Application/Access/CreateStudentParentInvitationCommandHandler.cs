@@ -50,10 +50,10 @@ public sealed class CreateStudentParentInvitationCommandHandler(
         string token = CreateToken();
         string tokenHash = HashToken(token);
 
-        StudentParentInvitation? invitation = await invitationRepository.FirstOrDefaultAsync(
-            item => item.StudentId == student.Id &&
-                    item.TargetEmailNormalized == normalizedEmail &&
-                    item.Status == ParentInvitationStatus.Pending);
+        StudentParentInvitation? invitation = await invitationRepository.FirstOrDefaultAsync(item =>
+            item.StudentId == student.Id &&
+            item.TargetEmailNormalized == normalizedEmail &&
+            item.Status == ParentInvitationStatus.Pending);
 
         if (invitation is null)
         {
@@ -70,7 +70,7 @@ public sealed class CreateStudentParentInvitationCommandHandler(
 
         string invitationUrl = invitationUrlBuilder.CreateStudentParentInvitationUrl(token);
         string studentName = student.PreferredName
-            ?? $"{student.User.FirstName} {student.User.LastName}".Trim();
+                             ?? $"{student.User.FirstName} {student.User.LastName}".Trim();
 
         await emailSender.SendStudentParentInvitationAsync(
             email,
@@ -97,9 +97,8 @@ public sealed class CreateStudentParentInvitationCommandHandler(
         }
     }
 
-    private static string CreateToken()
-        => Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
+    private static string CreateToken() => Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
 
-    private static string HashToken(string token)
-        => Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(token)));
+    private static string HashToken(string token) =>
+        Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(token)));
 }

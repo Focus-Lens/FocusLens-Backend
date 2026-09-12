@@ -15,7 +15,7 @@ public class UpdateStudentPreferencesCommandHandlerTests
     public async Task Handle_WhenGoalIsOmitted_PreservesExistingGoal()
     {
         Student student = CreateStudentWithPreferences();
-        var unitOfWork = new FakeUnitOfWork();
+        FakeUnitOfWork unitOfWork = new();
 
         Result<StudentDetailsResponse> result = await CreateHandler(student, unitOfWork).Handle(
             new UpdateStudentPreferencesCommand(new UpdateStudentPreferencesRequest
@@ -25,7 +25,8 @@ public class UpdateStudentPreferencesCommandHandlerTests
             CancellationToken.None);
 
         Assert.True(result.IsSuccess);
-        Assert.Equal(StudentGoal.FocusBetter, student.Goal);
+        Assert.Single(student.Goals);
+        Assert.Equal(StudentGoal.FocusBetter, student.Goals.Single());
         Assert.Equal(StudentGrade.Grade11, student.Grade);
         Assert.Equal(1, unitOfWork.SaveChangesCalls);
     }
@@ -36,14 +37,11 @@ public class UpdateStudentPreferencesCommandHandlerTests
         Student student = CreateStudentWithPreferences();
 
         Result<StudentDetailsResponse> result = await CreateHandler(student).Handle(
-            new UpdateStudentPreferencesCommand(new UpdateStudentPreferencesRequest
-            {
-                Goal = null
-            }),
+            new UpdateStudentPreferencesCommand(new UpdateStudentPreferencesRequest { Goals = null }),
             CancellationToken.None);
 
         Assert.True(result.IsSuccess);
-        Assert.Null(student.Goal);
+        Assert.Empty(student.Goals);
         Assert.Equal(StudentGrade.Grade10, student.Grade);
         Assert.Single(student.Subjects);
     }
@@ -54,15 +52,13 @@ public class UpdateStudentPreferencesCommandHandlerTests
         Student student = CreateStudentWithPreferences();
 
         Result<StudentDetailsResponse> result = await CreateHandler(student).Handle(
-            new UpdateStudentPreferencesCommand(new UpdateStudentPreferencesRequest
-            {
-                Subjects = []
-            }),
+            new UpdateStudentPreferencesCommand(new UpdateStudentPreferencesRequest { Subjects = [] }),
             CancellationToken.None);
 
         Assert.True(result.IsSuccess);
         Assert.Empty(student.Subjects);
-        Assert.Equal(StudentGoal.FocusBetter, student.Goal);
+        Assert.Single(student.Goals);
+        Assert.Equal(StudentGoal.FocusBetter, student.Goals.Single());
         Assert.Equal(StudentGrade.Grade10, student.Grade);
     }
 
@@ -89,10 +85,7 @@ public class UpdateStudentPreferencesCommandHandlerTests
         Student student = CreateStudentWithPreferences();
 
         Result<StudentDetailsResponse> result = await CreateHandler(student).Handle(
-            new UpdateStudentPreferencesCommand(new UpdateStudentPreferencesRequest
-            {
-                Subjects = null
-            }),
+            new UpdateStudentPreferencesCommand(new UpdateStudentPreferencesRequest { Subjects = null }),
             CancellationToken.None);
 
         Assert.False(result.IsSuccess);
@@ -106,10 +99,7 @@ public class UpdateStudentPreferencesCommandHandlerTests
         Student student = CreateStudentWithPreferences();
 
         Result<StudentDetailsResponse> result = await CreateHandler(student).Handle(
-            new UpdateStudentPreferencesCommand(new UpdateStudentPreferencesRequest
-            {
-                PreferredName = "  كريم  "
-            }),
+            new UpdateStudentPreferencesCommand(new UpdateStudentPreferencesRequest { PreferredName = "  كريم  " }),
             CancellationToken.None);
 
         Assert.True(result.IsSuccess);
@@ -124,10 +114,7 @@ public class UpdateStudentPreferencesCommandHandlerTests
         student.SetPreferredName("Karim");
 
         Result<StudentDetailsResponse> result = await CreateHandler(student).Handle(
-            new UpdateStudentPreferencesCommand(new UpdateStudentPreferencesRequest
-            {
-                PreferredName = null
-            }),
+            new UpdateStudentPreferencesCommand(new UpdateStudentPreferencesRequest { PreferredName = null }),
             CancellationToken.None);
 
         Assert.True(result.IsSuccess);
@@ -141,10 +128,7 @@ public class UpdateStudentPreferencesCommandHandlerTests
         Student student = CreateStudentWithPreferences();
 
         Result<StudentDetailsResponse> result = await CreateHandler(student).Handle(
-            new UpdateStudentPreferencesCommand(new UpdateStudentPreferencesRequest
-            {
-                PreferredName = "   "
-            }),
+            new UpdateStudentPreferencesCommand(new UpdateStudentPreferencesRequest { PreferredName = "   " }),
             CancellationToken.None);
 
         Assert.False(result.IsSuccess);
@@ -155,16 +139,18 @@ public class UpdateStudentPreferencesCommandHandlerTests
     private static UpdateStudentPreferencesCommandHandler CreateHandler(
         Student student,
         FakeUnitOfWork? unitOfWork = null)
-        => new(
+    {
+        return new UpdateStudentPreferencesCommandHandler(
             new InMemoryRepository<Student>(student),
             new FakeCurrentUser(student.UserId),
             unitOfWork ?? new FakeUnitOfWork());
+    }
 
     private static Student CreateStudentWithPreferences()
     {
         Student student = new(Guid.NewGuid());
         student.CompleteOnboarding(
-            StudentGoal.FocusBetter,
+            new[] { StudentGoal.FocusBetter },
             StudentGrade.Grade10,
             [StudentSubject.Predefined(StudentSubjectType.Math)]);
         return student;

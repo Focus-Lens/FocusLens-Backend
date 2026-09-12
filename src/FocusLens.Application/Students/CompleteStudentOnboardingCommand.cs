@@ -1,5 +1,5 @@
-using FocusLens.Contracts.Students;
 using FocusLens.Application.Features.Identity.Dtos;
+using FocusLens.Contracts.Students;
 using FocusLens.Domain.Common.Results;
 using MediatR;
 

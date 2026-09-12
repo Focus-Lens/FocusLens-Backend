@@ -1,6 +1,6 @@
 using FocusLens.Domain.Common.Results;
-using FocusLens.Domain.StudySessions;
 using FocusLens.Domain.Students;
+using FocusLens.Domain.StudySessions;
 
 namespace FocusLens.Domain.UnitTests.StudySessions;
 
@@ -175,13 +175,15 @@ public class StudySessionTests
     {
         StudySession session = CreateReadyDigitalSession();
         Guid materialId = session.StudyMaterialId!.Value;
-        Guid[] sectionIds = session.Selection!.SelectedSections.Select(section => section.StudyMaterialSectionId).ToArray();
+        Guid[] sectionIds = session.Selection!.SelectedSections.Select(section => section.StudyMaterialSectionId)
+            .ToArray();
 
         Assert.True(session.SetDuration(50).IsSuccess);
 
         Assert.Equal(StudySessionStatus.Draft, session.Status);
         Assert.Equal(materialId, session.StudyMaterialId);
-        Assert.Equal(sectionIds, session.Selection!.SelectedSections.Select(section => section.StudyMaterialSectionId));
+        Assert.Equal(sectionIds,
+            session.Selection!.SelectedSections.Select(section => section.StudyMaterialSectionId));
     }
 
     [Fact]
@@ -253,11 +255,13 @@ public class StudySessionTests
     }
 
     private static StudyMaterial CreateMaterial(Guid studentId)
-        => StudyMaterial.Create(
+    {
+        return StudyMaterial.Create(
             studentId,
             "book.pdf",
             1024,
             50,
             "original/book.pdf",
             StudyMaterialSource.Upload).Value;
+    }
 }

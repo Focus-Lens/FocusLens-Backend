@@ -7,8 +7,8 @@ public sealed class ApplicationDbContextInitialiser
 {
     private readonly ApplicationDbContext _dbContext;
     private readonly RoleSeeder _roleSeeder;
-    private readonly UserSeeder _userSeeder;
     private readonly UserRoleSeeder _userRoleSeeder;
+    private readonly UserSeeder _userSeeder;
 
     public ApplicationDbContextInitialiser(
         ApplicationDbContext dbContext,

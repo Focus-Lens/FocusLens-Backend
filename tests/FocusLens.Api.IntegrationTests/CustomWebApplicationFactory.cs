@@ -1,3 +1,4 @@
+using FocusLens.API;
 using FocusLens.API.Infrastructure;
 using FocusLens.Application.Common.Interfaces;
 using FocusLens.Infrastructure.Data;
@@ -12,7 +13,7 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 namespace FocusLens.Api.IntegrationTests;
 
 public sealed class CustomWebApplicationFactory
-    : WebApplicationFactory<FocusLens.API.Program>
+    : WebApplicationFactory<Program>
 {
     private readonly string _databaseName = $"FocusLensTests-{Guid.NewGuid()}";
 

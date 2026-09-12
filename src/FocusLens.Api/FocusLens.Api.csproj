@@ -1,43 +1,43 @@
 <Project Sdk="Microsoft.NET.Sdk.Web">
 
-  <PropertyGroup>
-    <TargetFramework>net10.0</TargetFramework>
-    <BaseOutputPath>bin/</BaseOutputPath>
-    <BaseIntermediateOutputPath>obj/</BaseIntermediateOutputPath>
-    <Nullable>enable</Nullable>
-    <ImplicitUsings>enable</ImplicitUsings>
-    <UserSecretsId>e0087eb7-5390-4b2a-bd51-8b66652060d2</UserSecretsId>
-    <DockerDefaultTargetOS>Windows</DockerDefaultTargetOS>
-  </PropertyGroup>
+    <PropertyGroup>
+        <TargetFramework>net10.0</TargetFramework>
+        <BaseOutputPath>bin/</BaseOutputPath>
+        <BaseIntermediateOutputPath>obj/</BaseIntermediateOutputPath>
+        <Nullable>enable</Nullable>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <UserSecretsId>e0087eb7-5390-4b2a-bd51-8b66652060d2</UserSecretsId>
+        <DockerDefaultTargetOS>Windows</DockerDefaultTargetOS>
+    </PropertyGroup>
 
-  <ItemGroup>
-    <PackageReference Include="Google.Apis.Auth" />
-    <PackageReference Include="MailKit" />
-    <PackageReference Include="Microsoft.AspNetCore.OpenApi" />
-    <PackageReference Include="Microsoft.EntityFrameworkCore.Design">
-      <PrivateAssets>all</PrivateAssets>
-      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
-    </PackageReference>
-    <PackageReference Include="Microsoft.VisualStudio.Azure.Containers.Tools.Targets" />
-    <PackageReference Include="Scalar.AspNetCore" />
-    <PackageReference Include="Serilog.AspNetCore" />
-  </ItemGroup>
+    <ItemGroup>
+        <PackageReference Include="Google.Apis.Auth"/>
+        <PackageReference Include="MailKit"/>
+        <PackageReference Include="Microsoft.AspNetCore.OpenApi"/>
+        <PackageReference Include="Microsoft.EntityFrameworkCore.Design">
+            <PrivateAssets>all</PrivateAssets>
+            <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+        </PackageReference>
+        <PackageReference Include="Microsoft.VisualStudio.Azure.Containers.Tools.Targets"/>
+        <PackageReference Include="Scalar.AspNetCore"/>
+        <PackageReference Include="Serilog.AspNetCore"/>
+    </ItemGroup>
 
-  <ItemGroup>
-    <ProjectReference Include="../FocusLens.Application/FocusLens.Application.csproj" />
-    <ProjectReference Include="../FocusLens.Infrastructure/FocusLens.Infrastructure.csproj" />
-    <ProjectReference Include="../FocusLens.Contracts/FocusLens.Contracts.csproj" />
-  </ItemGroup>
+    <ItemGroup>
+        <ProjectReference Include="../FocusLens.Application/FocusLens.Application.csproj"/>
+        <ProjectReference Include="../FocusLens.Infrastructure/FocusLens.Infrastructure.csproj"/>
+        <ProjectReference Include="../FocusLens.Contracts/FocusLens.Contracts.csproj"/>
+    </ItemGroup>
 
-  <ItemGroup>
-    <Folder Include="Minimal_APIs\" />
-  </ItemGroup>
+    <ItemGroup>
+        <Folder Include="Minimal_APIs\"/>
+    </ItemGroup>
 
-  <ItemGroup>
-    <Content Include="Templates/*.html">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
-    </Content>
-  </ItemGroup>
+    <ItemGroup>
+        <Content Include="Templates/*.html">
+            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+            <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+        </Content>
+    </ItemGroup>
 
 </Project>

@@ -1,6 +1,5 @@
 using System.ComponentModel;
 using System.Text.Json.Serialization;
-
 using FocusLens.Domain.Common.Results.Abstractions;
 
 namespace FocusLens.Domain.Common.Results;
@@ -15,11 +14,8 @@ public static class Result
 
 public sealed class Result<TValue> : IResult<TValue>
 {
-    private readonly TValue? _value = default;
-
-    private readonly List<Error>? _errors = null;
-
-    public bool IsSuccess { get; }
+    private readonly List<Error>? _errors;
+    private readonly TValue? _value;
 
     [JsonConstructor]
     [EditorBrowsable(EditorBrowsableState.Never)]
@@ -80,28 +76,39 @@ public sealed class Result<TValue> : IResult<TValue>
 
     public bool IsError => !IsSuccess;
 
+    public Error TopError => _errors?.Count > 0 ? _errors[0] : default;
+
+    public bool IsSuccess { get; }
+
     public List<Error> Errors => IsError ? _errors! : [];
 
     public TValue Value => IsSuccess ? _value! : default!;
 
-    public Error TopError => (_errors?.Count > 0) ? _errors[0] : default;
-
     public TNextValue Match<TNextValue>(
         Func<TValue, TNextValue> onValue,
-        Func<List<Error>, TNextValue> onError)
-        => IsSuccess ? onValue(Value!) : onError(Errors);
+        Func<List<Error>, TNextValue> onError) =>
+        IsSuccess ? onValue(Value!) : onError(Errors);
 
     public static implicit operator Result<TValue>(TValue value)
-        => new(value);
+    {
+        return new Result<TValue>(value);
+    }
 
     public static implicit operator Result<TValue>(Error error)
-        => new(error);
+    {
+        return new Result<TValue>(error);
+    }
 
     public static implicit operator Result<TValue>(List<Error> errors)
-        => new(errors);
+    {
+        return new Result<TValue>(errors);
+    }
 }
 
 public readonly record struct Success;
+
 public readonly record struct Created;
+
 public readonly record struct Deleted;
+
 public readonly record struct Updated;

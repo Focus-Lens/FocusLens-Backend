@@ -17,15 +17,11 @@ public sealed class StudentParentInvitationCommandHandlerTests
         Guid studentUserId = Guid.NewGuid();
         Student student = new(studentUserId);
         student.SetPreferredName("Youssef");
-        student.SetPrivateProperty("User", new ApplicationUser
-        {
-            FirstName = "Youssef",
-            LastName = "Ali"
-        });
+        student.SetPrivateProperty("User", new ApplicationUser { FirstName = "Youssef", LastName = "Ali" });
 
-        var invitations = new InMemoryRepository<StudentParentInvitation>();
-        var emailSender = new FakeEmailSender();
-        var handler = new CreateStudentParentInvitationCommandHandler(
+        InMemoryRepository<StudentParentInvitation> invitations = new();
+        FakeEmailSender emailSender = new();
+        CreateStudentParentInvitationCommandHandler handler = new(
             new InMemoryRepository<Student>(student),
             invitations,
             new FakeCurrentUser(studentUserId),
@@ -62,8 +58,8 @@ public sealed class StudentParentInvitationCommandHandlerTests
             DateTimeOffset.UtcNow.AddDays(1));
         invitation.SetPrivateProperty("Student", student);
 
-        var relationships = new InMemoryRepository<ParentStudentRelationship>();
-        var handler = new RespondToStudentParentInvitationCommandHandler(
+        InMemoryRepository<ParentStudentRelationship> relationships = new();
+        RespondToStudentParentInvitationCommandHandler handler = new(
             new InMemoryRepository<Parent>(parent),
             new InMemoryRepository<StudentParentInvitation>(invitation),
             relationships,
@@ -72,7 +68,7 @@ public sealed class StudentParentInvitationCommandHandlerTests
             TimeProvider.System);
 
         Result<InvitationResponse> result = await handler.Handle(
-            new RespondToStudentParentInvitationCommand(token, Accept: true),
+            new RespondToStudentParentInvitationCommand(token, true),
             CancellationToken.None);
 
         Assert.True(result.IsSuccess);
@@ -95,7 +91,7 @@ public sealed class StudentParentInvitationCommandHandlerTests
             Hash(token),
             DateTimeOffset.UtcNow.AddDays(1));
 
-        var handler = new RespondToStudentParentInvitationCommandHandler(
+        RespondToStudentParentInvitationCommandHandler handler = new(
             new InMemoryRepository<Parent>(parent),
             new InMemoryRepository<StudentParentInvitation>(invitation),
             new InMemoryRepository<ParentStudentRelationship>(),
@@ -104,7 +100,7 @@ public sealed class StudentParentInvitationCommandHandlerTests
             TimeProvider.System);
 
         Result<InvitationResponse> result = await handler.Handle(
-            new RespondToStudentParentInvitationCommand(token, Accept: true),
+            new RespondToStudentParentInvitationCommand(token, true),
             CancellationToken.None);
 
         Assert.False(result.IsSuccess);
@@ -112,6 +108,5 @@ public sealed class StudentParentInvitationCommandHandlerTests
         Assert.Equal(ParentInvitationStatus.Pending, invitation.Status);
     }
 
-    private static string Hash(string token)
-        => Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(token)));
+    private static string Hash(string token) => Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(token)));
 }

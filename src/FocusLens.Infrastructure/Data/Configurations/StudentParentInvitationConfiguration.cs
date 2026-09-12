@@ -26,9 +26,7 @@ public sealed class StudentParentInvitationConfiguration
         builder.HasIndex(invitation => invitation.TokenHash).IsUnique();
         builder.HasIndex(invitation => new
         {
-            invitation.StudentId,
-            invitation.TargetEmailNormalized,
-            invitation.Status
+            invitation.StudentId, invitation.TargetEmailNormalized, invitation.Status
         });
 
         builder.HasOne(invitation => invitation.Student)

@@ -2,11 +2,9 @@ using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text;
-
 using FocusLens.Domain.Common.Interfaces;
 using FocusLens.Domain.Common.Results;
 using FocusLens.Domain.Identity;
-using FocusLens.Domain.Interfaces;
 using FocusLens.Infrastructure.Data;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
@@ -17,15 +15,15 @@ namespace FocusLens.Infrastructure.Authentication;
 
 public sealed class TokenProvider : ITokenProvider
 {
-    private static readonly TimeSpan ClockSkew = TimeSpan.Zero;
     public const string TokenTypeClaim = "token_type";
     public const string AccessTokenType = "access";
     public const string OnboardingTokenType = "onboarding";
+    private static readonly TimeSpan ClockSkew = TimeSpan.Zero;
 
     private readonly ApplicationDbContext _dbContext;
-    private readonly UserManager<ApplicationUser> _userManager;
     private readonly JwtOptions _jwtOptions;
     private readonly TimeProvider _timeProvider;
+    private readonly UserManager<ApplicationUser> _userManager;
 
     public TokenProvider(
         ApplicationDbContext dbContext,
@@ -231,8 +229,8 @@ public sealed class TokenProvider : ITokenProvider
 
         List<RefreshToken> activeTokens = await _dbContext.RefreshTokens
             .Where(token => token.UserId == userId
-                && token.RevokedOnUtc == null
-                && token.ExpiresOnUtc > utcNow)
+                            && token.RevokedOnUtc == null
+                            && token.ExpiresOnUtc > utcNow)
             .ToListAsync(cancellationToken);
 
         foreach (RefreshToken token in activeTokens)
@@ -275,18 +273,19 @@ public sealed class TokenProvider : ITokenProvider
         SigningCredentials credentials = new(key, SecurityAlgorithms.HmacSha256);
 
         JwtSecurityToken token = new(
-            issuer: _jwtOptions.Issuer,
-            audience: _jwtOptions.Audience,
-            claims: claims,
-            notBefore: utcNow.UtcDateTime,
-            expires: expiresOnUtc.UtcDateTime,
-            signingCredentials: credentials);
+            _jwtOptions.Issuer,
+            _jwtOptions.Audience,
+            claims,
+            utcNow.UtcDateTime,
+            expiresOnUtc.UtcDateTime,
+            credentials);
 
         return new JwtSecurityTokenHandler().WriteToken(token);
     }
 
     private TokenValidationParameters CreateValidationParameters()
-        => new()
+    {
+        return new TokenValidationParameters
         {
             ValidateIssuer = true,
             ValidIssuer = _jwtOptions.Issuer,
@@ -298,6 +297,7 @@ public sealed class TokenProvider : ITokenProvider
             ValidateLifetime = true,
             ClockSkew = ClockSkew
         };
+    }
 
     private static string HashRefreshToken(string refreshToken)
     {

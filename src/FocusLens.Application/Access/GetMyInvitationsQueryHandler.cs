@@ -1,10 +1,9 @@
-using ICurrentUser = FocusLens.Application.Common.Interfaces.ICurrentUser;
-using FocusLens.Domain.Common.Interfaces;
 using FocusLens.Contracts.Access;
 using FocusLens.Domain;
 using FocusLens.Domain.Access;
-using FocusLens.Application.Common.Interfaces;
+using FocusLens.Domain.Common.Interfaces;
 using MediatR;
+using ICurrentUser = FocusLens.Application.Common.Interfaces.ICurrentUser;
 
 namespace FocusLens.Application.Access;
 
@@ -24,11 +23,9 @@ public sealed class GetMyInvitationsQueryHandler(
             return [];
         }
 
-        Parent? parent = await parentRepository.FirstOrDefaultAsync(
-            parent => parent.UserId == userId);
+        Parent? parent = await parentRepository.FirstOrDefaultAsync(parent => parent.UserId == userId);
 
-        Student? student = await studentRepository.FirstOrDefaultAsync(
-            student => student.UserId == userId);
+        Student? student = await studentRepository.FirstOrDefaultAsync(student => student.UserId == userId);
 
         if (parent is null && student is null)
         {
@@ -39,10 +36,9 @@ public sealed class GetMyInvitationsQueryHandler(
         Guid? studentId = student?.Id;
 
         IEnumerable<ParentStudentRelationship> relationships =
-            await relationshipRepository.GetAllAsync(
-                relationship =>
-                    (parentId.HasValue && relationship.ParentId == parentId.Value) ||
-                    (studentId.HasValue && relationship.StudentId == studentId.Value));
+            await relationshipRepository.GetAllAsync(relationship =>
+                (parentId.HasValue && relationship.ParentId == parentId.Value) ||
+                (studentId.HasValue && relationship.StudentId == studentId.Value));
 
         List<ParentStudentRelationship> relationshipList = relationships.ToList();
         Guid[] parentIds = relationshipList

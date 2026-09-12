@@ -68,4 +68,17 @@ public sealed class LoggingEmailSender : IEmailSender
 
         return Task.CompletedTask;
     }
+
+    public Task SendChildSetupInvitationAsync(
+        string childEmail,
+        string invitationUrl,
+        CancellationToken cancellationToken = default)
+    {
+        _logger.LogInformation(
+            "Child setup invitation sent to {ChildEmail}: {InvitationUrl}",
+            childEmail,
+            invitationUrl);
+
+        return Task.CompletedTask;
+    }
 }

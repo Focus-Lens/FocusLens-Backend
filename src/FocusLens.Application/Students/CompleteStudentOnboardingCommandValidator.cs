@@ -1,7 +1,6 @@
-using ContractStudentSubjectType = FocusLens.Contracts.Students.StudentSubjectType;
 using FluentValidation;
 using FocusLens.Contracts.Students;
-using FocusLens.Domain.Students;
+using ContractStudentSubjectType = FocusLens.Contracts.Students.StudentSubjectType;
 
 namespace FocusLens.Application.Students;
 
@@ -10,13 +9,35 @@ public sealed class CompleteStudentOnboardingCommandValidator
 {
     public CompleteStudentOnboardingCommandValidator()
     {
-        RuleFor(command => command.Request.Goal)
+        RuleFor(command => command.Request.Goals)
+            .Must(goals => goals is null || goals.Distinct().Count() == goals.Count)
+            .WithMessage("Goals must be unique.");
+
+        RuleForEach(command => command.Request.Goals!)
             .IsInEnum()
-            .When(command => command.Request.Goal.HasValue);
+            .When(command => command.Request.Goals is not null);
 
         RuleFor(command => command.Request.Grade)
             .IsInEnum()
             .When(command => command.Request.Grade.HasValue);
+
+        RuleFor(command => command.Request.StudyPriorities)
+            .Must(priorities =>
+                priorities is null ||
+                priorities.Distinct().Count() == priorities.Count)
+            .WithMessage("Study priorities must be unique.");
+
+        RuleForEach(command => command.Request.StudyPriorities!)
+            .IsInEnum()
+            .When(command => command.Request.StudyPriorities is not null);
+
+        RuleFor(command => command.Request.StudyTimeGoal!.Period)
+            .IsInEnum()
+            .When(command => command.Request.StudyTimeGoal is not null);
+
+        RuleFor(command => command.Request.StudyTimeGoal!.TargetMinutes)
+            .GreaterThan(0)
+            .When(command => command.Request.StudyTimeGoal is not null);
 
         RuleFor(command => command.Request.Subjects)
             .Must(HaveUniqueSubjects)

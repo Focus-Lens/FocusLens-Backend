@@ -1,4 +1,5 @@
 using FocusLens.Domain;
+using FocusLens.Domain.ChildSetup;
 using FocusLens.Domain.Access;
 using FocusLens.Domain.Identity;
 using FocusLens.Domain.StudySessions;
@@ -38,6 +39,10 @@ namespace FocusLens.Infrastructure.Data
 
         public DbSet<UserTermsAcceptance> UserTermsAcceptances =>
             Set<UserTermsAcceptance>();
+
+        public DbSet<ChildSetupDraft> ChildSetupDrafts => Set<ChildSetupDraft>();
+
+        public DbSet<ChildSetupInvitation> ChildSetupInvitations => Set<ChildSetupInvitation>();
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {

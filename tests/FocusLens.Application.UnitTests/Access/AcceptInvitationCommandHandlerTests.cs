@@ -21,11 +21,10 @@ public class AcceptInvitationCommandHandlerTests
 
         relationship.SetPrivateProperty("Student", student);
 
-        var relationshipRepository =
-            new InMemoryRepository<ParentStudentRelationship>(relationship);
-        var unitOfWork = new FakeUnitOfWork();
+        InMemoryRepository<ParentStudentRelationship> relationshipRepository = new(relationship);
+        FakeUnitOfWork unitOfWork = new();
 
-        var handler = new AcceptInvitationCommandHandler(
+        AcceptInvitationCommandHandler handler = new(
             relationshipRepository,
             new FakeCurrentUser(studentUserId),
             unitOfWork);
@@ -54,9 +53,9 @@ public class AcceptInvitationCommandHandlerTests
 
         relationship.SetPrivateProperty("Student", student);
 
-        var unitOfWork = new FakeUnitOfWork();
+        FakeUnitOfWork unitOfWork = new();
 
-        var handler = new AcceptInvitationCommandHandler(
+        AcceptInvitationCommandHandler handler = new(
             new InMemoryRepository<ParentStudentRelationship>(relationship),
             new FakeCurrentUser(otherStudentUserId),
             unitOfWork);
@@ -76,9 +75,9 @@ public class AcceptInvitationCommandHandlerTests
     public async Task Handle_WithMissingInvitation_ReturnsNotFound()
     {
         Guid studentUserId = Guid.NewGuid();
-        var unitOfWork = new FakeUnitOfWork();
+        FakeUnitOfWork unitOfWork = new();
 
-        var handler = new AcceptInvitationCommandHandler(
+        AcceptInvitationCommandHandler handler = new(
             new InMemoryRepository<ParentStudentRelationship>(),
             new FakeCurrentUser(studentUserId),
             unitOfWork);
@@ -107,9 +106,9 @@ public class AcceptInvitationCommandHandlerTests
         relationship.SetPrivateProperty("Student", student);
         relationship.Accept();
 
-        var unitOfWork = new FakeUnitOfWork();
+        FakeUnitOfWork unitOfWork = new();
 
-        var handler = new AcceptInvitationCommandHandler(
+        AcceptInvitationCommandHandler handler = new(
             new InMemoryRepository<ParentStudentRelationship>(relationship),
             new FakeCurrentUser(studentUserId),
             unitOfWork);

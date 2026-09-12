@@ -1,11 +1,11 @@
-using ICurrentUser = FocusLens.Application.Common.Interfaces.ICurrentUser;
-using FocusLens.Domain.Common.Interfaces;
+using FocusLens.Application.Common.Interfaces;
 using FocusLens.Contracts.Access;
 using FocusLens.Domain;
 using FocusLens.Domain.Access;
-using FocusLens.Application.Common.Interfaces;
+using FocusLens.Domain.Common.Interfaces;
 using FocusLens.Domain.Common.Results;
 using MediatR;
+using ICurrentUser = FocusLens.Application.Common.Interfaces.ICurrentUser;
 
 namespace FocusLens.Application.Access;
 
@@ -42,8 +42,7 @@ public sealed class CreateInvitationCommandHandler(
                 "Student email is required.");
         }
 
-        Parent? parent = await parentRepository.FirstOrDefaultAsync(
-            parent => parent.UserId == userId);
+        Parent? parent = await parentRepository.FirstOrDefaultAsync(parent => parent.UserId == userId);
 
         if (parent is null)
         {
@@ -83,9 +82,8 @@ public sealed class CreateInvitationCommandHandler(
         }
 
         ParentStudentRelationship? existingRelationship =
-            await relationshipRepository.FirstOrDefaultAsync(
-                relationship => relationship.ParentId == parent.Id &&
-                                   relationship.StudentId == student.Id);
+            await relationshipRepository.FirstOrDefaultAsync(relationship => relationship.ParentId == parent.Id &&
+                                                                             relationship.StudentId == student.Id);
 
         if (existingRelationship is not null)
         {

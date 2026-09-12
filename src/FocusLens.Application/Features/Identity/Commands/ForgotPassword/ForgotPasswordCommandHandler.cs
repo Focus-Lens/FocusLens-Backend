@@ -1,5 +1,4 @@
 using System.Security.Cryptography;
-
 using FocusLens.Application.Common.Interfaces;
 using FocusLens.Application.Common.Models;
 using FocusLens.Application.Features.Identity.Options;
@@ -13,11 +12,11 @@ namespace FocusLens.Application.Features.Identity.Commands.ForgotPassword;
 public sealed class ForgotPasswordCommandHandler
     : IRequestHandler<ForgotPasswordCommand, Result<Success>>
 {
-    private readonly IIdentityService _identityService;
     private readonly IEmailVerificationCodeStore _codeStore;
     private readonly IEmailSender _emailSender;
-    private readonly TimeProvider _timeProvider;
+    private readonly IIdentityService _identityService;
     private readonly RegistrationOptions _registrationOptions;
+    private readonly TimeProvider _timeProvider;
 
     public ForgotPasswordCommandHandler(
         IIdentityService identityService,
@@ -66,6 +65,5 @@ public sealed class ForgotPasswordCommandHandler
         return Result.Success;
     }
 
-    private static string GenerateCode()
-        => RandomNumberGenerator.GetInt32(0, 1_000_000).ToString("D6");
+    private static string GenerateCode() => RandomNumberGenerator.GetInt32(0, 1_000_000).ToString("D6");
 }

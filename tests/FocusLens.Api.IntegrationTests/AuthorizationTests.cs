@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Headers;
+using System.Text;
 
 namespace FocusLens.Api.IntegrationTests;
 
@@ -8,7 +9,7 @@ public class AuthorizationTests
     [Fact]
     public async Task GetParentMe_WithoutToken_ReturnsUnauthorized()
     {
-        await using var factory = new CustomWebApplicationFactory();
+        await using CustomWebApplicationFactory factory = new();
         using HttpClient client = factory.CreateClient();
 
         HttpResponseMessage response = await client.GetAsync("/api/parents/me");
@@ -19,7 +20,7 @@ public class AuthorizationTests
     [Fact]
     public async Task GetParentMe_WithStudentToken_ReturnsForbidden()
     {
-        await using var factory = new CustomWebApplicationFactory();
+        await using CustomWebApplicationFactory factory = new();
         using HttpClient client = factory.CreateClient();
         client.DefaultRequestHeaders.Authorization =
             new AuthenticationHeaderValue(
@@ -34,7 +35,7 @@ public class AuthorizationTests
     [Fact]
     public async Task GetStudentMe_WithoutToken_ReturnsUnauthorized()
     {
-        await using var factory = new CustomWebApplicationFactory();
+        await using CustomWebApplicationFactory factory = new();
         using HttpClient client = factory.CreateClient();
 
         HttpResponseMessage response = await client.GetAsync("/api/students/me");
@@ -45,7 +46,7 @@ public class AuthorizationTests
     [Fact]
     public async Task GetStudentMe_WithParentToken_ReturnsForbidden()
     {
-        await using var factory = new CustomWebApplicationFactory();
+        await using CustomWebApplicationFactory factory = new();
         using HttpClient client = factory.CreateClient();
         client.DefaultRequestHeaders.Authorization =
             new AuthenticationHeaderValue(
@@ -60,7 +61,7 @@ public class AuthorizationTests
     [Fact]
     public async Task CreateInvitation_WithStudentToken_ReturnsForbidden()
     {
-        await using var factory = new CustomWebApplicationFactory();
+        await using CustomWebApplicationFactory factory = new();
         using HttpClient client = factory.CreateClient();
         client.DefaultRequestHeaders.Authorization =
             new AuthenticationHeaderValue(
@@ -69,7 +70,7 @@ public class AuthorizationTests
 
         using StringContent content = new(
             """{"studentEmail":"student@example.com"}""",
-            System.Text.Encoding.UTF8,
+            Encoding.UTF8,
             "application/json");
 
         HttpResponseMessage response = await client.PostAsync(
@@ -82,7 +83,7 @@ public class AuthorizationTests
     [Fact]
     public async Task AcceptInvitation_WithParentToken_ReturnsForbidden()
     {
-        await using var factory = new CustomWebApplicationFactory();
+        await using CustomWebApplicationFactory factory = new();
         using HttpClient client = factory.CreateClient();
         client.DefaultRequestHeaders.Authorization =
             new AuthenticationHeaderValue(
@@ -100,7 +101,7 @@ public class AuthorizationTests
     [Fact]
     public async Task GetStudent_WithNoToken_ReturnsUnauthorized()
     {
-        await using var factory = new CustomWebApplicationFactory();
+        await using CustomWebApplicationFactory factory = new();
         using HttpClient client = factory.CreateClient();
 
         HttpResponseMessage response =
@@ -112,7 +113,7 @@ public class AuthorizationTests
     [Fact]
     public async Task GetStudent_WithStudentToken_ReturnsForbidden()
     {
-        await using var factory = new CustomWebApplicationFactory();
+        await using CustomWebApplicationFactory factory = new();
         using HttpClient client = factory.CreateClient();
 
         client.DefaultRequestHeaders.Authorization =
@@ -129,9 +130,9 @@ public class AuthorizationTests
     [Fact]
     public async Task CreateStudySession_WithoutToken_ReturnsUnauthorized()
     {
-        await using var factory = new CustomWebApplicationFactory();
+        await using CustomWebApplicationFactory factory = new();
         using HttpClient client = factory.CreateClient();
-        using StringContent content = new("{}", System.Text.Encoding.UTF8, "application/json");
+        using StringContent content = new("{}", Encoding.UTF8, "application/json");
 
         HttpResponseMessage response = await client.PostAsync("/api/study-sessions", content);
 
@@ -141,12 +142,12 @@ public class AuthorizationTests
     [Fact]
     public async Task CreateStudySession_WithParentToken_ReturnsForbidden()
     {
-        await using var factory = new CustomWebApplicationFactory();
+        await using CustomWebApplicationFactory factory = new();
         using HttpClient client = factory.CreateClient();
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue(
             "Bearer",
             TestJwtTokenFactory.Create(Guid.NewGuid(), "Parent"));
-        using StringContent content = new("{}", System.Text.Encoding.UTF8, "application/json");
+        using StringContent content = new("{}", Encoding.UTF8, "application/json");
 
         HttpResponseMessage response = await client.PostAsync("/api/study-sessions", content);
 

@@ -1,6 +1,7 @@
 using FocusLens.Application.Access;
 using FocusLens.Contracts.Access;
 using FocusLens.Contracts.Students;
+using FocusLens.Domain.Common.Results;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -17,7 +18,7 @@ public sealed class AccessController(ISender sender) : ApiController
         [FromBody] CreateInvitationRequest request,
         CancellationToken cancellationToken)
     {
-        var result = await sender.Send(
+        Result<InvitationResponse> result = await sender.Send(
             new CreateInvitationCommand(request),
             cancellationToken);
 
@@ -35,7 +36,7 @@ public sealed class AccessController(ISender sender) : ApiController
         [FromBody] CreateStudentParentInvitationRequest request,
         CancellationToken cancellationToken)
     {
-        var result = await sender.Send(
+        Result<StudentParentInvitationResponse> result = await sender.Send(
             new CreateStudentParentInvitationCommand(request),
             cancellationToken);
 
@@ -50,7 +51,7 @@ public sealed class AccessController(ISender sender) : ApiController
         [FromQuery] string token,
         CancellationToken cancellationToken)
     {
-        var result = await sender.Send(
+        Result<ResolveStudentParentInvitationResponse> result = await sender.Send(
             new ResolveStudentParentInvitationQuery(token),
             cancellationToken);
 
@@ -65,8 +66,8 @@ public sealed class AccessController(ISender sender) : ApiController
         [FromBody] RespondToStudentParentInvitationRequest request,
         CancellationToken cancellationToken)
     {
-        var result = await sender.Send(
-            new RespondToStudentParentInvitationCommand(request.Token, Accept: true),
+        Result<InvitationResponse> result = await sender.Send(
+            new RespondToStudentParentInvitationCommand(request.Token, true),
             cancellationToken);
 
         return result.IsSuccess ? Ok(result.Value) : Problem(result.Errors);
@@ -78,8 +79,8 @@ public sealed class AccessController(ISender sender) : ApiController
         [FromBody] RespondToStudentParentInvitationRequest request,
         CancellationToken cancellationToken)
     {
-        var result = await sender.Send(
-            new RespondToStudentParentInvitationCommand(request.Token, Accept: false),
+        Result<InvitationResponse> result = await sender.Send(
+            new RespondToStudentParentInvitationCommand(request.Token, false),
             cancellationToken);
 
         return result.IsSuccess ? Ok(result.Value) : Problem(result.Errors);
@@ -91,7 +92,7 @@ public sealed class AccessController(ISender sender) : ApiController
         Guid invitationId,
         CancellationToken cancellationToken)
     {
-        var result = await sender.Send(
+        Result<Success> result = await sender.Send(
             new CancelStudentParentInvitationCommand(invitationId),
             cancellationToken);
 
@@ -103,7 +104,7 @@ public sealed class AccessController(ISender sender) : ApiController
     public async Task<IActionResult> GetMyInvitations(
         CancellationToken cancellationToken)
     {
-        var invitations = await sender.Send(
+        IReadOnlyList<InvitationResponse> invitations = await sender.Send(
             new GetMyInvitationsQuery(),
             cancellationToken);
 
@@ -116,7 +117,7 @@ public sealed class AccessController(ISender sender) : ApiController
         Guid invitationId,
         CancellationToken cancellationToken)
     {
-        var result = await sender.Send(
+        Result<InvitationResponse> result = await sender.Send(
             new AcceptInvitationCommand(invitationId),
             cancellationToken);
 
@@ -134,7 +135,7 @@ public sealed class AccessController(ISender sender) : ApiController
         Guid invitationId,
         CancellationToken cancellationToken)
     {
-        var result = await sender.Send(
+        Result<InvitationResponse> result = await sender.Send(
             new RejectInvitationCommand(invitationId),
             cancellationToken);
 
@@ -151,7 +152,7 @@ public sealed class AccessController(ISender sender) : ApiController
     public async Task<IActionResult> GetMyStudents(
         CancellationToken cancellationToken)
     {
-        var students = await sender.Send(
+        IReadOnlyList<ParentStudentSummaryResponse> students = await sender.Send(
             new GetMyStudentsQuery(),
             cancellationToken);
 
@@ -178,19 +179,20 @@ public sealed class AccessController(ISender sender) : ApiController
     public async Task<IActionResult> GetMyParents(
         CancellationToken cancellationToken)
     {
-        var parents = await sender.Send(
+        IReadOnlyList<StudentParentSummaryResponse> parents = await sender.Send(
             new GetMyParentsQuery(),
             cancellationToken);
 
         return Ok(parents);
     }
+
     [HttpDelete("{relationshipId:guid}")]
     [Authorize(Roles = "Parent,Student")]
     public async Task<IActionResult> RevokeRelationship(
         Guid relationshipId,
         CancellationToken cancellationToken)
     {
-        var result = await sender.Send(
+        Result<Deleted> result = await sender.Send(
             new RevokeRelationshipCommand(relationshipId),
             cancellationToken);
 

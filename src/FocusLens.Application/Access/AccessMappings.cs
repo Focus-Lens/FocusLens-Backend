@@ -8,7 +8,8 @@ internal static class AccessMappings
     public static InvitationResponse ToResponse(
         this ParentStudentRelationship relationship,
         string? parentEmail = null)
-        => new(
+    {
+        return new InvitationResponse(
             relationship.Id,
             relationship.ParentId,
             relationship.StudentId,
@@ -17,4 +18,5 @@ internal static class AccessMappings
             relationship.ExpiresAtUtc,
             relationship.RevokedAtUtc,
             parentEmail);
+    }
 }

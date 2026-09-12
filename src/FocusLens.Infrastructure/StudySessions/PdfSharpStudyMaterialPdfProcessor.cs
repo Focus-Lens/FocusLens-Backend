@@ -33,8 +33,8 @@ public sealed class PdfSharpStudyMaterialPdfProcessor : IStudyMaterialPdfProcess
             derived.AddPage(source.Pages[pageIndex]);
         }
 
-        var output = new MemoryStream();
-        derived.Save(output, closeStream: false);
+        MemoryStream output = new();
+        derived.Save(output);
         output.Position = 0;
         return Task.FromResult<Stream>(output);
     }

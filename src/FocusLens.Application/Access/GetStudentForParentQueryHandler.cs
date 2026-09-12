@@ -1,11 +1,10 @@
-using ICurrentUser = FocusLens.Application.Common.Interfaces.ICurrentUser;
-using FocusLens.Application.Common.Interfaces;
 using FocusLens.Application.Common.Mappings;
 using FocusLens.Contracts.Students;
 using FocusLens.Domain;
 using FocusLens.Domain.Access;
 using FocusLens.Domain.Common.Interfaces;
 using MediatR;
+using ICurrentUser = FocusLens.Application.Common.Interfaces.ICurrentUser;
 
 namespace FocusLens.Application.Access;
 
@@ -30,8 +29,7 @@ public sealed class GetStudentForParentQueryHandler(
             return null;
         }
 
-        Parent? parent = await parentRepository.FirstOrDefaultAsync(
-            parent => parent.UserId == userId);
+        Parent? parent = await parentRepository.FirstOrDefaultAsync(parent => parent.UserId == userId);
 
         if (parent is null)
         {
@@ -39,11 +37,10 @@ public sealed class GetStudentForParentQueryHandler(
         }
 
         ParentStudentRelationship? relationship =
-            await relationshipRepository.FirstOrDefaultAsync(
-                relationship =>
-                    relationship.ParentId == parent.Id &&
-                    relationship.StudentId == request.StudentId &&
-                    relationship.Status == RelationshipStatus.Active);
+            await relationshipRepository.FirstOrDefaultAsync(relationship =>
+                relationship.ParentId == parent.Id &&
+                relationship.StudentId == request.StudentId &&
+                relationship.Status == RelationshipStatus.Active);
 
         if (relationship is null)
         {

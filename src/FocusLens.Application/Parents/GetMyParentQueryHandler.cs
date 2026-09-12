@@ -1,10 +1,8 @@
-using ICurrentUser = FocusLens.Application.Common.Interfaces.ICurrentUser;
-using FocusLens.Domain.Common.Interfaces;
-using FocusLens.Domain;
-using FocusLens.Application.Common.Interfaces;
 using FocusLens.Contracts;
-
+using FocusLens.Domain;
+using FocusLens.Domain.Common.Interfaces;
 using MediatR;
+using ICurrentUser = FocusLens.Application.Common.Interfaces.ICurrentUser;
 
 namespace FocusLens.Application.Parents;
 
@@ -22,8 +20,7 @@ public sealed class GetMyParentQueryHandler(
             return null;
         }
 
-        Parent? parent = await parentRepository.FirstOrDefaultAsync(
-            parent => parent.UserId == userId);
+        Parent? parent = await parentRepository.FirstOrDefaultAsync(parent => parent.UserId == userId);
 
         return parent is null
             ? null

@@ -1,11 +1,14 @@
 using FocusLens.Application.Access;
 using FocusLens.Contracts.Students;
-using ContractStudentGoal = FocusLens.Contracts.Students.StudentGoal;
-using ContractStudentGrade = FocusLens.Contracts.Students.StudentGrade;
-using ContractStudentSubjectType = FocusLens.Contracts.Students.StudentSubjectType;
 using FocusLens.Domain;
 using FocusLens.Domain.Access;
 using FocusLens.Domain.Students;
+using ContractStudentGoal = FocusLens.Contracts.Students.StudentGoal;
+using ContractStudentGrade = FocusLens.Contracts.Students.StudentGrade;
+using ContractStudentSubjectType = FocusLens.Contracts.Students.StudentSubjectType;
+using StudentGoal = FocusLens.Domain.Students.StudentGoal;
+using StudentGrade = FocusLens.Domain.Students.StudentGrade;
+using StudentSubjectType = FocusLens.Domain.Students.StudentSubjectType;
 
 namespace FocusLens.Application.UnitTests.Access;
 
@@ -21,10 +24,10 @@ public class GetStudentForParentQueryHandlerTests
         Student student = new(studentUserId);
 
         student.CompleteOnboarding(
-            FocusLens.Domain.Students.StudentGoal.FocusBetter,
-            FocusLens.Domain.Students.StudentGrade.Grade10,
+            new[] { StudentGoal.FocusBetter },
+            StudentGrade.Grade10,
             [
-                StudentSubject.Predefined(FocusLens.Domain.Students.StudentSubjectType.Math),
+                StudentSubject.Predefined(StudentSubjectType.Math),
                 StudentSubject.Custom("Economics")
             ]);
 
@@ -33,7 +36,7 @@ public class GetStudentForParentQueryHandlerTests
 
         relationship.Accept();
 
-        var handler = new GetStudentForParentQueryHandler(
+        GetStudentForParentQueryHandler handler = new(
             new InMemoryRepository<Parent>(parent),
             new InMemoryRepository<ParentStudentRelationship>(relationship),
             new InMemoryRepository<Student>(student),
@@ -46,7 +49,8 @@ public class GetStudentForParentQueryHandlerTests
         Assert.NotNull(result);
         Assert.Equal(student.Id, result.Id);
         Assert.Equal(student.UserId, result.UserId);
-        Assert.Equal(ContractStudentGoal.FocusBetter, result.Goal);
+        Assert.Single(result.Goals);
+        Assert.Equal(ContractStudentGoal.FocusBetter, result.Goals.Single());
         Assert.Equal(ContractStudentGrade.Grade10, result.Grade);
         Assert.True(result.OnboardingCompleted);
         Assert.Equal(2, result.Subjects.Count);
@@ -71,7 +75,7 @@ public class GetStudentForParentQueryHandlerTests
         ParentStudentRelationship relationship =
             new(parent.Id, student.Id);
 
-        var handler = new GetStudentForParentQueryHandler(
+        GetStudentForParentQueryHandler handler = new(
             new InMemoryRepository<Parent>(parent),
             new InMemoryRepository<ParentStudentRelationship>(relationship),
             new InMemoryRepository<Student>(student),
@@ -98,7 +102,7 @@ public class GetStudentForParentQueryHandlerTests
         relationship.Accept();
         relationship.Revoke();
 
-        var handler = new GetStudentForParentQueryHandler(
+        GetStudentForParentQueryHandler handler = new(
             new InMemoryRepository<Parent>(parent),
             new InMemoryRepository<ParentStudentRelationship>(relationship),
             new InMemoryRepository<Student>(student),
@@ -122,7 +126,7 @@ public class GetStudentForParentQueryHandlerTests
 
         relationship.Accept();
 
-        var handler = new GetStudentForParentQueryHandler(
+        GetStudentForParentQueryHandler handler = new(
             new InMemoryRepository<Parent>(parent),
             new InMemoryRepository<ParentStudentRelationship>(relationship),
             new InMemoryRepository<Student>(student),
@@ -148,7 +152,7 @@ public class GetStudentForParentQueryHandlerTests
 
         relationship.Accept();
 
-        var handler = new GetStudentForParentQueryHandler(
+        GetStudentForParentQueryHandler handler = new(
             new InMemoryRepository<Parent>(parent),
             new InMemoryRepository<ParentStudentRelationship>(relationship),
             new InMemoryRepository<Student>(),

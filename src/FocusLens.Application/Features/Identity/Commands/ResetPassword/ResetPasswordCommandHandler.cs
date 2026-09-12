@@ -1,7 +1,7 @@
-using FocusLens.Domain.Common.Interfaces;
 using FocusLens.Application.Common.Errors;
 using FocusLens.Application.Common.Interfaces;
 using FocusLens.Application.Common.Models;
+using FocusLens.Domain.Common.Interfaces;
 using FocusLens.Domain.Common.Results;
 using FocusLens.Domain.Identity;
 using FocusLens.Domain.Interfaces;
@@ -12,10 +12,10 @@ namespace FocusLens.Application.Features.Identity.Commands.ResetPassword;
 public sealed class ResetPasswordCommandHandler
     : IRequestHandler<ResetPasswordCommand, Result<Success>>
 {
-    private readonly IIdentityService _identityService;
     private readonly IEmailVerificationCodeStore _codeStore;
-    private readonly ITokenProvider _tokenProvider;
+    private readonly IIdentityService _identityService;
     private readonly TimeProvider _timeProvider;
+    private readonly ITokenProvider _tokenProvider;
 
     public ResetPasswordCommandHandler(
         IIdentityService identityService,
@@ -48,7 +48,7 @@ public sealed class ResetPasswordCommandHandler
                 _timeProvider.GetUtcNow(),
                 cancellationToken,
                 OtpCodePurpose.PasswordReset,
-                consume: false);
+                false);
 
         if (validationResult.Status == EmailVerificationCodeValidationStatus.Expired)
         {

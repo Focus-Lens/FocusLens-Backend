@@ -22,7 +22,7 @@ public sealed class StudySessionSelection : AuditableEntity
 
     public Guid StudySessionId { get; private set; }
 
-    public Guid StudyMaterialId { get; private set; }
+    public Guid StudyMaterialId { get; }
 
     public int FromPage { get; private set; }
 
@@ -70,7 +70,8 @@ public sealed class StudySessionSelection : AuditableEntity
     {
         if (string.IsNullOrWhiteSpace(storageReference))
         {
-            return Error.Validation("StudySessionSelections.DerivedStorageReferenceRequired", "Derived storage reference is required.");
+            return Error.Validation("StudySessionSelections.DerivedStorageReferenceRequired",
+                "Derived storage reference is required.");
         }
 
         DerivedStorageReference = storageReference.Trim();

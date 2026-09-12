@@ -40,7 +40,8 @@ public sealed class StudyMaterialSection : Entity
 
         if (estimatedDurationMinutes <= 0)
         {
-            return Error.Validation("StudyMaterialSections.DurationInvalid", "Estimated duration must be greater than zero.");
+            return Error.Validation("StudyMaterialSections.DurationInvalid",
+                "Estimated duration must be greater than zero.");
         }
 
         return new StudyMaterialSection(

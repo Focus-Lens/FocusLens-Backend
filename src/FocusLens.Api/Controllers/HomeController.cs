@@ -1,4 +1,5 @@
 using FocusLens.Application.Home;
+using FocusLens.Contracts.Home;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -13,21 +14,21 @@ public sealed class HomeController(ISender sender) : ControllerBase
     [HttpGet("study-overview")]
     public async Task<IActionResult> GetStudyOverview(CancellationToken cancellationToken)
     {
-        var response = await sender.Send(new GetStudyOverviewQuery(), cancellationToken);
+        StudyOverviewResponse? response = await sender.Send(new GetStudyOverviewQuery(), cancellationToken);
         return response is null ? NotFound() : Ok(response);
     }
 
     [HttpGet("streak")]
     public async Task<IActionResult> GetStreak(CancellationToken cancellationToken)
     {
-        var response = await sender.Send(new GetStudyStreakQuery(), cancellationToken);
+        StudyStreakResponse? response = await sender.Send(new GetStudyStreakQuery(), cancellationToken);
         return response is null ? NotFound() : Ok(response);
     }
 
     [HttpGet("sessions-by-day")]
     public async Task<IActionResult> GetSessionsByDay(CancellationToken cancellationToken)
     {
-        var response = await sender.Send(new GetSessionsByDayQuery(), cancellationToken);
+        SessionsByDayResponse? response = await sender.Send(new GetSessionsByDayQuery(), cancellationToken);
         return response is null ? NotFound() : Ok(response);
     }
 }

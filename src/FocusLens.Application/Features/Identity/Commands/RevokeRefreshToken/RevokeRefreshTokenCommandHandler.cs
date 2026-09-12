@@ -1,7 +1,6 @@
-using FocusLens.Domain.Common.Interfaces;
 using FocusLens.Application.Common.Errors;
+using FocusLens.Domain.Common.Interfaces;
 using FocusLens.Domain.Common.Results;
-using FocusLens.Domain.Interfaces;
 using MediatR;
 
 namespace FocusLens.Application.Features.Identity.Commands.RevokeRefreshToken;

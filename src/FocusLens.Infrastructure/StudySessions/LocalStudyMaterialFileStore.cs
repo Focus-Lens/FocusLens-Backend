@@ -14,15 +14,15 @@ public sealed class LocalStudyMaterialFileStore(
         Guid studentId,
         string fileName,
         Stream content,
-        CancellationToken cancellationToken)
-        => SaveAsync(studentId, "original", fileName, content, cancellationToken);
+        CancellationToken cancellationToken) =>
+        SaveAsync(studentId, "original", fileName, content, cancellationToken);
 
     public Task<string> SaveDerivedAsync(
         Guid studentId,
         string fileName,
         Stream content,
-        CancellationToken cancellationToken)
-        => SaveAsync(studentId, "derived", fileName, content, cancellationToken);
+        CancellationToken cancellationToken) =>
+        SaveAsync(studentId, "derived", fileName, content, cancellationToken);
 
     public Task<Stream> OpenReadAsync(string storageReference, CancellationToken cancellationToken)
     {
@@ -51,7 +51,8 @@ public sealed class LocalStudyMaterialFileStore(
         CancellationToken cancellationToken)
     {
         string extension = Path.GetExtension(fileName);
-        string relativePath = Path.Combine(studentId.ToString("N"), category, $"{Guid.CreateVersion7():N}{extension}");
+        string relativePath =
+            Path.Combine(studentId.ToString("N"), category, $"{Guid.CreateVersion7():N}{extension}");
         string path = ToFullPath(relativePath);
         Directory.CreateDirectory(Path.GetDirectoryName(path)!);
 

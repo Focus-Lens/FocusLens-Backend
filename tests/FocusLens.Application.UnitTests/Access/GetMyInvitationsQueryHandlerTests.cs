@@ -15,15 +15,12 @@ public class GetMyInvitationsQueryHandlerTests
         Guid studentUserId = Guid.NewGuid();
 
         Parent parent = new(parentUserId);
-        parent.SetPrivateProperty("User", new ApplicationUser
-        {
-            Email = "parent@example.com"
-        });
+        parent.SetPrivateProperty("User", new ApplicationUser { Email = "parent@example.com" });
         Student student = new(studentUserId);
         ParentStudentRelationship relationship =
             new(parent.Id, student.Id);
 
-        var handler = new GetMyInvitationsQueryHandler(
+        GetMyInvitationsQueryHandler handler = new(
             new InMemoryRepository<Parent>(parent),
             new InMemoryRepository<Student>(student),
             new InMemoryRepository<ParentStudentRelationship>(relationship),
@@ -48,15 +45,12 @@ public class GetMyInvitationsQueryHandlerTests
         Guid studentUserId = Guid.NewGuid();
 
         Parent parent = new(parentUserId);
-        parent.SetPrivateProperty("User", new ApplicationUser
-        {
-            Email = "parent@example.com"
-        });
+        parent.SetPrivateProperty("User", new ApplicationUser { Email = "parent@example.com" });
         Student student = new(studentUserId);
         ParentStudentRelationship relationship =
             new(parent.Id, student.Id);
 
-        var handler = new GetMyInvitationsQueryHandler(
+        GetMyInvitationsQueryHandler handler = new(
             new InMemoryRepository<Parent>(parent),
             new InMemoryRepository<Student>(student),
             new InMemoryRepository<ParentStudentRelationship>(relationship),
@@ -85,7 +79,7 @@ public class GetMyInvitationsQueryHandlerTests
         ParentStudentRelationship relationship =
             new(parent.Id, student.Id);
 
-        var handler = new GetMyInvitationsQueryHandler(
+        GetMyInvitationsQueryHandler handler = new(
             new InMemoryRepository<Parent>(parent),
             new InMemoryRepository<Student>(student),
             new InMemoryRepository<ParentStudentRelationship>(relationship),
@@ -106,7 +100,7 @@ public class GetMyInvitationsQueryHandlerTests
         ParentStudentRelationship relationship =
             new(parent.Id, student.Id);
 
-        var handler = new GetMyInvitationsQueryHandler(
+        GetMyInvitationsQueryHandler handler = new(
             new InMemoryRepository<Parent>(parent),
             new InMemoryRepository<Student>(student),
             new InMemoryRepository<ParentStudentRelationship>(relationship),

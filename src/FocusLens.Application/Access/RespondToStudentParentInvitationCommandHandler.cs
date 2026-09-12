@@ -86,8 +86,8 @@ public sealed class RespondToStudentParentInvitationCommandHandler(
                 null);
         }
 
-        ParentStudentRelationship? relationship = await relationshipRepository.FirstOrDefaultAsync(
-            item => item.ParentId == parent.Id && item.StudentId == invitation.StudentId);
+        ParentStudentRelationship? relationship = await relationshipRepository.FirstOrDefaultAsync(item =>
+            item.ParentId == parent.Id && item.StudentId == invitation.StudentId);
 
         if (relationship is not null && relationship.Status != RelationshipStatus.Revoked)
         {
@@ -120,7 +120,9 @@ public sealed class RespondToStudentParentInvitationCommandHandler(
     }
 
     private static Error InvalidInvitation()
-        => Error.NotFound(
+    {
+        return Error.NotFound(
             "Access.InvitationInvalidOrExpired",
             "This invitation link is invalid or has expired.");
+    }
 }

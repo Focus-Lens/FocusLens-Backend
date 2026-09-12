@@ -1,7 +1,7 @@
 namespace FocusLens.Domain.Access;
 
 /// <summary>
-/// Identifies which side created a pending parent-student link request.
+///     Identifies which side created a pending parent-student link request.
 /// </summary>
 public enum InvitationInitiator
 {

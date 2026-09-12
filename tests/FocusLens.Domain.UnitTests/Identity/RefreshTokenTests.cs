@@ -8,7 +8,7 @@ public class RefreshTokenTests
     [Fact]
     public void Create_WithValidValues_ReturnsActiveRefreshToken()
     {
-        var expiresOnUtc = DateTimeOffset.UtcNow.AddDays(7);
+        DateTimeOffset expiresOnUtc = DateTimeOffset.UtcNow.AddDays(7);
 
         Result<RefreshToken> result = RefreshToken.Create(
             Guid.NewGuid(),
@@ -45,7 +45,7 @@ public class RefreshTokenTests
             "token-value",
             Guid.NewGuid(),
             DateTimeOffset.UtcNow.AddDays(7)).Value;
-        var revokedOnUtc = DateTimeOffset.UtcNow;
+        DateTimeOffset revokedOnUtc = DateTimeOffset.UtcNow;
 
         Result<Success> result = token.Revoke(revokedOnUtc);
 

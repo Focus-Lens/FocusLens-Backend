@@ -1,42 +1,41 @@
 ﻿using System.Linq.Expressions;
 
-namespace FocusLens.Domain.Common.Interfaces
+namespace FocusLens.Domain.Common.Interfaces;
+
+public interface IBaseRepository<T> where T : class
 {
-    public interface IBaseRepository<T> where T : class
-    {
-        Task<T?> GetByIdAsync(
-            Guid id,
-            params Expression<Func<T, object>>[] includes
-        );
+    Task<T?> GetByIdAsync(
+        Guid id,
+        params Expression<Func<T, object>>[] includes
+    );
 
-        Task<IEnumerable<T>> GetAllAsync(
-            params Expression<Func<T, object>>[] includes
-        );
+    Task<IEnumerable<T>> GetAllAsync(
+        params Expression<Func<T, object>>[] includes
+    );
 
-        Task<IEnumerable<T>> GetAllAsync(
-            Expression<Func<T, bool>> criteria,
-            params Expression<Func<T, object>>[] includes
-        );
+    Task<IEnumerable<T>> GetAllAsync(
+        Expression<Func<T, bool>> criteria,
+        params Expression<Func<T, object>>[] includes
+    );
 
-        IQueryable<T> GetAll();
+    IQueryable<T> GetAll();
 
-        Task<T?> FirstOrDefaultAsync(
-            Expression<Func<T, bool>> criteria,
-            params Expression<Func<T, object>>[] includes
-        );
+    Task<T?> FirstOrDefaultAsync(
+        Expression<Func<T, bool>> criteria,
+        params Expression<Func<T, object>>[] includes
+    );
 
-        void Add(T entity);
+    void Add(T entity);
 
-        Task AddRangeAsync(IEnumerable<T> entities);
+    Task AddRangeAsync(IEnumerable<T> entities);
 
-        void Update(T entity);
+    void Update(T entity);
 
-        Task UpdateAsync(T entity);
+    Task UpdateAsync(T entity);
 
-        Task DeleteAsync(T entity);
+    Task DeleteAsync(T entity);
 
-        void DeleteRange(IEnumerable<T> entities);
+    void DeleteRange(IEnumerable<T> entities);
 
-        void Delete(T entity);
-    }
+    void Delete(T entity);
 }

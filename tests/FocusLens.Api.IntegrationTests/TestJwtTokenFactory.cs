@@ -1,7 +1,6 @@
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
-
 using Microsoft.IdentityModel.Tokens;
 
 namespace FocusLens.Api.IntegrationTests;
@@ -17,7 +16,7 @@ public static class TestJwtTokenFactory
         List<Claim> claims =
         [
             new(ClaimTypes.NameIdentifier, userId.ToString()),
-            new(ClaimTypes.Role, role),
+            new(ClaimTypes.Role, role)
         ];
 
         SymmetricSecurityKey key =
@@ -27,12 +26,12 @@ public static class TestJwtTokenFactory
             new(key, SecurityAlgorithms.HmacSha256);
 
         JwtSecurityToken token = new(
-            issuer: Issuer,
-            audience: Audience,
-            claims: claims,
-            notBefore: DateTime.UtcNow,
-            expires: DateTime.UtcNow.AddMinutes(15),
-            signingCredentials: credentials);
+            Issuer,
+            Audience,
+            claims,
+            DateTime.UtcNow,
+            DateTime.UtcNow.AddMinutes(15),
+            credentials);
 
         return new JwtSecurityTokenHandler().WriteToken(token);
     }

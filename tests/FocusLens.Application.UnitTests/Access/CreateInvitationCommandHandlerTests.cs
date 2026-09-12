@@ -17,21 +17,18 @@ public class CreateInvitationCommandHandlerTests
 
         Parent parent = new(parentUserId);
         Student student = new(studentUserId);
-        ApplicationUser studentUser = new()
-        {
-            Email = "student@example.com"
-        };
+        ApplicationUser studentUser = new() { Email = "student@example.com" };
         student.SetPrivateProperty("User", studentUser);
 
-        var parentRepository = new InMemoryRepository<Parent>(parent);
-        var studentRepository = new InMemoryRepository<Student>(student);
-        var relationshipRepository = new InMemoryRepository<ParentStudentRelationship>();
+        InMemoryRepository<Parent> parentRepository = new(parent);
+        InMemoryRepository<Student> studentRepository = new(student);
+        InMemoryRepository<ParentStudentRelationship> relationshipRepository = new();
         const string parentEmail = "parent@example.com";
-        var currentUser = new FakeCurrentUser(parentUserId, parentEmail);
-        var unitOfWork = new FakeUnitOfWork();
-        var emailSender = new FakeEmailSender();
+        FakeCurrentUser currentUser = new(parentUserId, parentEmail);
+        FakeUnitOfWork unitOfWork = new();
+        FakeEmailSender emailSender = new();
 
-        var handler = new CreateInvitationCommandHandler(
+        CreateInvitationCommandHandler handler = new(
             parentRepository,
             studentRepository,
             relationshipRepository,
@@ -61,7 +58,7 @@ public class CreateInvitationCommandHandlerTests
         Guid parentUserId = Guid.NewGuid();
         Parent parent = new(parentUserId);
 
-        var handler = new CreateInvitationCommandHandler(
+        CreateInvitationCommandHandler handler = new(
             new InMemoryRepository<Parent>(parent),
             new InMemoryRepository<Student>(),
             new InMemoryRepository<ParentStudentRelationship>(),
@@ -87,19 +84,16 @@ public class CreateInvitationCommandHandlerTests
 
         Parent parent = new(parentUserId);
         Student student = new(studentUserId);
-        ApplicationUser studentUser = new()
-        {
-            Email = "student@example.com"
-        };
+        ApplicationUser studentUser = new() { Email = "student@example.com" };
         student.SetPrivateProperty("User", studentUser);
 
         ParentStudentRelationship existingRelationship =
             new(parent.Id, student.Id);
 
-        var unitOfWork = new FakeUnitOfWork();
-        var emailSender = new FakeEmailSender();
+        FakeUnitOfWork unitOfWork = new();
+        FakeEmailSender emailSender = new();
 
-        var handler = new CreateInvitationCommandHandler(
+        CreateInvitationCommandHandler handler = new(
             new InMemoryRepository<Parent>(parent),
             new InMemoryRepository<Student>(student),
             new InMemoryRepository<ParentStudentRelationship>(existingRelationship),
@@ -124,7 +118,7 @@ public class CreateInvitationCommandHandlerTests
     [Fact]
     public async Task Handle_WithEmptyEmail_ReturnsValidationError()
     {
-        var handler = new CreateInvitationCommandHandler(
+        CreateInvitationCommandHandler handler = new(
             new InMemoryRepository<Parent>(),
             new InMemoryRepository<Student>(),
             new InMemoryRepository<ParentStudentRelationship>(),
@@ -152,10 +146,7 @@ public class CreateInvitationCommandHandlerTests
         Parent parent = new(parentUserId);
         Student student = new(studentUserId);
 
-        ApplicationUser studentUser = new()
-        {
-            Email = "student@example.com"
-        };
+        ApplicationUser studentUser = new() { Email = "student@example.com" };
 
         student.SetPrivateProperty("User", studentUser);
 
@@ -164,13 +155,13 @@ public class CreateInvitationCommandHandlerTests
 
         existingRelationship.Reject();
 
-        var relationshipRepository =
-            new InMemoryRepository<ParentStudentRelationship>(
+        InMemoryRepository<ParentStudentRelationship> relationshipRepository =
+            new(
                 existingRelationship);
 
-        var unitOfWork = new FakeUnitOfWork();
+        FakeUnitOfWork unitOfWork = new();
 
-        var handler = new CreateInvitationCommandHandler(
+        CreateInvitationCommandHandler handler = new(
             new InMemoryRepository<Parent>(parent),
             new InMemoryRepository<Student>(student),
             relationshipRepository,
