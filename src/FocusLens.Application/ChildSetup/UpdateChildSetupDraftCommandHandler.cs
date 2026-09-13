@@ -8,7 +8,6 @@ using FocusLens.Domain.Common.Results;
 using FocusLens.Domain.Students;
 using MediatR;
 using ContractStudentSubjectType = FocusLens.Contracts.Students.StudentSubjectType;
-using ContractStudentGrade = FocusLens.Contracts.Students.StudentGrade;
 using ContractStudyPriority = FocusLens.Contracts.Students.StudyPriority;
 using DomainStudyPriority = FocusLens.Domain.Students.StudyPriority;
 using ICurrentUser = FocusLens.Application.Common.Interfaces.ICurrentUser;
@@ -27,7 +26,7 @@ public sealed class UpdateChildSetupDraftCommandHandler(
         UpdateChildSetupDraftCommand request,
         CancellationToken cancellationToken)
     {
-        if (currentUser.UserId is not Guid userId || userId == Guid.Empty)
+        if (currentUser.UserId is not { } userId || userId == Guid.Empty)
         {
             return Error.Unauthorized(
                 "Parents.CurrentUserUnavailable",
@@ -97,7 +96,7 @@ public sealed class UpdateChildSetupDraftCommandHandler(
                 "Last name cannot exceed 100 characters.");
         }
 
-        if (request.Request.DateOfBirth is DateOnly dateOfBirth &&
+        if (request.Request.DateOfBirth is { } dateOfBirth &&
             dateOfBirth > DateOnly.FromDateTime(DateTime.UtcNow))
         {
             return Error.Validation(
@@ -105,7 +104,7 @@ public sealed class UpdateChildSetupDraftCommandHandler(
                 "Date of birth cannot be in the future.");
         }
 
-        if (request.Request.Grade is ContractStudentGrade grade &&
+        if (request.Request.Grade is { } grade &&
             !Enum.IsDefined(grade))
         {
             return Error.Validation(
@@ -336,7 +335,7 @@ public sealed class UpdateChildSetupDraftCommandHandler(
                 : new StudyTimeGoalResponse(
                     draft.StudyTimeGoal.Period.ToString(),
                     draft.StudyTimeGoal.TargetMinutes,
-                  draft.StudyTimeGoal.Days,
-                  draft.StudyTimeGoal.StartDate));
+                    draft.StudyTimeGoal.Days,
+                    draft.StudyTimeGoal.StartDate));
     }
 }

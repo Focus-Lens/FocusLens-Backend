@@ -2,6 +2,7 @@ using FocusLens.Application.Common.Errors;
 using FocusLens.Application.Common.Mappings;
 using FocusLens.Contracts.Students;
 using FocusLens.Domain;
+using FocusLens.Domain.Access;
 using FocusLens.Domain.ChildSetup;
 using FocusLens.Domain.Common.Interfaces;
 using FocusLens.Domain.Common.Results;
@@ -17,6 +18,7 @@ namespace FocusLens.Application.ChildSetup;
 public sealed class ActivateChildSetupCommandHandler(
     IBaseRepository<Student> studentRepository,
     IBaseRepository<ChildSetupDraft> childSetupDraftRepository,
+    IBaseRepository<ParentStudentRelationship> relationshipRepository,
     ICurrentUser currentUser,
     IIdentityService identityService,
     IUnitOfWork unitOfWork)
@@ -113,6 +115,39 @@ public sealed class ActivateChildSetupCommandHandler(
         if (!updateResult.Succeeded)
         {
             return updateResult.ToApplicationErrors();
+        }
+
+        ParentStudentRelationship? relationship =
+            await relationshipRepository.FirstOrDefaultAsync(item =>
+                item.ParentId == draft.ParentId &&
+                item.StudentId == student.Id);
+
+        if (relationship is null)
+        {
+            relationship = new ParentStudentRelationship(
+                draft.ParentId,
+                student.Id,
+                InvitationInitiator.Parent,
+                null);
+
+            relationship.Accept();
+            relationshipRepository.Add(relationship);
+        }
+        else if (relationship.Status == RelationshipStatus.Revoked)
+        {
+            relationship.Reinvite();
+            relationship.Accept();
+            relationshipRepository.Update(relationship);
+        }
+        else if (relationship.Status == RelationshipStatus.Pending)
+        {
+            if (relationship.IsExpired(DateTimeOffset.UtcNow))
+            {
+                relationship.Reinvite();
+            }
+
+            relationship.Accept();
+            relationshipRepository.Update(relationship);
         }
 
         draft.MarkActivated();

@@ -118,7 +118,8 @@ public sealed class CreateChildSetupInvitationCommandHandler(
         return new ChildSetupInvitationResponse(
             invitation.Id,
             invitation.Status.ToString(),
-            invitation.ExpiresAtUtc
+            invitation.ExpiresAtUtc,
+            invitationUrl
         );
     }
 

@@ -11,21 +11,22 @@ using ICurrentUser = FocusLens.Application.Common.Interfaces.ICurrentUser;
 
 namespace FocusLens.Application.ChildSetup;
 
-public sealed class ResendChildSetupInvitationCommandHandler(
+public sealed class GetChildSetupInvitationLinkCommandHandler(
     IBaseRepository<Parent> parentRepository,
     IBaseRepository<ChildSetupDraft> draftRepository,
     IBaseRepository<ChildSetupInvitation> invitationRepository,
     ICurrentUser currentUser,
     IUnitOfWork unitOfWork,
-    IEmailSender emailSender,
     IInvitationUrlBuilder invitationUrlBuilder,
     TimeProvider timeProvider)
-    : IRequestHandler<ResendChildSetupInvitationCommand, Result<ChildSetupInvitationResponse>>
+    : IRequestHandler<
+        GetChildSetupInvitationLinkCommand,
+        Result<ChildSetupInvitationResponse>>
 {
     private static readonly TimeSpan InvitationLifetime = TimeSpan.FromDays(7);
 
     public async Task<Result<ChildSetupInvitationResponse>> Handle(
-        ResendChildSetupInvitationCommand request,
+        GetChildSetupInvitationLinkCommand request,
         CancellationToken cancellationToken)
     {
         if (currentUser.UserId is not Guid userId || userId == Guid.Empty)
@@ -67,9 +68,10 @@ public sealed class ResendChildSetupInvitationCommandHandler(
                 "This child setup does not have an active invitation.");
         }
 
-        ChildSetupInvitation? invitation = await invitationRepository.FirstOrDefaultAsync(item =>
-            item.ChildSetupDraftId == draft.Id
-            && item.Status == ChildSetupInvitationStatus.Pending);
+        ChildSetupInvitation? invitation =
+            await invitationRepository.FirstOrDefaultAsync(item =>
+                item.ChildSetupDraftId == draft.Id &&
+                item.Status == ChildSetupInvitationStatus.Pending);
 
         if (invitation is null)
         {
@@ -80,24 +82,20 @@ public sealed class ResendChildSetupInvitationCommandHandler(
 
         string token = Convert.ToHexString(
             RandomNumberGenerator.GetBytes(32));
+
         string tokenHash = Convert.ToHexString(
             SHA256.HashData(Encoding.UTF8.GetBytes(token)));
+
         DateTimeOffset expiresAtUtc =
             timeProvider.GetUtcNow().Add(InvitationLifetime);
 
         invitation.Renew(tokenHash, expiresAtUtc);
+
         invitationRepository.Update(invitation);
         await unitOfWork.SaveChangesAsync();
 
         string invitationUrl =
             invitationUrlBuilder.CreateChildSetupInvitationUrl(token);
-
-        string childEmail = invitation.TargetEmailNormalized;
-
-        await emailSender.SendChildSetupInvitationAsync(
-            childEmail,
-            invitationUrl,
-            cancellationToken);
 
         return new ChildSetupInvitationResponse(
             invitation.Id,

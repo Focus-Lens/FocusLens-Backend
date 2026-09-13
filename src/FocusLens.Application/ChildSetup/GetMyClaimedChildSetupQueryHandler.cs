@@ -70,7 +70,7 @@ public sealed class GetMyClaimedChildSetupQueryHandler(
                 : new StudyTimeGoalResponse(
                     draft.StudyTimeGoal.Period.ToString(),
                     draft.StudyTimeGoal.TargetMinutes,
-                  draft.StudyTimeGoal.Days,
-                  draft.StudyTimeGoal.StartDate));
+                    draft.StudyTimeGoal.Days,
+                    draft.StudyTimeGoal.StartDate));
     }
 }

@@ -37,6 +37,20 @@ public sealed class ParentsController(ISender sender) : ApiController
             Problem);
     }
 
+    [HttpPost("child-setups/{draftId:guid}/invite/link")]
+    public async Task<IActionResult> GetChildInvitationLink(
+        Guid draftId,
+        CancellationToken cancellationToken)
+    {
+        Result<ChildSetupInvitationResponse> result = await sender.Send(
+            new GetChildSetupInvitationLinkCommand(draftId),
+            cancellationToken);
+
+        return result.Match(
+            Ok,
+            Problem);
+    }
+
     [HttpPost("child-setups/{draftId:guid}/invite/resend")]
     public async Task<IActionResult> ResendChildInvitation(
         Guid draftId,
@@ -49,6 +63,32 @@ public sealed class ParentsController(ISender sender) : ApiController
         return result.Match(
             Ok,
             Problem);
+    }
+
+    [HttpPost("child-setups/{draftId:guid}/invite/cancel")]
+    public async Task<IActionResult> CancelChildInvitation(
+        Guid draftId,
+        CancellationToken cancellationToken)
+    {
+        Result<Success> result = await sender.Send(
+            new CancelChildSetupInvitationCommand(draftId),
+            cancellationToken);
+
+        return result.Match(
+            _ => NoContent(),
+            Problem);
+    }
+
+    [HttpGet("child-setups/invitations")]
+    public async Task<IActionResult> GetMyChildSetupInvitations(
+        CancellationToken cancellationToken)
+    {
+        IReadOnlyList<ParentChildSetupInvitationResponse> invitations =
+            await sender.Send(
+                new GetMyChildSetupInvitationsQuery(),
+                cancellationToken);
+
+        return Ok(invitations);
     }
 
     [HttpGet("child-setups/{draftId:guid}")]

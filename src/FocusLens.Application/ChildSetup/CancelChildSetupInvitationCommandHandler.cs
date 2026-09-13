@@ -1,7 +1,3 @@
-using System.Security.Cryptography;
-using System.Text;
-using FocusLens.Application.Common.Interfaces;
-using FocusLens.Contracts.ChildSetup;
 using FocusLens.Domain;
 using FocusLens.Domain.ChildSetup;
 using FocusLens.Domain.Common.Interfaces;
@@ -11,21 +7,16 @@ using ICurrentUser = FocusLens.Application.Common.Interfaces.ICurrentUser;
 
 namespace FocusLens.Application.ChildSetup;
 
-public sealed class ResendChildSetupInvitationCommandHandler(
+public sealed class CancelChildSetupInvitationCommandHandler(
     IBaseRepository<Parent> parentRepository,
     IBaseRepository<ChildSetupDraft> draftRepository,
     IBaseRepository<ChildSetupInvitation> invitationRepository,
     ICurrentUser currentUser,
-    IUnitOfWork unitOfWork,
-    IEmailSender emailSender,
-    IInvitationUrlBuilder invitationUrlBuilder,
-    TimeProvider timeProvider)
-    : IRequestHandler<ResendChildSetupInvitationCommand, Result<ChildSetupInvitationResponse>>
+    IUnitOfWork unitOfWork)
+    : IRequestHandler<CancelChildSetupInvitationCommand, Result<Success>>
 {
-    private static readonly TimeSpan InvitationLifetime = TimeSpan.FromDays(7);
-
-    public async Task<Result<ChildSetupInvitationResponse>> Handle(
-        ResendChildSetupInvitationCommand request,
+    public async Task<Result<Success>> Handle(
+        CancelChildSetupInvitationCommand request,
         CancellationToken cancellationToken)
     {
         if (currentUser.UserId is not Guid userId || userId == Guid.Empty)
@@ -35,6 +26,13 @@ public sealed class ResendChildSetupInvitationCommandHandler(
                 "The current user could not be identified.");
         }
 
+        if (request.DraftId == Guid.Empty)
+        {
+            return Error.Validation(
+                "ChildSetup.InvalidDraftId",
+                "The child setup draft ID is invalid.");
+        }
+
         Parent? parent = await parentRepository.FirstOrDefaultAsync(item => item.UserId == userId);
 
         if (parent is null)
@@ -42,13 +40,6 @@ public sealed class ResendChildSetupInvitationCommandHandler(
             return Error.NotFound(
                 "Parents.NotFound",
                 "The current user does not have a parent profile.");
-        }
-
-        if (request.DraftId == Guid.Empty)
-        {
-            return Error.Validation(
-                "ChildSetup.InvalidDraftId",
-                "The child setup draft ID is invalid.");
         }
 
         ChildSetupDraft? draft = await draftRepository.FirstOrDefaultAsync(item => item.Id == request.DraftId);
@@ -67,9 +58,10 @@ public sealed class ResendChildSetupInvitationCommandHandler(
                 "This child setup does not have an active invitation.");
         }
 
-        ChildSetupInvitation? invitation = await invitationRepository.FirstOrDefaultAsync(item =>
-            item.ChildSetupDraftId == draft.Id
-            && item.Status == ChildSetupInvitationStatus.Pending);
+        ChildSetupInvitation? invitation =
+            await invitationRepository.FirstOrDefaultAsync(item =>
+                item.ChildSetupDraftId == draft.Id &&
+                item.Status == ChildSetupInvitationStatus.Pending);
 
         if (invitation is null)
         {
@@ -78,31 +70,13 @@ public sealed class ResendChildSetupInvitationCommandHandler(
                 "No pending invitation exists for this child setup.");
         }
 
-        string token = Convert.ToHexString(
-            RandomNumberGenerator.GetBytes(32));
-        string tokenHash = Convert.ToHexString(
-            SHA256.HashData(Encoding.UTF8.GetBytes(token)));
-        DateTimeOffset expiresAtUtc =
-            timeProvider.GetUtcNow().Add(InvitationLifetime);
+        invitation.Cancel();
+        draft.ResetToDraft();
 
-        invitation.Renew(tokenHash, expiresAtUtc);
         invitationRepository.Update(invitation);
+        draftRepository.Update(draft);
         await unitOfWork.SaveChangesAsync();
 
-        string invitationUrl =
-            invitationUrlBuilder.CreateChildSetupInvitationUrl(token);
-
-        string childEmail = invitation.TargetEmailNormalized;
-
-        await emailSender.SendChildSetupInvitationAsync(
-            childEmail,
-            invitationUrl,
-            cancellationToken);
-
-        return new ChildSetupInvitationResponse(
-            invitation.Id,
-            invitation.Status.ToString(),
-            invitation.ExpiresAtUtc,
-            invitationUrl);
+        return Result.Success;
     }
 }

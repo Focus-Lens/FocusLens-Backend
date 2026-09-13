@@ -90,8 +90,8 @@ public sealed class GetChildSetupInvitationQueryHandler(
                 : new StudyTimeGoalResponse(
                     draft.StudyTimeGoal.Period.ToString(),
                     draft.StudyTimeGoal.TargetMinutes,
-                  draft.StudyTimeGoal.Days,
-                  draft.StudyTimeGoal.StartDate),
+                    draft.StudyTimeGoal.Days,
+                    draft.StudyTimeGoal.StartDate),
             invitation.ExpiresAtUtc);
     }
 

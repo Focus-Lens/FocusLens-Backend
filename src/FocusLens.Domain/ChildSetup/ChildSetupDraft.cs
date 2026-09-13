@@ -110,6 +110,17 @@ public sealed class ChildSetupDraft : AuditableEntity
         Status = ChildSetupStatus.Invited;
     }
 
+    public void ResetToDraft()
+    {
+        if (Status != ChildSetupStatus.Invited)
+        {
+            throw new InvalidOperationException(
+                "Only an invited setup can be reset to draft.");
+        }
+
+        Status = ChildSetupStatus.Draft;
+    }
+
     public void MarkClaimed(Guid studentId)
     {
         if (studentId == Guid.Empty)
