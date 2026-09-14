@@ -200,7 +200,8 @@ public sealed class StudySession : AuditableEntity
             return StudySessionErrors.NotConfigurable;
         }
 
-        if (SelectedSubjectId is null || FocusDurationMinutes is null)
+        if (SelectedSubjectId is null ||
+            (FocusDurationMinutes is null && EstimatedStudyTimeMinutes <= 0))
         {
             return StudySessionErrors.NotReady;
         }
@@ -235,12 +236,6 @@ public sealed class StudySession : AuditableEntity
         if (Status != StudySessionStatus.Active)
         {
             return StudySessionErrors.NotActive;
-        }
-
-        if (HasElapsed(pausedAtUtc))
-        {
-            Complete(pausedAtUtc);
-            return StudySessionErrors.AlreadyCompleted;
         }
 
         Status = StudySessionStatus.Paused;
@@ -279,38 +274,39 @@ public sealed class StudySession : AuditableEntity
         return Result.Success;
     }
 
-    private void Complete(DateTimeOffset completedAtUtc)
-    {
-        Status = StudySessionStatus.Completed;
-        CompletedAtUtc = completedAtUtc;
-    }
-
-    public bool CompleteIfElapsed(DateTimeOffset utcNow)
-    {
-        if (Status != StudySessionStatus.Active || !HasElapsed(utcNow))
-        {
-            return false;
-        }
-
-        Complete(utcNow);
-        return true;
-    }
-
-    public Result<Success> UpdateProgress(
-        int? currentPage,
-        IEnumerable<Guid>? completedSectionIds,
-        DateTimeOffset activityAtUtc)
+    public Result<Success> CompleteSuccessfully(DateTimeOffset completedAtUtc)
     {
         if (Status is not (StudySessionStatus.Active or StudySessionStatus.Paused))
         {
             return StudySessionErrors.NotInProgress;
         }
 
+        if (Status == StudySessionStatus.Paused)
+        {
+            AccumulatePause(completedAtUtc);
+            PausedAtUtc = null;
+        }
+
+        Status = StudySessionStatus.Completed;
+        CompletedAtUtc = completedAtUtc;
+        return Result.Success;
+    }
+
+    public Result<Success> UpdateProgress(
+        int? currentPage,
+        DateTimeOffset activityAtUtc)
+    {
+        if (Status != StudySessionStatus.Active)
+        {
+            return StudySessionErrors.NotActive;
+        }
+
         if (currentPage is not null)
         {
             if (Selection is null
                 || currentPage < Selection.FromPage
-                || currentPage > Selection.ToPage)
+                || Material is null
+                || currentPage > Material.PageCount)
             {
                 return StudySessionErrors.CurrentPageOutsideRange;
             }
@@ -318,49 +314,75 @@ public sealed class StudySession : AuditableEntity
             CurrentPage = currentPage;
         }
 
-        if (completedSectionIds is not null)
+        LastActivityAtUtc = activityAtUtc;
+        return Result.Success;
+    }
+
+    public Result<Success> MarkSectionCompleted(Guid studyMaterialSectionId)
+    {
+        if (studyMaterialSectionId == Guid.Empty)
         {
-            Guid[] ids = completedSectionIds.ToArray();
-            if (ids.Distinct().Count() != ids.Length)
-            {
-                return StudySessionErrors.DuplicateSection;
-            }
-
-            HashSet<Guid> selectedIds = Selection?.SelectedSections
-                .Select(section => section.StudyMaterialSectionId)
-                .ToHashSet() ?? [];
-            if (ids.Any(id => !selectedIds.Contains(id)))
-            {
-                return StudySessionErrors.SectionMismatch;
-            }
-
-            _completedSections.Clear();
-            _completedSections.AddRange(ids.Select(id => new StudySessionCompletedSection(id)));
+            return StudySessionErrors.SectionMismatch;
         }
 
-        LastActivityAtUtc = activityAtUtc;
+        bool isSelected = Selection?.SelectedSections
+            .Any(section => section.StudyMaterialSectionId == studyMaterialSectionId) == true;
+        if (!isSelected)
+        {
+            return StudySessionErrors.SectionMismatch;
+        }
+
+        if (_completedSections.All(section => section.StudyMaterialSectionId != studyMaterialSectionId))
+        {
+            _completedSections.Add(new StudySessionCompletedSection(studyMaterialSectionId));
+        }
+
         return Result.Success;
     }
 
     public TimeSpan GetRemainingDuration(DateTimeOffset utcNow)
     {
-        if (
-            FocusDurationMinutes is null
-            || StartedAtUtc is null
-            || Status is StudySessionStatus.Completed or StudySessionStatus.Cancelled
-        )
+        TimeSpan elapsed = GetElapsedDuration(utcNow);
+        int durationMinutes = EstimatedStudyTimeMinutes > 0
+            ? EstimatedStudyTimeMinutes
+            : FocusDurationMinutes ?? 0;
+
+        if (durationMinutes <= 0)
         {
             return TimeSpan.Zero;
         }
 
-        DateTimeOffset effectiveNow =
-            Status == StudySessionStatus.Paused && PausedAtUtc is not null
-                ? PausedAtUtc.Value
-                : utcNow;
-        TimeSpan elapsed =
-            effectiveNow - StartedAtUtc.Value - TimeSpan.FromSeconds(AccumulatedPausedSeconds);
-        TimeSpan remaining = TimeSpan.FromMinutes(FocusDurationMinutes.Value) - elapsed;
+        TimeSpan remaining = TimeSpan.FromMinutes(durationMinutes) - elapsed;
         return remaining > TimeSpan.Zero ? remaining : TimeSpan.Zero;
+    }
+
+    public TimeSpan GetOvertimeDuration(DateTimeOffset utcNow)
+    {
+        TimeSpan elapsed = GetElapsedDuration(utcNow);
+        int durationMinutes = EstimatedStudyTimeMinutes > 0
+            ? EstimatedStudyTimeMinutes
+            : FocusDurationMinutes ?? 0;
+        TimeSpan overtime = elapsed - TimeSpan.FromMinutes(durationMinutes);
+        return durationMinutes > 0 && overtime > TimeSpan.Zero ? overtime : TimeSpan.Zero;
+    }
+
+    private TimeSpan GetElapsedDuration(DateTimeOffset utcNow)
+    {
+        if (StartedAtUtc is null || Status == StudySessionStatus.Cancelled)
+        {
+            return TimeSpan.Zero;
+        }
+
+        DateTimeOffset effectiveNow = Status switch
+        {
+            StudySessionStatus.Paused when PausedAtUtc is not null => PausedAtUtc.Value,
+            StudySessionStatus.Completed when CompletedAtUtc is not null => CompletedAtUtc.Value,
+            _ => utcNow
+        };
+
+        TimeSpan elapsed = effectiveNow - StartedAtUtc.Value -
+                           TimeSpan.FromSeconds(AccumulatedPausedSeconds);
+        return elapsed > TimeSpan.Zero ? elapsed : TimeSpan.Zero;
     }
 
     private Result<Success> EnsureConfigurable()
@@ -377,8 +399,6 @@ public sealed class StudySession : AuditableEntity
             Status = StudySessionStatus.Draft;
         }
     }
-
-    private bool HasElapsed(DateTimeOffset utcNow) => GetRemainingDuration(utcNow) == TimeSpan.Zero;
 
     private void AccumulatePause(DateTimeOffset utcNow)
     {

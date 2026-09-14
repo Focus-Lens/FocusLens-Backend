@@ -10,8 +10,8 @@ namespace FocusLens.Application.StudySessions;
 public sealed class GetStudySessionQueryHandler(
     IBaseRepository<Student> studentRepository,
     IBaseRepository<StudySession> studySessionRepository,
+    IBaseRepository<StudySessionSelectedSection> selectedSectionRepository,
     ICurrentUser currentUser,
-    IUnitOfWork unitOfWork,
     TimeProvider timeProvider)
     : IRequestHandler<GetStudySessionQuery, StudySessionResponse?>
 {
@@ -31,7 +31,7 @@ public sealed class GetStudySessionQueryHandler(
 
         StudySession? session = await studySessionRepository.FirstOrDefaultAsync(
             item => item.Id == request.SessionId && item.StudentId == student.Id,
-            item => item.Selection!,
+            item => item.Selection!.SelectedSections,
             item => item.CompletedSections);
         if (session is null)
         {
@@ -39,11 +39,17 @@ public sealed class GetStudySessionQueryHandler(
         }
 
         DateTimeOffset utcNow = timeProvider.GetUtcNow();
-        if (session.CompleteIfElapsed(utcNow))
-        {
-            await unitOfWork.SaveChangesAsync();
-        }
 
-        return session.ToResponse(utcNow);
+        IEnumerable<StudySessionSelectedSection> selectedSections =
+            await selectedSectionRepository.GetAllAsync(
+                section => section.StudySessionSelectionId == session.Selection!.Id);
+
+        int estimatedStudyTimeMinutes =
+            selectedSections.Sum(section => section.EstimatedDurationMinutes);
+
+        return session.ToResponse(utcNow) with
+        {
+            EstimatedStudyTimeMinutes = estimatedStudyTimeMinutes
+        };
     }
 }

@@ -1,5 +1,5 @@
-using FocusLens.Domain;
 using FocusLens.Application.Features.Identity.Dtos;
+using FocusLens.Domain;
 using FocusLens.Domain.Common.Results;
 using MediatR;
 

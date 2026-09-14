@@ -1,5 +1,3 @@
-using FocusLens.Domain;
-
 namespace FocusLens.Domain.UnitTests;
 
 public sealed class LegalDocumentTests
@@ -12,14 +10,12 @@ public sealed class LegalDocumentTests
             LegalDocumentAudience.Student,
             "2026-09-04",
             "Original terms",
-            isPublished: false,
-            publishedOnUtc: null);
+            false,
+            null);
 
         document.Publish(publishedOnUtc);
 
-        Assert.Throws<InvalidOperationException>(
-            () => document.SetDraftContent("2026-09-05", "Updated terms"));
-        Assert.Throws<InvalidOperationException>(
-            () => document.Publish(publishedOnUtc.AddDays(1)));
+        Assert.Throws<InvalidOperationException>(() => document.SetDraftContent("2026-09-05", "Updated terms"));
+        Assert.Throws<InvalidOperationException>(() => document.Publish(publishedOnUtc.AddDays(1)));
     }
 }

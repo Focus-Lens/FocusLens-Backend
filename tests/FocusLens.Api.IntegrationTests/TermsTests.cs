@@ -1,7 +1,5 @@
-using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
-
 using FocusLens.Domain;
 using FocusLens.Infrastructure.Data;
 using Microsoft.Extensions.DependencyInjection;
@@ -15,7 +13,7 @@ public class TermsTests
     [InlineData("Student")]
     public async Task GetTerms_ReturnsCurrentPublishedTermsForAudience(string audience)
     {
-        await using var factory = new CustomWebApplicationFactory();
+        await using CustomWebApplicationFactory factory = new();
         LegalDocument terms = CreatePublishedTerms(
             audience,
             "2026-09-04",
@@ -42,7 +40,7 @@ public class TermsTests
     [Fact]
     public async Task GetTerms_WhenMultipleVersionsArePublished_ReturnsLatestAndKeepsHistory()
     {
-        await using var factory = new CustomWebApplicationFactory();
+        await using CustomWebApplicationFactory factory = new();
         LegalDocument oldTerms = CreatePublishedTerms(
             "Student",
             "2026-09-04",
@@ -84,6 +82,6 @@ public class TermsTests
             Enum.Parse<LegalDocumentAudience>(audience),
             version,
             content,
-            isPublished: true,
+            true,
             publishedOnUtc);
 }

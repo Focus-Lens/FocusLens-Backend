@@ -11,6 +11,8 @@ public sealed class StudySessionCompletedSectionConfiguration
     {
         builder.ToTable("StudySessionCompletedSections");
         builder.HasKey(section => section.Id);
+        builder.Property(section => section.Id).ValueGeneratedNever();
+        builder.Property(section => section.Id).ValueGeneratedNever();
         builder.Property(section => section.StudySessionId).IsRequired();
         builder.Property(section => section.StudyMaterialSectionId).IsRequired();
         builder.HasIndex(section => new { section.StudySessionId, section.StudyMaterialSectionId }).IsUnique();

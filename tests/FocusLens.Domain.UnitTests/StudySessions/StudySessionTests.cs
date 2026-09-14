@@ -24,9 +24,9 @@ public class StudySessionTests
         StudySession session = StudySession.Create(Guid.NewGuid(), StudySessionMode.Digital).Value;
         StudentSubject subject = StudentSubject.Predefined(StudentSubjectType.Math);
         StudyMaterial material = CreateMaterial(session.StudentId);
-        StudyMaterialSection first = StudyMaterialSection.Create(material.Id, "Chapter 1", 8).Value;
-        StudyMaterialSection second = StudyMaterialSection.Create(material.Id, "Practice", 12).Value;
-        StudyMaterialSection third = StudyMaterialSection.Create(material.Id, "Review", 12).Value;
+        StudyMaterialSection first = StudyMaterialSection.Create(material.Id, "Chapter 1", 8, 1, 3).Value;
+        StudyMaterialSection second = StudyMaterialSection.Create(material.Id, "Practice", 12, 4, 6).Value;
+        StudyMaterialSection third = StudyMaterialSection.Create(material.Id, "Review", 12, 7, 10).Value;
 
         Assert.True(session.SetSubject(subject).IsSuccess);
         Assert.True(session.SetDuration(25).IsSuccess);
@@ -118,21 +118,38 @@ public class StudySessionTests
     }
 
     [Fact]
-    public void ActiveSession_WhenDurationElapses_CompletesOnObservation()
+    public void ActiveSession_WhenFocusTargetElapses_RemainsActive()
     {
         StudySession session = CreateReadyDigitalSession();
         DateTimeOffset startedAt = new(2026, 9, 7, 10, 0, 0, TimeSpan.Zero);
 
         session.Start(startedAt);
 
-        Assert.True(session.CompleteIfElapsed(startedAt.AddMinutes(25)));
-        Assert.Equal(StudySessionStatus.Completed, session.Status);
-        Assert.Equal(startedAt.AddMinutes(25), session.CompletedAtUtc);
+        Assert.Equal(StudySessionStatus.Active, session.Status);
+        Assert.Null(session.CompletedAtUtc);
         Assert.Equal(TimeSpan.Zero, session.GetRemainingDuration(startedAt.AddMinutes(25)));
     }
 
     [Fact]
-    public void PausedSession_DoesNotExpireWhilePaused()
+    public void ActiveSession_WhenAiEstimatedTimeElapses_RemainsActiveAndReportsOvertime()
+    {
+        StudySession session = CreateReadyDigitalSession();
+        DateTimeOffset startedAt = new(2026, 9, 7, 10, 0, 0, TimeSpan.Zero);
+
+        // The selected AI section is estimated at 15 minutes; the legacy
+        // focus-duration fallback is 25 minutes and must not control timing.
+        Assert.True(session.Start(startedAt).IsSuccess);
+
+        DateTimeOffset afterEstimate = startedAt.AddMinutes(16);
+
+        Assert.Equal(StudySessionStatus.Active, session.Status);
+        Assert.Null(session.CompletedAtUtc);
+        Assert.Equal(TimeSpan.Zero, session.GetRemainingDuration(afterEstimate));
+        Assert.Equal(TimeSpan.FromMinutes(1), session.GetOvertimeDuration(afterEstimate));
+    }
+
+    [Fact]
+    public void PausedSession_PreservesRemainingFocusTime()
     {
         StudySession session = CreateReadyDigitalSession();
         DateTimeOffset startedAt = new(2026, 9, 7, 10, 0, 0, TimeSpan.Zero);
@@ -140,9 +157,56 @@ public class StudySessionTests
         session.Start(startedAt);
         session.Pause(startedAt.AddMinutes(10));
 
-        Assert.False(session.CompleteIfElapsed(startedAt.AddHours(1)));
         Assert.Equal(StudySessionStatus.Paused, session.Status);
         Assert.Equal(TimeSpan.FromMinutes(15), session.GetRemainingDuration(startedAt.AddHours(1)));
+    }
+
+    [Fact]
+    public void SelectedSection_LeavingItsPageRange_MakesChallengeAvailable()
+    {
+        StudySession session = CreateReadyDigitalSession();
+        StudySessionSelectedSection section = session.Selection!.SelectedSections.Single();
+        DateTimeOffset startedAt = new(2026, 9, 7, 10, 0, 0, TimeSpan.Zero);
+
+        Assert.True(section.Start(startedAt).IsSuccess);
+        Assert.True(section.MakeChallengeAvailable(startedAt.AddMinutes(2)).IsSuccess);
+
+        Assert.Equal(startedAt.AddMinutes(2), section.ChallengeAvailableAtUtc);
+        Assert.True(section.IsChallengeAvailable);
+        Assert.Null(section.CompletedAtUtc);
+        Assert.Equal(15, section.EstimatedDurationMinutes);
+    }
+
+    [Fact]
+    public void SelectedSection_LeavingItsPageRange_IsIdempotent()
+    {
+        StudySession session = CreateReadyDigitalSession();
+        StudySessionSelectedSection section = session.Selection!.SelectedSections.Single();
+        DateTimeOffset startedAt = new(2026, 9, 7, 10, 0, 0, TimeSpan.Zero);
+
+        section.Start(startedAt);
+
+        Result<Success> result = section.MakeChallengeAvailable(startedAt.AddMinutes(15));
+
+        Assert.True(result.IsSuccess);
+    }
+
+    [Fact]
+    public void AvailableChallenge_Postpone_DefersItForExactlyFiveMinutes()
+    {
+        StudySession session = CreateReadyDigitalSession();
+        StudySessionSelectedSection section = session.Selection!.SelectedSections.Single();
+        DateTimeOffset now = new(2026, 9, 7, 10, 0, 0, TimeSpan.Zero);
+
+        Assert.True(section.Start(now).IsSuccess);
+        Assert.True(section.MakeChallengeAvailable(now).IsSuccess);
+        Assert.True(section.PostponeChallenge(now, TimeSpan.FromMinutes(5)).IsSuccess);
+
+        Assert.Equal(now, section.ChallengePostponedAtUtc);
+        Assert.Equal(now.AddMinutes(5), section.ChallengeDeferredUntilUtc);
+        Assert.False(section.IsChallengeAvailableAt(now.AddMinutes(4).AddSeconds(59)));
+        Assert.True(section.IsChallengeAvailableAt(now.AddMinutes(5)));
+        Assert.True(section.PostponeChallenge(now.AddMinutes(5), TimeSpan.FromMinutes(5)).IsError);
     }
 
     [Fact]
@@ -150,7 +214,7 @@ public class StudySessionTests
     {
         StudySession session = CreateReadyDigitalSession();
         StudyMaterialSection selected = StudyMaterialSection.Create(
-            session.StudyMaterialId!.Value, "Chapter 1", 15).Value;
+            session.StudyMaterialId!.Value, "Chapter 1", 15, 2, 10).Value;
         StudySessionSelection selection = StudySessionSelection.Create(
             session,
             session.Material,
@@ -162,11 +226,11 @@ public class StudySessionTests
         DateTimeOffset now = new(2026, 9, 7, 10, 0, 0, TimeSpan.Zero);
         session.Start(now);
 
-        Result<Success> result = session.UpdateProgress(5, [selected.Id], now.AddMinutes(2));
+        Result<Success> result = session.UpdateProgress(5, now.AddMinutes(2));
 
         Assert.True(result.IsSuccess);
         Assert.Equal(5, session.CurrentPage);
-        Assert.Equal(selected.Id, Assert.Single(session.CompletedSections).StudyMaterialSectionId);
+        Assert.Empty(session.CompletedSections);
         Assert.Equal(now.AddMinutes(2), session.LastActivityAtUtc);
     }
 
@@ -244,7 +308,7 @@ public class StudySessionTests
     {
         StudySession session = StudySession.Create(Guid.NewGuid(), StudySessionMode.Digital).Value;
         StudyMaterial material = CreateMaterial(session.StudentId);
-        StudyMaterialSection section = StudyMaterialSection.Create(material.Id, "Chapter 1", 15).Value;
+        StudyMaterialSection section = StudyMaterialSection.Create(material.Id, "Chapter 1", 15, 1, 10).Value;
         session.SetSubject(StudentSubject.Predefined(StudentSubjectType.Math));
         session.SetDuration(25);
         session.SetStudyMaterial(material);

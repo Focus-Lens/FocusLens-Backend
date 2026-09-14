@@ -2,10 +2,10 @@ using System.Net;
 using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
-using FocusLens.Infrastructure.Data;
 using FocusLens.Domain;
 using FocusLens.Domain.Students;
 using FocusLens.Domain.StudySessions;
+using FocusLens.Infrastructure.Data;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace FocusLens.Api.IntegrationTests;

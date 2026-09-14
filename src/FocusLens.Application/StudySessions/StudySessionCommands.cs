@@ -22,8 +22,6 @@ public sealed record SetStudySessionSelectionCommand(Guid SessionId, SetStudySes
 public sealed record UpdateStudySessionSelectionCommand(Guid SessionId, SetStudySessionSelectionRequest Request)
     : IRequest<Result<StudySessionSelectionResponse>>;
 
-public sealed record ReceiveStudySessionSectionsCommand(Guid SessionId, ReceiveStudySessionSectionsRequest Request)
-    : IRequest<Result<StudySessionResponse>>;
 
 public sealed record ChangeStudySessionMaterialCommand(
     Guid SessionId,

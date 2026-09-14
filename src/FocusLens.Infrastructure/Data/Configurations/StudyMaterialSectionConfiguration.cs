@@ -13,6 +13,8 @@ public sealed class StudyMaterialSectionConfiguration : IEntityTypeConfiguration
         builder.Property(section => section.StudyMaterialId).IsRequired();
         builder.Property(section => section.Name).HasMaxLength(200).IsRequired();
         builder.Property(section => section.EstimatedDurationMinutes).IsRequired();
+        builder.Property(section => section.FromPage).IsRequired();
+        builder.Property(section => section.ToPage).IsRequired();
         builder.HasIndex(section => section.StudyMaterialId);
         builder.HasOne<StudyMaterial>()
             .WithMany()

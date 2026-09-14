@@ -3,7 +3,6 @@ using FocusLens.Contracts.StudySessions;
 using FocusLens.Domain.Common.Results;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.Mvc;
 
 namespace FocusLens.API.Controllers;
@@ -94,15 +93,25 @@ public sealed class StudySessionsController(ISender sender) : ApiController
     [HttpPost("{sessionId:guid}/sections")]
     public async Task<IActionResult> ReceiveSections(
         Guid sessionId,
-        [FromBody] ReceiveStudySessionSectionsRequest request,
-        CancellationToken cancellationToken
-    )
+        CancellationToken cancellationToken)
     {
         return ToActionResult(
             await sender.Send(
-                new ReceiveStudySessionSectionsCommand(sessionId, request),
-                cancellationToken
-            )
+                new AnalyzeStudySessionContentCommand(sessionId),
+                cancellationToken)
+        );
+    }
+
+    [HttpPut("{sessionId:guid}/sections")]
+    public async Task<IActionResult> SelectSections(
+        Guid sessionId,
+        [FromBody] SelectStudySessionAiSectionsRequest request,
+        CancellationToken cancellationToken)
+    {
+        return ToActionResult(
+            await sender.Send(
+                new SelectStudySessionAiSectionsCommand(sessionId, request),
+                cancellationToken)
         );
     }
 
@@ -145,7 +154,9 @@ public sealed class StudySessionsController(ISender sender) : ApiController
     {
         if (files is null || files.Count == 0)
         {
-            return Problem([Error.Validation("StudySessionImages.FilesRequired", "At least one image file is required.")]);
+            return Problem([
+                Error.Validation("StudySessionImages.FilesRequired", "At least one image file is required.")
+            ]);
         }
 
         if (files.Any(file => file.Length == 0))

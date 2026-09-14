@@ -13,6 +13,12 @@ public sealed class StudySessionSelectedSectionConfiguration : IEntityTypeConfig
         builder.Property(section => section.StudySessionSelectionId).IsRequired();
         builder.Property(section => section.StudyMaterialSectionId).IsRequired();
         builder.Property(section => section.EstimatedDurationMinutes).IsRequired();
+        builder.Property(section => section.Order).IsRequired();
+        builder.Property(section => section.StartedAtUtc);
+        builder.Property(section => section.ChallengeAvailableAtUtc);
+        builder.Property(section => section.ChallengeDeferredUntilUtc);
+        builder.Property(section => section.ChallengePostponedAtUtc);
+        builder.Property(section => section.CompletedAtUtc);
         builder.HasIndex(section => new { section.StudySessionSelectionId, section.StudyMaterialSectionId })
             .IsUnique();
         builder.HasOne<StudyMaterialSection>()

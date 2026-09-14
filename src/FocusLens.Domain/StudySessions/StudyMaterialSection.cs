@@ -9,12 +9,20 @@ public sealed class StudyMaterialSection : Entity
     {
     }
 
-    private StudyMaterialSection(Guid id, Guid studyMaterialId, string name, int estimatedDurationMinutes)
+    private StudyMaterialSection(
+        Guid id,
+        Guid studyMaterialId,
+        string name,
+        int estimatedDurationMinutes,
+        int fromPage,
+        int toPage)
         : base(id)
     {
         StudyMaterialId = studyMaterialId;
         Name = name;
         EstimatedDurationMinutes = estimatedDurationMinutes;
+        FromPage = fromPage;
+        ToPage = toPage;
     }
 
     public Guid StudyMaterialId { get; private set; }
@@ -23,10 +31,16 @@ public sealed class StudyMaterialSection : Entity
 
     public int EstimatedDurationMinutes { get; private set; }
 
+    public int FromPage { get; private set; }
+
+    public int ToPage { get; private set; }
+
     public static Result<StudyMaterialSection> Create(
         Guid studyMaterialId,
         string? name,
-        int estimatedDurationMinutes)
+        int estimatedDurationMinutes,
+        int fromPage,
+        int toPage)
     {
         if (studyMaterialId == Guid.Empty)
         {
@@ -44,10 +58,19 @@ public sealed class StudyMaterialSection : Entity
                 "Estimated duration must be greater than zero.");
         }
 
+        if (fromPage < 1 || toPage < fromPage)
+        {
+            return Error.Validation(
+                "StudyMaterialSections.PageRangeInvalid",
+                "The section page range is invalid.");
+        }
+
         return new StudyMaterialSection(
             Guid.CreateVersion7(),
             studyMaterialId,
             name.Trim(),
-            estimatedDurationMinutes);
+            estimatedDurationMinutes,
+            fromPage,
+            toPage);
     }
 }

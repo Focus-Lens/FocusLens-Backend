@@ -15,15 +15,15 @@ namespace FocusLens.Application.Features.Identity.Commands.RegisterParent;
 public sealed class RegisterParentCommandHandler
     : IRequestHandler<RegisterParentCommand, Result<Success>>
 {
-    private readonly IIdentityService _identityService;
-    private readonly IBaseRepository<Parent> _parentRepository;
-    private readonly IBaseRepository<LegalDocument> _legalDocumentRepository;
-    private readonly IBaseRepository<UserTermsAcceptance> _termsAcceptanceRepository;
-    private readonly IUnitOfWork _unitOfWork;
     private readonly IEmailVerificationCodeStore _codeStore;
     private readonly IEmailSender _emailSender;
-    private readonly TimeProvider _timeProvider;
+    private readonly IIdentityService _identityService;
+    private readonly IBaseRepository<LegalDocument> _legalDocumentRepository;
+    private readonly IBaseRepository<Parent> _parentRepository;
     private readonly RegistrationOptions _registrationOptions;
+    private readonly IBaseRepository<UserTermsAcceptance> _termsAcceptanceRepository;
+    private readonly TimeProvider _timeProvider;
+    private readonly IUnitOfWork _unitOfWork;
 
     public RegisterParentCommandHandler(
         IIdentityService identityService,
@@ -79,7 +79,7 @@ public sealed class RegisterParentCommandHandler
             UserName = email,
             FirstName = request.FirstName.Trim(),
             LastName = request.LastName.Trim(),
-            EmailConfirmed = false,
+            EmailConfirmed = false
         };
         user.AcceptTerms(terms.Version, utcNow);
 
@@ -144,10 +144,9 @@ public sealed class RegisterParentCommandHandler
     private async Task<LegalDocument?> GetCurrentPublishedTermsAsync()
     {
         IEnumerable<LegalDocument> publishedDocuments =
-            await _legalDocumentRepository.GetAllAsync(
-                document => document.Audience == LegalDocumentAudience.Parent
-                    && document.IsPublished
-                    && document.PublishedOnUtc != null);
+            await _legalDocumentRepository.GetAllAsync(document => document.Audience == LegalDocumentAudience.Parent
+                                                                   && document.IsPublished
+                                                                   && document.PublishedOnUtc != null);
 
         return publishedDocuments
             .OrderByDescending(document => document.PublishedOnUtc)

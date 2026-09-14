@@ -1,5 +1,4 @@
 using System.Security.Cryptography;
-
 using FocusLens.Application.Common.Errors;
 using FocusLens.Application.Common.Interfaces;
 using FocusLens.Application.Features.Identity.Options;
@@ -13,11 +12,11 @@ namespace FocusLens.Application.Features.Identity.Commands.ResendVerificationCod
 public sealed class ResendVerificationCodeCommandHandler
     : IRequestHandler<ResendVerificationCodeCommand, Result<Success>>
 {
-    private readonly IIdentityService _identityService;
     private readonly IEmailVerificationCodeStore _codeStore;
     private readonly IEmailSender _emailSender;
-    private readonly TimeProvider _timeProvider;
+    private readonly IIdentityService _identityService;
     private readonly RegistrationOptions _registrationOptions;
+    private readonly TimeProvider _timeProvider;
 
     public ResendVerificationCodeCommandHandler(
         IIdentityService identityService,

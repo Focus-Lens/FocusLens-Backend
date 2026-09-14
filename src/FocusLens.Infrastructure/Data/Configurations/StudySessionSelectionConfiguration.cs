@@ -14,6 +14,9 @@ public sealed class StudySessionSelectionConfiguration : IEntityTypeConfiguratio
         builder.Property(selection => selection.StudyMaterialId).IsRequired();
         builder.Property(selection => selection.FromPage).IsRequired();
         builder.Property(selection => selection.ToPage).IsRequired();
+        builder.Property(selection => selection.AiExtractedText);
+        builder.Property(selection => selection.AiAnalysisJson);
+        builder.Property(selection => selection.SelectedAiSectionIdsJson);
         builder.Property(selection => selection.DerivedStorageReference).HasMaxLength(500);
         builder.HasIndex(selection => selection.StudySessionId).IsUnique();
 

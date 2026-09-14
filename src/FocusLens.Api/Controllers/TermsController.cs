@@ -1,4 +1,6 @@
 using FocusLens.Application.Terms;
+using FocusLens.Contracts.Terms;
+using FocusLens.Domain.Common.Results;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -14,7 +16,7 @@ public sealed class TermsController(ISender sender) : ApiController
         [FromQuery] string audience,
         CancellationToken cancellationToken)
     {
-        var result = await sender.Send(new GetTermsQuery(audience), cancellationToken);
+        Result<TermsResponse> result = await sender.Send(new GetTermsQuery(audience), cancellationToken);
 
         return result.Match(
             Ok,

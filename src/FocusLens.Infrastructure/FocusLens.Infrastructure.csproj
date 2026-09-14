@@ -22,10 +22,12 @@
             <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
         </PackageReference>
         <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions"/>
+        <PackageReference Include="Microsoft.Extensions.Http"/>
         <PackageReference Include="PDFsharp"/>
     </ItemGroup>
 
     <ItemGroup>
+        <ProjectReference Include="../FocusLens.Application/FocusLens.Application.csproj"/>
         <ProjectReference Include="../FocusLens.Domain/FocusLens.Domain.csproj"/>
     </ItemGroup>
 

@@ -15,7 +15,8 @@ public sealed record StudySessionResponse(
     IReadOnlyCollection<Guid> CompletedSectionIds,
     Guid? SelectedSubjectId,
     int? FocusDurationMinutes,
-    int EstimatedStudyTimeMinutes);
+    int EstimatedStudyTimeMinutes,
+    int OvertimeSeconds = 0);
 
 public sealed record StudyMaterialResponse(
     Guid Id,
@@ -28,7 +29,9 @@ public sealed record StudyMaterialResponse(
 public sealed record StudyMaterialSectionResponse(
     Guid Id,
     string Name,
-    int EstimatedDurationMinutes);
+    int EstimatedDurationMinutes,
+    int FromPage,
+    int ToPage);
 
 public sealed record StudySessionSelectionResponse(
     Guid Id,

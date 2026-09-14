@@ -1,5 +1,5 @@
-using FocusLens.Contracts.Terms;
 using FocusLens.Application.Common.Errors;
+using FocusLens.Contracts.Terms;
 using FocusLens.Domain;
 using FocusLens.Domain.Common.Interfaces;
 using FocusLens.Domain.Common.Results;
@@ -16,17 +16,17 @@ public sealed class GetTermsQueryHandler(IBaseRepository<LegalDocument> legalDoc
     {
         if (!Enum.TryParse(
                 request.Audience,
-                ignoreCase: true,
+                true,
                 out LegalDocumentAudience audience)
             || !Enum.IsDefined(audience))
         {
             return ApplicationErrors.Terms.InvalidAudience;
         }
 
-        IEnumerable<LegalDocument> publishedDocuments = await legalDocuments.GetAllAsync(
-            document => document.Audience == audience
-                && document.IsPublished
-                && document.PublishedOnUtc != null);
+        IEnumerable<LegalDocument> publishedDocuments = await legalDocuments.GetAllAsync(document =>
+            document.Audience == audience
+            && document.IsPublished
+            && document.PublishedOnUtc != null);
 
         LegalDocument? terms = publishedDocuments
             .OrderByDescending(document => document.PublishedOnUtc)

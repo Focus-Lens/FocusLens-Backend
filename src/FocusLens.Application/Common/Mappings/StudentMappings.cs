@@ -55,8 +55,8 @@ internal static class StudentMappings
                 : new StudyTimeGoalResponse(
                     student.StudyTimeGoal.Period.ToString(),
                     student.StudyTimeGoal.TargetMinutes,
-                  student.StudyTimeGoal.Days,
-                  student.StudyTimeGoal.StartDate),
+                    student.StudyTimeGoal.Days,
+                    student.StudyTimeGoal.StartDate),
             student.IsOnboardingCompleted);
     }
 }

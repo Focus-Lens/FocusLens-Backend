@@ -36,7 +36,7 @@ public class AuthRouteTests
     [InlineData("/api/auth/google/parent")]
     public async Task AccountTypedGoogleRoutes_Exist(string route)
     {
-        await using var factory = new CustomWebApplicationFactory();
+        await using CustomWebApplicationFactory factory = new();
         using HttpClient client = factory.CreateClient();
         using StringContent content = new("{}", Encoding.UTF8, "application/json");
 

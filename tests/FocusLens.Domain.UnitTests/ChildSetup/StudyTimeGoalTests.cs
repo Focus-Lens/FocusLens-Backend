@@ -1,3 +1,4 @@
+using FocusLens.Domain.Common.Results;
 using FocusLens.Domain.Students;
 
 namespace FocusLens.Domain.UnitTests.ChildSetup;
@@ -9,7 +10,7 @@ public class StudyTimeGoalTests
     {
         DateOnly startDate = new(2026, 9, 14);
 
-        var result = StudyTimeGoal.Create(
+        Result<StudyTimeGoal> result = StudyTimeGoal.Create(
             StudyTimeGoalPeriod.Daily,
             60,
             [DayOfWeek.Monday, DayOfWeek.Wednesday, DayOfWeek.Friday],
@@ -30,7 +31,7 @@ public class StudyTimeGoalTests
     [Fact]
     public void Create_WithZeroTarget_ReturnsError()
     {
-        var result = StudyTimeGoal.Create(
+        Result<StudyTimeGoal> result = StudyTimeGoal.Create(
             StudyTimeGoalPeriod.Daily,
             0,
             [DayOfWeek.Monday],
@@ -42,7 +43,7 @@ public class StudyTimeGoalTests
     [Fact]
     public void Create_WithNegativeTarget_ReturnsError()
     {
-        var result = StudyTimeGoal.Create(
+        Result<StudyTimeGoal> result = StudyTimeGoal.Create(
             StudyTimeGoalPeriod.Weekly,
             -10,
             [],
@@ -54,7 +55,7 @@ public class StudyTimeGoalTests
     [Fact]
     public void Create_WithInvalidPeriod_ReturnsError()
     {
-        var result = StudyTimeGoal.Create(
+        Result<StudyTimeGoal> result = StudyTimeGoal.Create(
             (StudyTimeGoalPeriod)999,
             60,
             [],
@@ -66,7 +67,7 @@ public class StudyTimeGoalTests
     [Fact]
     public void Create_WithDailyGoalAndNoDays_ReturnsError()
     {
-        var result = StudyTimeGoal.Create(
+        Result<StudyTimeGoal> result = StudyTimeGoal.Create(
             StudyTimeGoalPeriod.Daily,
             60,
             [],
@@ -78,7 +79,7 @@ public class StudyTimeGoalTests
     [Fact]
     public void Create_WithWeeklyGoalAndDays_ReturnsError()
     {
-        var result = StudyTimeGoal.Create(
+        Result<StudyTimeGoal> result = StudyTimeGoal.Create(
             StudyTimeGoalPeriod.Weekly,
             60,
             [DayOfWeek.Monday],
@@ -90,7 +91,7 @@ public class StudyTimeGoalTests
     [Fact]
     public void Create_WithDuplicateDays_ReturnsError()
     {
-        var result = StudyTimeGoal.Create(
+        Result<StudyTimeGoal> result = StudyTimeGoal.Create(
             StudyTimeGoalPeriod.Daily,
             60,
             [DayOfWeek.Monday, DayOfWeek.Monday],
@@ -102,7 +103,7 @@ public class StudyTimeGoalTests
     [Fact]
     public void Create_WithInvalidDay_ReturnsError()
     {
-        var result = StudyTimeGoal.Create(
+        Result<StudyTimeGoal> result = StudyTimeGoal.Create(
             StudyTimeGoalPeriod.Daily,
             60,
             [(DayOfWeek)999],
@@ -114,7 +115,7 @@ public class StudyTimeGoalTests
     [Fact]
     public void Create_WithWeeklyGoalAndNoDays_CreatesGoal()
     {
-        var result = StudyTimeGoal.Create(
+        Result<StudyTimeGoal> result = StudyTimeGoal.Create(
             StudyTimeGoalPeriod.Weekly,
             480,
             [],

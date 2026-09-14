@@ -9,11 +9,7 @@ public sealed class UserTermsAcceptanceConfiguration
 {
     public void Configure(EntityTypeBuilder<UserTermsAcceptance> builder)
     {
-        builder.HasIndex(acceptance => new
-        {
-            acceptance.UserId,
-            acceptance.LegalDocumentId
-        })
+        builder.HasIndex(acceptance => new { acceptance.UserId, acceptance.LegalDocumentId })
             .IsUnique();
 
         builder.HasOne(acceptance => acceptance.User)

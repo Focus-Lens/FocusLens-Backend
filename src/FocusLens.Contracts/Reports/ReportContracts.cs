@@ -1,0 +1,37 @@
+namespace FocusLens.Contracts.Reports;
+
+public sealed record ReportSessionListItemResponse(
+    Guid SessionId,
+    DateTimeOffset StartedAtUtc,
+    string Subject,
+    string MaterialName,
+    string Mode,
+    string Status,
+    int ActualDurationMinutes,
+    int CompletionPercentage,
+    int QuestionsGenerated,
+    int CorrectQuestions,
+    int Attempts,
+    int LearningPercentage);
+
+public sealed record ReportSessionListResponse(
+    IReadOnlyCollection<ReportSessionListItemResponse> Items,
+    int Page,
+    int PageSize,
+    int TotalCount);
+
+public sealed record ReportSessionDetailResponse(
+    Guid SessionId,
+    DateTimeOffset StartedAtUtc,
+    string Subject,
+    string MaterialName,
+    string Mode,
+    string Status,
+    int ActualDurationMinutes,
+    int CompletionPercentage,
+    int QuestionsGenerated,
+    int CorrectQuestions,
+    int Attempts,
+    int LearningPercentage,
+    int CompletedSections,
+    int TotalSelectedSections);

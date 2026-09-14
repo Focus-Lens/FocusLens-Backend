@@ -1,4 +1,5 @@
 using FocusLens.Contracts.StudySessions;
+using FocusLens.Application.Common.Interfaces;
 using FocusLens.Domain;
 using FocusLens.Domain.Common.Interfaces;
 using FocusLens.Domain.Common.Results;
@@ -18,8 +19,8 @@ public sealed class StudySessionCommandHandler(
     IBaseRepository<StudySession> studySessionRepository,
     IBaseRepository<StudyMaterial> materialRepository,
     IBaseRepository<StudySessionSelection> selectionRepository,
-    IBaseRepository<StudyMaterialSection> sectionRepository,
     IBaseRepository<StudySessionSelectedSection> selectedSectionRepository,
+    IBaseRepository<StudyMaterialSection> materialSectionRepository,
     IBaseRepository<StudySessionImage> imageRepository,
     IStudyMaterialFileStore fileStore,
     IStudySessionImageFileStore imageFileStore,
@@ -34,7 +35,6 @@ public sealed class StudySessionCommandHandler(
         IRequestHandler<SetStudySessionDurationCommand, Result<Success>>,
         IRequestHandler<SetStudySessionSelectionCommand, Result<StudySessionSelectionResponse>>,
         IRequestHandler<UpdateStudySessionSelectionCommand, Result<StudySessionSelectionResponse>>,
-        IRequestHandler<ReceiveStudySessionSectionsCommand, Result<StudySessionResponse>>,
         IRequestHandler<ChangeStudySessionMaterialCommand, Result<StudyMaterialResponse>>,
         IRequestHandler<StartStudySessionCommand, Result<Success>>,
         IRequestHandler<UploadStudyMaterialCommand, Result<StudyMaterialResponse>>,
@@ -101,56 +101,64 @@ public sealed class StudySessionCommandHandler(
         CancellationToken cancellationToken) =>
         HandleRuntimeAsync(request.SessionId, session => session.End(timeProvider.GetUtcNow()));
 
-    public Task<Result<StudySessionResponse>> Handle(PauseStudySessionCommand request,
-        CancellationToken cancellationToken) =>
-        HandleRuntimeAsync(request.SessionId, session => session.Pause(timeProvider.GetUtcNow()));
-
-    public async Task<Result<StudySessionResponse>> Handle(ReceiveStudySessionSectionsCommand request,
+    public async Task<Result<StudySessionResponse>> Handle(
+        PauseStudySessionCommand request,
         CancellationToken cancellationToken)
     {
         Result<StudySession> sessionResult =
-            await GetSessionAsync(request.SessionId, includeMaterial: true, includeSelection: true);
+            await GetSessionAsync(
+                request.SessionId,
+                includeSelection: true);
+
         if (sessionResult.IsError)
         {
             return sessionResult.TopError;
         }
 
-        if (sessionResult.Value.Material is not { } material || sessionResult.Value.Selection is null)
+        DateTimeOffset now = timeProvider.GetUtcNow();
+
+        Result<Success> pauseResult =
+            sessionResult.Value.Pause(now);
+
+        if (pauseResult.IsError)
         {
-            return StudySessionErrors.SectionsRequireMaterial;
+            return pauseResult.TopError;
         }
 
-        List<StudyMaterialSection> materialSections = [];
-        foreach (StudyMaterialSectionRequest requestedSection in request.Request.Sections ?? [])
-        {
-            Result<StudyMaterialSection> sectionResult = StudyMaterialSection.Create(material.Id,
-                requestedSection.Name, requestedSection.EstimatedDurationMinutes);
-            if (sectionResult.IsError)
-            {
-                return sectionResult.TopError;
-            }
-
-            materialSections.Add(sectionResult.Value);
-        }
-
-        Result<Success> setSectionsResult = sessionResult.Value.SetSelectedSections(materialSections);
-        if (setSectionsResult.IsError)
-        {
-            return setSectionsResult.TopError;
-        }
-
-        IEnumerable<StudySessionSelectedSection> oldSelectedSections =
-            await selectedSectionRepository.GetAllAsync(section =>
-                section.StudySessionSelectionId == sessionResult.Value.Selection.Id);
-        selectedSectionRepository.DeleteRange(oldSelectedSections);
-        await sectionRepository.AddRangeAsync(materialSections);
-        await selectedSectionRepository.AddRangeAsync(sessionResult.Value.Selection.SelectedSections);
-        return await SaveSessionAsync(Result.Success, sessionResult.Value);
+        return await SaveSessionAsync(
+            pauseResult,
+            sessionResult.Value);
     }
 
-    public Task<Result<StudySessionResponse>> Handle(ResumeStudySessionCommand request,
-        CancellationToken cancellationToken) =>
-        HandleRuntimeAsync(request.SessionId, session => session.Resume(timeProvider.GetUtcNow()));
+
+    public async Task<Result<StudySessionResponse>> Handle(
+        ResumeStudySessionCommand request,
+        CancellationToken cancellationToken)
+    {
+        Result<StudySession> sessionResult =
+            await GetSessionAsync(
+                request.SessionId,
+                includeSelection: true);
+
+        if (sessionResult.IsError)
+        {
+            return sessionResult.TopError;
+        }
+
+        StudySession session = sessionResult.Value;
+        DateTimeOffset now = timeProvider.GetUtcNow();
+        Result<Success> resumeResult =
+            session.Resume(now);
+
+        if (resumeResult.IsError)
+        {
+            return resumeResult.TopError;
+        }
+
+        return await SaveSessionAsync(
+            resumeResult,
+            session);
+    }
 
     public async Task<Result<Success>> Handle(SetStudySessionDurationCommand request,
         CancellationToken cancellationToken)
@@ -225,36 +233,147 @@ public sealed class StudySessionCommandHandler(
         return await SaveSessionAsync(sessionResult.Value.SetSubject(subject));
     }
 
-    public async Task<Result<Success>> Handle(StartStudySessionCommand request, CancellationToken cancellationToken)
+    public async Task<Result<Success>> Handle(
+        StartStudySessionCommand request,
+        CancellationToken cancellationToken)
     {
-        Result<StudySession> sessionResult = await GetSessionAsync(request.SessionId, includeMaterial: true);
+        Result<StudySession> sessionResult =
+            await GetSessionAsync(
+                request.SessionId,
+                includeMaterial: true,
+                includeSelection: true);
+
         if (sessionResult.IsError)
         {
             return sessionResult.TopError;
         }
 
-        if (sessionResult.Value.Status == StudySessionStatus.Draft)
+        StudySession session = sessionResult.Value;
+
+        if (session.Selection is null)
         {
-            Result<Success> readyResult = sessionResult.Value.MarkReady();
+            return StudySessionErrors.SectionsRequireMaterial;
+        }
+
+        List<StudySessionSelectedSection> selectedSections =
+            (await selectedSectionRepository.GetAllAsync(
+                section => section.StudySessionSelectionId == session.Selection.Id))
+            .OrderBy(section => section.Order)
+            .ToList();
+
+        if (selectedSections.Count == 0)
+        {
+            return Error.Validation(
+                "StudySessionSections.NoneSelected",
+                "At least one study section must be selected before starting the session.");
+        }
+
+        if (session.Status == StudySessionStatus.Draft)
+        {
+            Result<Success> readyResult = session.MarkReady();
+
             if (readyResult.IsError)
             {
                 return readyResult.TopError;
             }
         }
 
-        return await SaveSessionAsync(sessionResult.Value.Start(timeProvider.GetUtcNow()));
+        DateTimeOffset now = timeProvider.GetUtcNow();
+
+        Result<Success> startResult = session.Start(now);
+
+        if (startResult.IsError)
+        {
+            return startResult;
+        }
+
+        Result<Success> sectionStartResult =
+            selectedSections[0].Start(now);
+
+        if (sectionStartResult.IsError)
+        {
+            return sectionStartResult;
+        }
+
+        return await SaveSessionAsync(Result.Success);
     }
 
-    public Task<Result<StudySessionResponse>> Handle(
+    public async Task<Result<StudySessionResponse>> Handle(
         UpdateStudySessionProgressCommand request,
         CancellationToken cancellationToken)
     {
-        return HandleRuntimeAsync(
+        Result<StudySession> sessionResult = await GetSessionAsync(
             request.SessionId,
-            session => session.UpdateProgress(
-                request.Request.CurrentPage,
-                request.Request.CompletedSectionIds,
-                timeProvider.GetUtcNow()));
+            includeMaterial: true,
+            includeSelection: true);
+        if (sessionResult.IsError)
+        {
+            return sessionResult.TopError;
+        }
+
+        StudySession session = sessionResult.Value;
+        DateTimeOffset now = timeProvider.GetUtcNow();
+        StudySessionSelectedSection? currentSection = null;
+        StudyMaterialSection? activeMaterialSection = null;
+
+        if (session.Status == StudySessionStatus.Active && session.Selection is not null)
+        {
+            currentSection = await selectedSectionRepository.FirstOrDefaultAsync(section =>
+                section.StudySessionSelectionId == session.Selection.Id &&
+                section.StartedAtUtc != null &&
+                section.CompletedAtUtc == null);
+
+            if (currentSection is not null)
+            {
+                activeMaterialSection = await materialSectionRepository.FirstOrDefaultAsync(section =>
+                    section.Id == currentSection.StudyMaterialSectionId);
+
+                if (activeMaterialSection is null)
+                {
+                    return Error.Validation(
+                        "StudySessionQuestions.SectionUnavailable",
+                        "The active material section could not be found.");
+                }
+
+                if (currentSection.IsChallengeAvailableAt(now) &&
+                    request.Request.CurrentPage is int requestedPage &&
+                    requestedPage > activeMaterialSection.ToPage &&
+                    requestedPage != session.CurrentPage)
+                {
+                    return Error.Conflict(
+                        "StudySessionQuestions.ChallengeMustBeResolved",
+                        "Resolve the current section challenge before continuing.");
+                }
+            }
+        }
+
+        Result<Success> progressResult = session.UpdateProgress(request.Request.CurrentPage, now);
+        if (progressResult.IsError)
+        {
+            return progressResult.TopError;
+        }
+
+        if (session.Status == StudySessionStatus.Active &&
+            request.Request.CurrentPage is int currentPage &&
+            session.Selection is not null)
+        {
+            if (currentSection is not null && !currentSection.IsChallengeAvailable)
+            {
+                if (currentPage > activeMaterialSection!.ToPage ||
+                    (currentPage == activeMaterialSection.ToPage &&
+                     currentPage == session.Selection.ToPage))
+                {
+                    Result<Success> challengeResult = currentSection.MakeChallengeAvailable(now);
+                    if (challengeResult.IsError)
+                    {
+                        return challengeResult.TopError;
+                    }
+                }
+            }
+        }
+
+        await unitOfWork.SaveChangesAsync();
+        return session.ToResponse(now);
     }
 
     public async Task<Result<StudySessionSelectionResponse>> Handle(UpdateStudySessionSelectionCommand request,
@@ -563,14 +682,14 @@ public sealed class StudySessionCommandHandler(
         StudySession? session = includeMaterial && includeSelection
             ? await studySessionRepository.FirstOrDefaultAsync(
                 item => item.Id == sessionId && item.StudentId == studentResult.Value.Id, item => item.Material!,
-                item => item.Selection!, item => item.CompletedSections)
+                item => item.Selection!.SelectedSections, item => item.CompletedSections)
             : includeMaterial
                 ? await studySessionRepository.FirstOrDefaultAsync(
                     item => item.Id == sessionId && item.StudentId == studentResult.Value.Id,
-                    item => item.Material!, item => item.Selection!, item => item.CompletedSections)
+                    item => item.Material!, item => item.Selection!.SelectedSections, item => item.CompletedSections)
                 : await studySessionRepository.FirstOrDefaultAsync(
                     item => item.Id == sessionId && item.StudentId == studentResult.Value.Id,
-                    item => item.Selection!, item => item.CompletedSections);
+                    item => item.Selection!.SelectedSections, item => item.CompletedSections);
         return session is null
             ? Error.NotFound("StudySessions.NotFound", "The study session was not found.")
             : session;
@@ -598,15 +717,9 @@ public sealed class StudySessionCommandHandler(
         }
 
         StudySession session = sessionResult.Value;
-        bool completedNaturally = session.CompleteIfElapsed(timeProvider.GetUtcNow());
         Result<Success> result = operation(session);
         if (result.IsError)
         {
-            if (completedNaturally)
-            {
-                await unitOfWork.SaveChangesAsync();
-            }
-
             return result.TopError;
         }
 

@@ -580,6 +580,9 @@ namespace FocusLens.Infrastructure.Data.Migrations
                     b.Property<int>("EstimatedDurationMinutes")
                         .HasColumnType("int");
 
+                    b.Property<int>("FromPage")
+                        .HasColumnType("int");
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(200)
@@ -587,6 +590,9 @@ namespace FocusLens.Infrastructure.Data.Migrations
 
                     b.Property<Guid>("StudyMaterialId")
                         .HasColumnType("uniqueidentifier");
+
+                    b.Property<int>("ToPage")
+                        .HasColumnType("int");
 
                     b.HasKey("Id");
 
@@ -668,7 +674,6 @@ namespace FocusLens.Infrastructure.Data.Migrations
             modelBuilder.Entity("FocusLens.Domain.StudySessions.StudySessionCompletedSection", b =>
                 {
                     b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
                         .HasColumnType("uniqueidentifier");
 
                     b.Property<Guid>("StudyMaterialSectionId")
@@ -733,14 +738,163 @@ namespace FocusLens.Infrastructure.Data.Migrations
                     b.ToTable("StudySessionImages", (string)null);
                 });
 
+            modelBuilder.Entity("FocusLens.Domain.StudySessions.StudySessionQuestion", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("AiConceptId")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("AiConceptName")
+                        .IsRequired()
+                        .HasMaxLength(300)
+                        .HasColumnType("nvarchar(300)");
+
+                    b.Property<string>("AiSectionId")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("AiSectionTitle")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<string>("CorrectAnswer")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<string>("Difficulty")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<int>("EstimatedTimeMinutes")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Explanation")
+                        .IsRequired()
+                        .HasMaxLength(4000)
+                        .HasColumnType("nvarchar(4000)");
+
+                    b.Property<DateTimeOffset?>("ExplanationShownAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<int>("Order")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Question")
+                        .IsRequired()
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<Guid?>("StudyMaterialSectionId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("StudySessionId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("StudyMaterialSectionId");
+
+                    b.HasIndex("StudySessionId", "Order")
+                        .IsUnique();
+
+                    b.ToTable("StudySessionQuestions", (string)null);
+                });
+
+            modelBuilder.Entity("FocusLens.Domain.StudySessions.StudySessionQuestionAnswer", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("AnsweredAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<int>("AttemptNumber")
+                        .HasColumnType("int");
+
+                    b.Property<bool>("IsCorrect")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("LearningSignal")
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)");
+
+                    b.Property<string>("SelectedAnswer")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<Guid>("StudySessionQuestionId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("StudySessionQuestionId", "AttemptNumber")
+                        .IsUnique();
+
+                    b.ToTable("StudySessionQuestionAnswers", (string)null);
+                });
+
+            modelBuilder.Entity("FocusLens.Domain.StudySessions.StudySessionQuestionOption", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int>("Order")
+                        .HasColumnType("int");
+
+                    b.Property<Guid>("StudySessionQuestionId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Text")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("StudySessionQuestionId", "Order")
+                        .IsUnique();
+
+                    b.ToTable("StudySessionQuestionOptions", (string)null);
+                });
+
             modelBuilder.Entity("FocusLens.Domain.StudySessions.StudySessionSelectedSection", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<DateTimeOffset?>("ChallengeAvailableAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<DateTimeOffset?>("ChallengeDeferredUntilUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<DateTimeOffset?>("ChallengePostponedAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<DateTimeOffset?>("CompletedAtUtc")
+                        .HasColumnType("datetimeoffset");
+
                     b.Property<int>("EstimatedDurationMinutes")
                         .HasColumnType("int");
+
+                    b.Property<int>("Order")
+                        .HasColumnType("int");
+
+                    b.Property<DateTimeOffset?>("StartedAtUtc")
+                        .HasColumnType("datetimeoffset");
 
                     b.Property<Guid>("StudyMaterialSectionId")
                         .HasColumnType("uniqueidentifier");
@@ -764,6 +918,12 @@ namespace FocusLens.Infrastructure.Data.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<string>("AiAnalysisJson")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("AiExtractedText")
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<DateTimeOffset>("CreatedAtUtc")
                         .HasColumnType("datetimeoffset");
 
@@ -782,6 +942,9 @@ namespace FocusLens.Infrastructure.Data.Migrations
 
                     b.Property<DateTimeOffset>("LastModifiedUtc")
                         .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("SelectedAiSectionIdsJson")
+                        .HasColumnType("nvarchar(max)");
 
                     b.Property<Guid>("StudyMaterialId")
                         .HasColumnType("uniqueidentifier");
@@ -1236,6 +1399,38 @@ namespace FocusLens.Infrastructure.Data.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("FocusLens.Domain.StudySessions.StudySessionQuestion", b =>
+                {
+                    b.HasOne("FocusLens.Domain.StudySessions.StudyMaterialSection", null)
+                        .WithMany()
+                        .HasForeignKey("StudyMaterialSectionId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("FocusLens.Domain.StudySessions.StudySession", null)
+                        .WithMany()
+                        .HasForeignKey("StudySessionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("FocusLens.Domain.StudySessions.StudySessionQuestionAnswer", b =>
+                {
+                    b.HasOne("FocusLens.Domain.StudySessions.StudySessionQuestion", null)
+                        .WithMany()
+                        .HasForeignKey("StudySessionQuestionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("FocusLens.Domain.StudySessions.StudySessionQuestionOption", b =>
+                {
+                    b.HasOne("FocusLens.Domain.StudySessions.StudySessionQuestion", null)
+                        .WithMany("Options")
+                        .HasForeignKey("StudySessionQuestionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("FocusLens.Domain.StudySessions.StudySessionSelectedSection", b =>
                 {
                     b.HasOne("FocusLens.Domain.StudySessions.StudyMaterialSection", null)
@@ -1350,6 +1545,11 @@ namespace FocusLens.Infrastructure.Data.Migrations
                     b.Navigation("CompletedSections");
 
                     b.Navigation("Selection");
+                });
+
+            modelBuilder.Entity("FocusLens.Domain.StudySessions.StudySessionQuestion", b =>
+                {
+                    b.Navigation("Options");
                 });
 
             modelBuilder.Entity("FocusLens.Domain.StudySessions.StudySessionSelection", b =>

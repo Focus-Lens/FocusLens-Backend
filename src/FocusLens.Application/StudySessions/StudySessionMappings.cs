@@ -24,7 +24,8 @@ internal static class StudySessionMappings
             session.CompletedSections.Select(section => section.StudyMaterialSectionId).ToArray(),
             session.SelectedSubjectId,
             session.FocusDurationMinutes,
-            session.EstimatedStudyTimeMinutes);
+            session.EstimatedStudyTimeMinutes,
+            (int)Math.Floor(session.GetOvertimeDuration(utcNow).TotalSeconds));
     }
 
     public static StudyMaterialResponse ToResponse(this StudyMaterial material)

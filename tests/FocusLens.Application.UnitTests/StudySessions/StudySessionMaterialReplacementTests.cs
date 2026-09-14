@@ -204,6 +204,10 @@ public sealed class StudySessionMaterialReplacementTests
         Assert.Empty(fixture.ImageFileStore.SavedReferences);
     }
 
+    private static StudySessionImageUploadFile UploadFile(string fileName, byte[] content) =>
+        new(fileName, "application/octet-stream", content.Length,
+            _ => Task.FromResult<Stream>(new MemoryStream(content)));
+
     private sealed record Fixture(
         StudySessionCommandHandler Handler,
         StudySession Session,
@@ -249,8 +253,8 @@ public sealed class StudySessionMaterialReplacementTests
                 new InMemoryRepository<StudySession>(session),
                 materials,
                 selections,
-                new InMemoryRepository<StudyMaterialSection>(),
                 new InMemoryRepository<StudySessionSelectedSection>(),
+                new InMemoryRepository<StudyMaterialSection>(),
                 images,
                 fileStore,
                 imageFileStore,
@@ -263,10 +267,6 @@ public sealed class StudySessionMaterialReplacementTests
                 imageFileStore, unitOfWork);
         }
     }
-
-    private static StudySessionImageUploadFile UploadFile(string fileName, byte[] content) =>
-        new(fileName, "application/octet-stream", content.Length,
-            _ => Task.FromResult<Stream>(new MemoryStream(content)));
 
     private sealed class RecordingFileStore : IStudyMaterialFileStore
     {

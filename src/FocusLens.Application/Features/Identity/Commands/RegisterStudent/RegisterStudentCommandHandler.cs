@@ -1,5 +1,4 @@
 using System.Security.Cryptography;
-
 using FocusLens.Application.Common.Errors;
 using FocusLens.Application.Common.Interfaces;
 using FocusLens.Application.Features.Identity.Options;
@@ -16,15 +15,15 @@ namespace FocusLens.Application.Features.Identity.Commands.RegisterStudent;
 public sealed class RegisterStudentCommandHandler
     : IRequestHandler<RegisterStudentCommand, Result<Success>>
 {
-    private readonly IIdentityService _identityService;
-    private readonly IBaseRepository<Student> _studentRepository;
-    private readonly IBaseRepository<LegalDocument> _legalDocumentRepository;
-    private readonly IBaseRepository<UserTermsAcceptance> _termsAcceptanceRepository;
-    private readonly IUnitOfWork _unitOfWork;
     private readonly IEmailVerificationCodeStore _codeStore;
     private readonly IEmailSender _emailSender;
-    private readonly TimeProvider _timeProvider;
+    private readonly IIdentityService _identityService;
+    private readonly IBaseRepository<LegalDocument> _legalDocumentRepository;
     private readonly RegistrationOptions _registrationOptions;
+    private readonly IBaseRepository<Student> _studentRepository;
+    private readonly IBaseRepository<UserTermsAcceptance> _termsAcceptanceRepository;
+    private readonly TimeProvider _timeProvider;
+    private readonly IUnitOfWork _unitOfWork;
 
     public RegisterStudentCommandHandler(
         IIdentityService identityService,
@@ -143,10 +142,9 @@ public sealed class RegisterStudentCommandHandler
     private async Task<LegalDocument?> GetCurrentPublishedTermsAsync()
     {
         IEnumerable<LegalDocument> publishedDocuments =
-            await _legalDocumentRepository.GetAllAsync(
-                document => document.Audience == LegalDocumentAudience.Student
-                    && document.IsPublished
-                    && document.PublishedOnUtc != null);
+            await _legalDocumentRepository.GetAllAsync(document => document.Audience == LegalDocumentAudience.Student
+                                                                   && document.IsPublished
+                                                                   && document.PublishedOnUtc != null);
 
         return publishedDocuments
             .OrderByDescending(document => document.PublishedOnUtc)

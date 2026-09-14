@@ -13,11 +13,5 @@ public sealed record SetStudySessionDurationRequest(int FocusDurationMinutes);
 
 public sealed record SetStudySessionSelectionRequest(int FromPage, int ToPage);
 
-public sealed record UpdateStudySessionProgressRequest(
-    int? CurrentPage,
-    IReadOnlyCollection<Guid>? CompletedSectionIds);
+public sealed record UpdateStudySessionProgressRequest(int? CurrentPage);
 
-public sealed record StudyMaterialSectionRequest(string Name, int EstimatedDurationMinutes);
-
-public sealed record ReceiveStudySessionSectionsRequest(
-    IReadOnlyCollection<StudyMaterialSectionRequest> Sections);

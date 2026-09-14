@@ -16,6 +16,12 @@ public sealed class CustomWebApplicationFactory
     : WebApplicationFactory<Program>
 {
     private readonly string _databaseName = $"FocusLensTests-{Guid.NewGuid()}";
+    private readonly TimeProvider? _timeProvider;
+
+    public CustomWebApplicationFactory(DateTimeOffset? utcNow = null)
+    {
+        _timeProvider = utcNow is null ? null : new FixedTimeProvider(utcNow.Value);
+    }
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
@@ -27,6 +33,12 @@ public sealed class CustomWebApplicationFactory
             services.RemoveAll<IDbContextOptionsConfiguration<ApplicationDbContext>>();
             services.RemoveAll<ApplicationDbContext>();
             services.RemoveAll<IEmailSender>();
+
+            if (_timeProvider is not null)
+            {
+                services.RemoveAll<TimeProvider>();
+                services.AddSingleton(_timeProvider);
+            }
 
             services.AddDbContext<ApplicationDbContext>(options =>
                 options.UseInMemoryDatabase(_databaseName)
@@ -45,5 +57,10 @@ public sealed class CustomWebApplicationFactory
         await dbContext.Database.EnsureCreatedAsync();
         await seed(dbContext);
         await dbContext.SaveChangesAsync();
+    }
+
+    private sealed class FixedTimeProvider(DateTimeOffset utcNow) : TimeProvider
+    {
+        public override DateTimeOffset GetUtcNow() => utcNow;
     }
 }

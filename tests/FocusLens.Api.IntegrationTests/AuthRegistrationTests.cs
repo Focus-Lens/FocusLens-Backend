@@ -1,6 +1,5 @@
 using System.Net;
 using System.Net.Http.Json;
-
 using FocusLens.Domain;
 using FocusLens.Domain.Common.Constants;
 using FocusLens.Domain.Identity;
@@ -17,7 +16,7 @@ public class AuthRegistrationTests
     [Fact]
     public async Task IdentityPasswordPolicy_MatchesWebRequirements()
     {
-        await using var factory = new CustomWebApplicationFactory();
+        await using CustomWebApplicationFactory factory = new();
 
         IdentityOptions options = factory.Services
             .GetRequiredService<IOptions<IdentityOptions>>()
@@ -33,7 +32,7 @@ public class AuthRegistrationTests
     [Fact]
     public async Task RegisterStudent_ProvisionsStudentRoleEntityTermsAcceptanceAndTenMinuteCode()
     {
-        await using var factory = new CustomWebApplicationFactory();
+        await using CustomWebApplicationFactory factory = new();
         Guid currentTermsId = await SeedRegistrationDependenciesAsync(
             factory,
             LegalDocumentAudience.Student);
@@ -76,7 +75,7 @@ public class AuthRegistrationTests
     [Fact]
     public async Task RegisterParent_ProvisionsParentRoleAndEntity()
     {
-        await using var factory = new CustomWebApplicationFactory();
+        await using CustomWebApplicationFactory factory = new();
         Guid currentTermsId = await SeedRegistrationDependenciesAsync(
             factory,
             LegalDocumentAudience.Parent);
@@ -107,7 +106,7 @@ public class AuthRegistrationTests
         Assert.Contains(
             dbContext.UserRoles,
             userRole => userRole.UserId == user.Id
-                && userRole.RoleId == parentRole.Id);
+                        && userRole.RoleId == parentRole.Id);
         Assert.Single(dbContext.Parents);
         Assert.Empty(dbContext.Students);
 
@@ -119,7 +118,7 @@ public class AuthRegistrationTests
     [Fact]
     public async Task RegisterParent_WhenPasswordHasNoSymbol_ReturnsBadRequest()
     {
-        await using var factory = new CustomWebApplicationFactory();
+        await using CustomWebApplicationFactory factory = new();
         await SeedRegistrationDependenciesAsync(
             factory,
             LegalDocumentAudience.Parent);
@@ -145,7 +144,7 @@ public class AuthRegistrationTests
     public async Task Register_WhenTermsRejected_ReturnsBadRequestAndDoesNotCreateRecords(
         string endpoint)
     {
-        await using var factory = new CustomWebApplicationFactory();
+        await using CustomWebApplicationFactory factory = new();
         await SeedRegistrationDependenciesAsync(
             factory,
             endpoint.EndsWith("student", StringComparison.Ordinal)
@@ -184,13 +183,13 @@ public class AuthRegistrationTests
             audience,
             "2026-08-01",
             $"{audience} old terms",
-            isPublished: true,
+            true,
             new DateTimeOffset(2026, 8, 1, 0, 0, 0, TimeSpan.Zero));
         LegalDocument currentTerms = new(
             audience,
             "2026-09-04",
             $"{audience} terms",
-            isPublished: true,
+            true,
             new DateTimeOffset(2026, 9, 4, 0, 0, 0, TimeSpan.Zero));
 
         await factory.SeedAsync(db =>
@@ -206,10 +205,5 @@ public class AuthRegistrationTests
     }
 
     private static ApplicationRole CreateRole(string name)
-        => new()
-        {
-            Name = name,
-            NormalizedName = name.ToUpperInvariant(),
-            IsDefault = true
-        };
+        => new() { Name = name, NormalizedName = name.ToUpperInvariant(), IsDefault = true };
 }
