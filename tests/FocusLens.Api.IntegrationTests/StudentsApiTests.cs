@@ -48,7 +48,7 @@ public class StudentsApiTests
 
         using HttpClient client = CreateStudentClient(factory, userId);
         using StringContent content = new(
-            """{"goals":["FocusBetter"],"grade":"Grade10","subjects":[{"type":"Math","customName":null}],"studyPriorities":["StayFocused","ExamPreparation"],"studyTimeGoal":{"period":"Daily","targetMinutes":60,"days":["Monday","Tuesday","Wednesday","Thursday","Friday"],"startDate":null},"dateOfBirth":"2010-05-12"}""",
+            """{"goals":["FocusBetter"],"grade":"Grade10","subjects":[{"type":"Math","customName":null}],"studyPriorities":["StayFocused","ExamPreparation"],"studyTimeGoal":{"period":"Daily","targetMinutes":60,"days":["Monday","Tuesday","Wednesday","Thursday","Friday"],"startDate":"2026-09-14"},"dateOfBirth":"2010-05-12"}""",
             Encoding.UTF8,
             "application/json");
 

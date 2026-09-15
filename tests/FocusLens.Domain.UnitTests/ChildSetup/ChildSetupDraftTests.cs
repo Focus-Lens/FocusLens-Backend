@@ -77,7 +77,7 @@ public class ChildSetupDraftTests
                 StudyTimeGoalPeriod.Daily,
                 60,
                 [DayOfWeek.Monday],
-                null).Value;
+                new DateOnly(2026, 9, 14)).Value;
 
         draft.SetStudyTimeGoal(goal);
 

@@ -154,9 +154,14 @@ public sealed class StudySessionSetupApiTests
         return content;
     }
 
-    private static async Task AssertNoContentAsync(HttpResponseMessage response)
-    {
-        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
-        Assert.Equal(string.Empty, await response.Content.ReadAsStringAsync());
-    }
+   private static async Task AssertNoContentAsync(HttpResponseMessage response)
+{
+    string body = await response.Content.ReadAsStringAsync();
+
+    Assert.True(
+        response.StatusCode == HttpStatusCode.NoContent,
+        $"Expected NoContent, got {(int)response.StatusCode} ({response.StatusCode}). Body: {body}");
+
+    Assert.Equal(string.Empty, body);
+}
 }

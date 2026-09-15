@@ -21,8 +21,10 @@ public static class DependencyInjection
             });
 
         services.AddHttpContextAccessor();
+        services.AddDataProtection();
         services.AddScoped<ICurrentUser, CurrentUser>();
         services.AddScoped<IEmailVerificationCodeStore, EmailVerificationCodeStore>();
+        services.AddScoped<IChildSetupInvitationTokenProtector, ChildSetupInvitationTokenProtector>();
         services.AddScoped<IEmailSender, SmtpEmailSender>();
         services.AddSingleton<IInvitationUrlBuilder, InvitationUrlBuilder>();
         services.AddScoped<IGoogleTokenValidator, GoogleTokenValidator>();

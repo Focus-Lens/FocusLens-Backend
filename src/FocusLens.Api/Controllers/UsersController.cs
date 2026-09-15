@@ -1,7 +1,9 @@
 using FocusLens.Application.Features.Users.Commands.ChangePassword;
+using FocusLens.Application.Features.Users.Commands.DeleteCurrentUser;
 using FocusLens.Application.Features.Users.Commands.UpdateCurrentUser;
 using FocusLens.Application.Features.Users.Dtos;
 using FocusLens.Application.Features.Users.Queries.GetCurrentUser;
+using FocusLens.Application.Features.Users.Queries.GetCurrentUserAccountStatus;
 using FocusLens.Domain.Common.Results;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
@@ -33,6 +35,19 @@ public sealed class UsersController : ApiController
             Problem);
     }
 
+    [HttpGet("me/account-status")]
+    public async Task<IActionResult> GetCurrentUserAccountStatus(
+        CancellationToken cancellationToken)
+    {
+        Result<UserAccountStatusDto> result = await _sender.Send(
+            new GetCurrentUserAccountStatusQuery(),
+            cancellationToken);
+
+        return result.Match(
+            Ok,
+            Problem);
+    }
+
     [HttpPut("me")]
     public async Task<IActionResult> UpdateCurrentUser(
         UpdateCurrentUserCommand command,
@@ -55,5 +70,15 @@ public sealed class UsersController : ApiController
         return result.Match(
             _ => NoContent(),
             Problem);
+    }
+
+    [HttpDelete("me")]
+    public async Task<IActionResult> DeleteCurrentUser(CancellationToken cancellationToken)
+    {
+        Result<Success> result = await _sender.Send(
+            new DeleteCurrentUserCommand(),
+            cancellationToken);
+
+        return result.Match(_ => NoContent(), Problem);
     }
 }

@@ -24,6 +24,10 @@ public sealed class ChildSetupInvitationConfiguration
             .HasMaxLength(128)
             .IsRequired();
 
+        builder.Property(invitation => invitation.ProtectedToken)
+            .HasMaxLength(1024)
+            .IsRequired(false);
+
         builder.Property(invitation => invitation.ExpiresAtUtc)
             .IsRequired();
 

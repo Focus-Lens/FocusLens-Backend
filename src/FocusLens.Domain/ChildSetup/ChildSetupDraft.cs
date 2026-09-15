@@ -110,7 +110,7 @@ public sealed class ChildSetupDraft : AuditableEntity
         Status = ChildSetupStatus.Invited;
     }
 
-    public void ResetToDraft()
+       public void ResetToDraft()
     {
         if (Status != ChildSetupStatus.Invited)
         {
@@ -120,6 +120,8 @@ public sealed class ChildSetupDraft : AuditableEntity
 
         Status = ChildSetupStatus.Draft;
     }
+
+    public void MarkInvitationCancelled() => ResetToDraft();
 
     public void MarkClaimed(Guid studentId)
     {

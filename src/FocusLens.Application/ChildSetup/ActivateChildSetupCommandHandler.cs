@@ -37,6 +37,7 @@ public sealed class ActivateChildSetupCommandHandler(
 
         Student? student = await studentRepository.FirstOrDefaultAsync(
             item => item.UserId == userId,
+            item => item.User,
             item => item.Subjects);
 
         if (student is null)

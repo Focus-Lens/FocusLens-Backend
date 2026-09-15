@@ -44,6 +44,11 @@ public sealed record StudyTimeGoal
             return StudyTimeGoalErrors.TargetMinutesInvalid;
         }
 
+        if (startDate is null)
+        {
+            return StudyTimeGoalErrors.StartDateRequired;
+        }
+
         ArgumentNullException.ThrowIfNull(days);
 
         DayOfWeek[] values = days.ToArray();
@@ -63,9 +68,9 @@ public sealed record StudyTimeGoal
             return StudyTimeGoalErrors.DaysRequired;
         }
 
-        if (period == StudyTimeGoalPeriod.Weekly && values.Length > 0)
+        if (period == StudyTimeGoalPeriod.Weekly && values.Length != 1)
         {
-            return StudyTimeGoalErrors.DaysNotAllowed;
+            return StudyTimeGoalErrors.WeeklyStartDayRequired;
         }
 
         return new StudyTimeGoal(

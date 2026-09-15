@@ -9,6 +9,7 @@ using FocusLens.Application.Features.Identity.Commands.ResetPassword;
 using FocusLens.Application.Features.Identity.Commands.RevokeRefreshToken;
 using FocusLens.Application.Features.Identity.Commands.VerifyEmail;
 using FocusLens.Application.Features.Identity.Dtos;
+using FocusLens.Application.Features.Users.Commands.RestoreAccount;
 using FocusLens.Domain;
 using FocusLens.Domain.Common.Results;
 using MediatR;
@@ -172,6 +173,17 @@ public sealed class AuthController : ApiController
         return result.Match(
             _ => NoContent(),
             Problem);
+    }
+
+    [AllowAnonymous]
+    [HttpPost("restore-account")]
+    public async Task<IActionResult> RestoreAccount(
+        RestoreAccountCommand command,
+        CancellationToken cancellationToken)
+    {
+        Result<Success> result = await _sender.Send(command, cancellationToken);
+
+        return result.Match(_ => NoContent(), Problem);
     }
 
     public sealed record GoogleLoginRequest(string IdToken);

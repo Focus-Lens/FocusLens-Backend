@@ -1,8 +1,10 @@
 using FocusLens.Application.Students;
 using FocusLens.Application.UnitTests.Access;
 using FocusLens.Domain;
+using FocusLens.Domain.Access;
 using FocusLens.Domain.Common.Results;
 using FocusLens.Domain.Students;
+using FocusLens.Domain.Identity;
 using StudentDetailsResponse = FocusLens.Contracts.Students.StudentDetailsResponse;
 using ContractStudentGrade = FocusLens.Contracts.Students.StudentGrade;
 using UpdateStudentPreferencesRequest = FocusLens.Contracts.Students.UpdateStudentPreferencesRequest;
@@ -142,6 +144,8 @@ public class UpdateStudentPreferencesCommandHandlerTests
     {
         return new UpdateStudentPreferencesCommandHandler(
             new InMemoryRepository<Student>(student),
+            new InMemoryRepository<ParentStudentRelationship>(),
+            new FakeNotificationWriter(),
             new FakeCurrentUser(student.UserId),
             unitOfWork ?? new FakeUnitOfWork());
     }
@@ -149,6 +153,12 @@ public class UpdateStudentPreferencesCommandHandlerTests
     private static Student CreateStudentWithPreferences()
     {
         Student student = new(Guid.NewGuid());
+        student.SetPrivateProperty("User", new ApplicationUser
+        {
+            FirstName = "Test",
+            LastName = "Student",
+            Email = "test@example.com"
+        });
         student.CompleteOnboarding(
             new[] { StudentGoal.FocusBetter },
             StudentGrade.Grade10,

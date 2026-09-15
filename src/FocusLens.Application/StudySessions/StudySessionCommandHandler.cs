@@ -1,5 +1,6 @@
 using FocusLens.Contracts.StudySessions;
 using FocusLens.Application.Common.Interfaces;
+using FocusLens.Application.Notifications;
 using FocusLens.Domain;
 using FocusLens.Domain.Common.Interfaces;
 using FocusLens.Domain.Common.Results;
@@ -28,7 +29,8 @@ public sealed class StudySessionCommandHandler(
     ICurrentUser currentUser,
     IUnitOfWork unitOfWork,
     IOptions<StudySessionImageUploadOptions> imageUploadOptions,
-    TimeProvider timeProvider = null!)
+    TimeProvider timeProvider = null!,
+    StudyNotificationService? studyNotificationService = null)
     : IRequestHandler<CreateStudySessionCommand, Result<StudySessionResponse>>,
         IRequestHandler<SetStudySessionModeCommand, Result<Success>>,
         IRequestHandler<SetStudySessionSubjectCommand, Result<Success>>,

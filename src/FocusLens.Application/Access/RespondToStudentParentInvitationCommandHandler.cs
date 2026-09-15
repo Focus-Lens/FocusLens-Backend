@@ -6,17 +6,19 @@ using FocusLens.Domain;
 using FocusLens.Domain.Access;
 using FocusLens.Domain.Common.Interfaces;
 using FocusLens.Domain.Common.Results;
+using FocusLens.Domain.Notifications;
 using MediatR;
 
 namespace FocusLens.Application.Access;
 
 public sealed class RespondToStudentParentInvitationCommandHandler(
     IBaseRepository<Parent> parentRepository,
-    IBaseRepository<StudentParentInvitation> invitationRepository,
-    IBaseRepository<ParentStudentRelationship> relationshipRepository,
-    ICurrentUser currentUser,
-    IUnitOfWork unitOfWork,
-    TimeProvider timeProvider)
+        IBaseRepository<StudentParentInvitation> invitationRepository,
+        IBaseRepository<ParentStudentRelationship> relationshipRepository,
+        ICurrentUser currentUser,
+        IUnitOfWork unitOfWork,
+        TimeProvider timeProvider,
+        INotificationWriter? notificationWriter = null)
     : IRequestHandler<RespondToStudentParentInvitationCommand, Result<InvitationResponse>>
 {
     public async Task<Result<InvitationResponse>> Handle(
@@ -39,7 +41,8 @@ public sealed class RespondToStudentParentInvitationCommandHandler(
         Parent? parent = await parentRepository.FirstOrDefaultAsync(item => item.UserId == userId);
         StudentParentInvitation? invitation = await invitationRepository.FirstOrDefaultAsync(
             item => item.TokenHash == tokenHash,
-            item => item.Student);
+            item => item.Student,
+            item => item.Student.User);
 
         if (parent is null || invitation is null)
         {
@@ -114,6 +117,23 @@ public sealed class RespondToStudentParentInvitationCommandHandler(
         relationship.Accept(now);
         invitation.Accept(now);
         invitationRepository.Update(invitation);
+        if (notificationWriter is not null)
+        {
+            if (!invitation.Student.User.IsDisabled &&
+                invitation.Student.User.DeletedAtUtc is null)
+            {
+                await notificationWriter.AddAsync(
+                    invitation.Student.UserId,
+                    NotificationAudience.Student,
+                    NotificationCategory.ParentConnectionConfirmed,
+                    "Parent connection confirmed",
+                    "Your invited parent accepted your connection request.",
+                    "/access/parents",
+                    "View connection",
+                    $"relationship:{relationship.Id}:confirmed:student");
+            }
+        }
+
         await unitOfWork.SaveChangesAsync();
 
         return relationship.ToResponse();

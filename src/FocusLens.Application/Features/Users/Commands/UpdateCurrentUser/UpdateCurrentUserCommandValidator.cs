@@ -14,5 +14,9 @@ public sealed class UpdateCurrentUserCommandValidator
         RuleFor(command => command.LastName)
             .NotEmpty()
             .MaximumLength(100);
+
+        RuleFor(command => command.PhoneNumber)
+            .MaximumLength(32)
+            .When(command => command.PhoneNumber is not null);
     }
 }

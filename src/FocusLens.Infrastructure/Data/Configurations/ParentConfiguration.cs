@@ -15,6 +15,8 @@ public class ParentConfiguration : IEntityTypeConfiguration<Parent>
         builder.Property(parent => parent.UserId)
             .IsRequired();
 
+        builder.Property(parent => parent.WeekStartsOn);
+
         builder.HasIndex(parent => parent.UserId)
             .IsUnique();
 

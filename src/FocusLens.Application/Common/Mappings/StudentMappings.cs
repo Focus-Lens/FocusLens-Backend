@@ -33,7 +33,12 @@ internal static class StudentMappings
         return new StudentDetailsResponse(
             student.Id,
             student.UserId,
+            student.User.FirstName,
+            student.User.LastName,
+            student.User.Email ?? string.Empty,
+            student.User.PhoneNumber,
             student.PreferredName,
+            student.ProfileImageStorageReference,
             student.DateOfBirth,
             student.Goals
                 .Select(StudentEnumMapper.ToContract)
@@ -57,6 +62,9 @@ internal static class StudentMappings
                     student.StudyTimeGoal.TargetMinutes,
                     student.StudyTimeGoal.Days,
                     student.StudyTimeGoal.StartDate),
+            student.ShareSessionSummariesWithParents,
+            student.ShareSubjectTrendsWithParents,
+            false,
             student.IsOnboardingCompleted);
     }
 }

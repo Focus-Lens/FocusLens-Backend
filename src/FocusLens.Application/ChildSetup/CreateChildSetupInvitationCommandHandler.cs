@@ -20,6 +20,7 @@ public sealed class CreateChildSetupInvitationCommandHandler(
     IUnitOfWork unitOfWork,
     IEmailSender emailSender,
     IInvitationUrlBuilder invitationUrlBuilder,
+    IChildSetupInvitationTokenProtector tokenProtector,
     TimeProvider timeProvider
 ) : IRequestHandler<CreateChildSetupInvitationCommand, Result<ChildSetupInvitationResponse>>
 {
@@ -87,6 +88,13 @@ public sealed class CreateChildSetupInvitationCommandHandler(
             );
         }
 
+        if (parent.WeekStartsOn is null)
+        {
+            return Error.Validation(
+                "ChildSetup.WeekStartsOnRequired",
+                "Choose a week start day before sending a child setup invitation.");
+        }
+
         if (!IsComplete(draft))
         {
             return Error.Validation(
@@ -98,9 +106,15 @@ public sealed class CreateChildSetupInvitationCommandHandler(
         string normalizedEmail = childEmail.ToUpperInvariant();
         string token = CreateToken();
         string tokenHash = HashToken(token);
+        string protectedToken = tokenProtector.Protect(token);
         DateTimeOffset expiresAtUtc = timeProvider.GetUtcNow().Add(InvitationLifetime);
 
-        ChildSetupInvitation invitation = new(draft.Id, normalizedEmail, tokenHash, expiresAtUtc);
+        ChildSetupInvitation invitation = new(
+            draft.Id,
+            normalizedEmail,
+            tokenHash,
+            expiresAtUtc,
+            protectedToken);
 
         invitationRepository.Add(invitation);
         draft.MarkInvited();

@@ -1,4 +1,5 @@
 using FocusLens.Application.Common.Mappings;
+using FocusLens.Application.Parents;
 using FocusLens.Contracts.ChildSetup;
 using FocusLens.Contracts.Students;
 using FocusLens.Domain;
@@ -130,6 +131,7 @@ public sealed class UpdateChildSetupDraftCommandHandler(
 
         if (!TryCreateStudyTimeGoal(
                 request.Request.StudyTimeGoal,
+                parent.WeekStartsOn,
                 out StudyTimeGoal? studyTimeGoal,
                 out Error? studyTimeGoalError))
         {
@@ -154,7 +156,7 @@ public sealed class UpdateChildSetupDraftCommandHandler(
 
         await unitOfWork.SaveChangesAsync();
 
-        return ToResponse(draft);
+        return ToResponse(draft, parent.WeekStartsOn);
     }
 
     private static bool AreValidSubjects(
@@ -248,6 +250,7 @@ public sealed class UpdateChildSetupDraftCommandHandler(
 
     private static bool TryCreateStudyTimeGoal(
         StudyTimeGoalRequest? request,
+        DayOfWeek? weekStartsOn,
         out StudyTimeGoal? goal,
         out Error? error)
     {
@@ -279,10 +282,20 @@ public sealed class UpdateChildSetupDraftCommandHandler(
             Enum.Parse<StudyTimeGoalPeriod>(
                 request.Period.ToString());
 
+        if (period == StudyTimeGoalPeriod.Weekly && weekStartsOn is null)
+        {
+            error = Error.Validation(
+                "ChildSetup.WeekStartsOnRequired",
+                "Choose a week start day before setting up a weekly study-time goal.");
+            return false;
+        }
+
         Result<StudyTimeGoal> result = StudyTimeGoal.Create(
             period,
             request.TargetMinutes,
-            request.Days ?? [],
+            period == StudyTimeGoalPeriod.Weekly
+                ? [weekStartsOn!.Value]
+                : request.Days ?? [],
             request.StartDate);
 
         if (result.IsError)
@@ -310,7 +323,8 @@ public sealed class UpdateChildSetupDraftCommandHandler(
     }
 
     private static ChildSetupDraftResponse ToResponse(
-        ChildSetupDraft draft)
+        ChildSetupDraft draft,
+        DayOfWeek? weekStartsOn)
     {
         return new ChildSetupDraftResponse(
             draft.Id,
@@ -335,7 +349,9 @@ public sealed class UpdateChildSetupDraftCommandHandler(
                 : new StudyTimeGoalResponse(
                     draft.StudyTimeGoal.Period.ToString(),
                     draft.StudyTimeGoal.TargetMinutes,
-                    draft.StudyTimeGoal.Days,
+                    weekStartsOn is DayOfWeek value
+                        ? ParentWeekdayOrder.OrderDays(draft.StudyTimeGoal.Days, value)
+                        : draft.StudyTimeGoal.Days,
                     draft.StudyTimeGoal.StartDate));
     }
 }

@@ -8,6 +8,8 @@ public sealed class UpdateStudentPreferencesRequest
     private IReadOnlyCollection<StudentGoal>? _goals;
     private StudentGrade? _grade;
     private string? _preferredName;
+    private bool? _shareSessionSummariesWithParents;
+    private bool? _shareSubjectTrendsWithParents;
     private IReadOnlyCollection<StudyPriority>? _studyPriorities;
     private StudyTimeGoalRequest? _studyTimeGoal;
     private IReadOnlyCollection<StudentSubjectRequest>? _subjects;
@@ -82,6 +84,26 @@ public sealed class UpdateStudentPreferencesRequest
         }
     }
 
+    public bool? ShareSessionSummariesWithParents
+    {
+        get => _shareSessionSummariesWithParents;
+        set
+        {
+            ShareSessionSummariesWithParentsProvided = true;
+            _shareSessionSummariesWithParents = value;
+        }
+    }
+
+    public bool? ShareSubjectTrendsWithParents
+    {
+        get => _shareSubjectTrendsWithParents;
+        set
+        {
+            ShareSubjectTrendsWithParentsProvided = true;
+            _shareSubjectTrendsWithParents = value;
+        }
+    }
+
     [JsonIgnore] public bool DateOfBirthProvided { get; private set; }
 
     [JsonIgnore] public bool GoalsProvided { get; private set; }
@@ -95,4 +117,8 @@ public sealed class UpdateStudentPreferencesRequest
     [JsonIgnore] public bool PreferredNameProvided { get; private set; }
 
     [JsonIgnore] public bool SubjectsProvided { get; private set; }
+
+    [JsonIgnore] public bool ShareSessionSummariesWithParentsProvided { get; private set; }
+
+    [JsonIgnore] public bool ShareSubjectTrendsWithParentsProvided { get; private set; }
 }

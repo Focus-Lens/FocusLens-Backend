@@ -23,6 +23,7 @@ public sealed class GetMyStudentQueryHandler(
 
         Student? student = await studentRepository.FirstOrDefaultAsync(
             student => student.UserId == userId,
+            student => student.User,
             student => student.Subjects);
 
         return student?.ToDetailsResponse();

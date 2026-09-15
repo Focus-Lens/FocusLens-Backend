@@ -100,7 +100,7 @@ public class StudySessionTests
         Assert.True(session.Resume(startedAt.AddMinutes(20)).IsSuccess);
 
         Assert.Equal(StudySessionStatus.Active, session.Status);
-        Assert.Equal(TimeSpan.FromMinutes(10), session.GetRemainingDuration(startedAt.AddMinutes(25)));
+        Assert.Equal(TimeSpan.Zero, session.GetRemainingDuration(startedAt.AddMinutes(25)));
     }
 
     [Fact]
@@ -149,7 +149,7 @@ public class StudySessionTests
     }
 
     [Fact]
-    public void PausedSession_PreservesRemainingFocusTime()
+    public void PausedSession_PreservesRemainingEstimatedTime()
     {
         StudySession session = CreateReadyDigitalSession();
         DateTimeOffset startedAt = new(2026, 9, 7, 10, 0, 0, TimeSpan.Zero);
@@ -158,7 +158,7 @@ public class StudySessionTests
         session.Pause(startedAt.AddMinutes(10));
 
         Assert.Equal(StudySessionStatus.Paused, session.Status);
-        Assert.Equal(TimeSpan.FromMinutes(15), session.GetRemainingDuration(startedAt.AddHours(1)));
+        Assert.Equal(TimeSpan.FromMinutes(5), session.GetRemainingDuration(startedAt.AddHours(1)));
     }
 
     [Fact]

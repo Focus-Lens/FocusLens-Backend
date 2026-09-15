@@ -1,8 +1,11 @@
 using FocusLens.Application.Common.Mappings;
+using FocusLens.Application.Common.Interfaces;
 using FocusLens.Contracts.Students;
 using FocusLens.Domain;
+using FocusLens.Domain.Access;
 using FocusLens.Domain.Common.Interfaces;
 using FocusLens.Domain.Common.Results;
+using FocusLens.Domain.Notifications;
 using FocusLens.Domain.Students;
 using MediatR;
 using ContractStudentGrade = FocusLens.Contracts.Students.StudentGrade;
@@ -15,6 +18,8 @@ namespace FocusLens.Application.Students;
 
 public sealed class UpdateStudentPreferencesCommandHandler(
     IBaseRepository<Student> studentRepository,
+    IBaseRepository<ParentStudentRelationship> relationshipRepository,
+    INotificationWriter notificationWriter,
     ICurrentUser currentUser,
     IUnitOfWork unitOfWork)
     : IRequestHandler<UpdateStudentPreferencesCommand, Result<StudentDetailsResponse>>
@@ -39,6 +44,7 @@ public sealed class UpdateStudentPreferencesCommandHandler(
 
         Student? student = await studentRepository.FirstOrDefaultAsync(
             item => item.UserId == userId,
+            item => item.User,
             item => item.Subjects);
 
         if (student is null)
@@ -76,9 +82,43 @@ public sealed class UpdateStudentPreferencesCommandHandler(
             return preferredNameError!.Value;
         }
 
+        bool sharingChanged = WillUpdateSharingPreferences(student, request.Request);
+        if (!TryUpdateSharingPreferences(student, request.Request, out Error? sharingError))
+        {
+            return sharingError!.Value;
+        }
+
         if (!TryUpdateSubjects(student, request.Request, out Error? subjectsError))
         {
             return subjectsError!.Value;
+        }
+
+        if (sharingChanged)
+        {
+            IEnumerable<ParentStudentRelationship> relationships =
+                await relationshipRepository.GetAllAsync(
+                    relationship => relationship.StudentId == student.Id &&
+                                    relationship.Status == RelationshipStatus.Active,
+                    relationship => relationship.Parent,
+                    relationship => relationship.Parent.User);
+
+            foreach (ParentStudentRelationship relationship in relationships)
+            {
+                if (relationship.Parent.User.IsDisabled || relationship.Parent.User.DeletedAtUtc is not null)
+                {
+                    continue;
+                }
+
+                await notificationWriter.AddAsync(
+                    relationship.Parent.UserId,
+                    NotificationAudience.Parent,
+                    NotificationCategory.PrivacyInformationUpdated,
+                    "Privacy information updated",
+                    "A connected student updated what study information is shared with you.",
+                    $"/parents/students/{student.Id}/dashboard",
+                    "View student",
+                    $"student:{student.Id}:privacy:{DateTimeOffset.UtcNow.Ticks}:parent:{relationship.Parent.UserId}");
+            }
         }
 
         await unitOfWork.SaveChangesAsync();
@@ -94,6 +134,8 @@ public sealed class UpdateStudentPreferencesCommandHandler(
                || request.StudyTimeGoalProvided
                || request.GradeProvided
                || request.PreferredNameProvided
+               || request.ShareSessionSummariesWithParentsProvided
+               || request.ShareSubjectTrendsWithParentsProvided
                || request.SubjectsProvided;
     }
 
@@ -286,6 +328,42 @@ public sealed class UpdateStudentPreferencesCommandHandler(
 
         student.ReplaceSubjects(requests.Select(MapSubject));
         return true;
+    }
+
+    private static bool TryUpdateSharingPreferences(
+        Student student,
+        UpdateStudentPreferencesRequest request,
+        out Error? error)
+    {
+        error = null;
+
+        if (!request.ShareSessionSummariesWithParentsProvided &&
+            !request.ShareSubjectTrendsWithParentsProvided)
+        {
+            return true;
+        }
+
+        student.SetParentSharingPreferences(
+            request.ShareSessionSummariesWithParentsProvided
+                ? request.ShareSessionSummariesWithParents!.Value
+                : student.ShareSessionSummariesWithParents,
+            request.ShareSubjectTrendsWithParentsProvided
+                ? request.ShareSubjectTrendsWithParents!.Value
+                : student.ShareSubjectTrendsWithParents);
+
+        return true;
+    }
+
+    private static bool WillUpdateSharingPreferences(Student student, UpdateStudentPreferencesRequest request)
+    {
+        bool summariesChanged = request.ShareSessionSummariesWithParentsProvided &&
+                                request.ShareSessionSummariesWithParents !=
+                                student.ShareSessionSummariesWithParents;
+        bool trendsChanged = request.ShareSubjectTrendsWithParentsProvided &&
+                             request.ShareSubjectTrendsWithParents !=
+                             student.ShareSubjectTrendsWithParents;
+
+        return summariesChanged || trendsChanged;
     }
 
     private static bool TryUpdatePreferredName(Student student, UpdateStudentPreferencesRequest request,

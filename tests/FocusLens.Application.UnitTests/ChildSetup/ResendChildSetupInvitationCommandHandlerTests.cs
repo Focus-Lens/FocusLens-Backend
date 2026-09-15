@@ -38,6 +38,7 @@ public sealed class ResendChildSetupInvitationCommandHandlerTests
             new FakeUnitOfWork(),
             emailSender,
             new FakeInvitationUrlBuilder(),
+            new FakeChildSetupInvitationTokenProtector(),
             TimeProvider.System);
 
         DateTimeOffset oldExpiry = invitation.ExpiresAtUtc;
@@ -94,6 +95,7 @@ public sealed class ResendChildSetupInvitationCommandHandlerTests
             new FakeUnitOfWork(),
             emailSender,
             new FakeInvitationUrlBuilder(),
+            new FakeChildSetupInvitationTokenProtector(),
             TimeProvider.System);
 
         Result<ChildSetupInvitationResponse> result =
@@ -123,6 +125,7 @@ public sealed class ResendChildSetupInvitationCommandHandlerTests
             new FakeUnitOfWork(),
             emailSender,
             new FakeInvitationUrlBuilder(),
+            new FakeChildSetupInvitationTokenProtector(),
             TimeProvider.System);
 
         Result<ChildSetupInvitationResponse> result =

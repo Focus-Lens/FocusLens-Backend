@@ -19,6 +19,7 @@ public sealed class ResendChildSetupInvitationCommandHandler(
     IUnitOfWork unitOfWork,
     IEmailSender emailSender,
     IInvitationUrlBuilder invitationUrlBuilder,
+    IChildSetupInvitationTokenProtector tokenProtector,
     TimeProvider timeProvider)
     : IRequestHandler<ResendChildSetupInvitationCommand, Result<ChildSetupInvitationResponse>>
 {
@@ -82,10 +83,11 @@ public sealed class ResendChildSetupInvitationCommandHandler(
             RandomNumberGenerator.GetBytes(32));
         string tokenHash = Convert.ToHexString(
             SHA256.HashData(Encoding.UTF8.GetBytes(token)));
+        string protectedToken = tokenProtector.Protect(token);
         DateTimeOffset expiresAtUtc =
             timeProvider.GetUtcNow().Add(InvitationLifetime);
 
-        invitation.Renew(tokenHash, expiresAtUtc);
+        invitation.Renew(tokenHash, expiresAtUtc, protectedToken);
         invitationRepository.Update(invitation);
         await unitOfWork.SaveChangesAsync();
 

@@ -18,5 +18,17 @@ public class Parent : AuditableEntity
 
     public Guid UserId { get; private set; }
 
+    public DayOfWeek? WeekStartsOn { get; private set; }
+
     public ApplicationUser User { get; private set; } = null!;
+
+    public void SetWeekStartsOn(DayOfWeek weekStartsOn)
+    {
+        if (!Enum.IsDefined(weekStartsOn))
+        {
+            throw new ArgumentOutOfRangeException(nameof(weekStartsOn), weekStartsOn, "Week start day is invalid.");
+        }
+
+        WeekStartsOn = weekStartsOn;
+    }
 }

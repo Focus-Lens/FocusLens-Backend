@@ -97,9 +97,18 @@ public sealed class ProgressQueryHandler(
 
         ParentStudentRelationship? relationship = await relationshipRepository.FirstOrDefaultAsync(item =>
             item.ParentId == parent.Id && item.StudentId == studentId && item.Status == RelationshipStatus.Active);
-        return relationship is null
-            ? null
-            : await studentRepository.FirstOrDefaultAsync(student => student.Id == studentId, student => student.Subjects);
+        if (relationship is null)
+        {
+            return null;
+        }
+
+        Student? connectedStudent = await studentRepository.FirstOrDefaultAsync(
+            student => student.Id == studentId,
+            student => student.Subjects);
+
+        return connectedStudent?.ShareSubjectTrendsWithParents == true
+            ? connectedStudent
+            : null;
     }
 
     private DateRange? ResolveRange(GetProgressQuery request)

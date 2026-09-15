@@ -41,6 +41,9 @@ public sealed class UpdateCurrentUserCommandHandler
 
         user.FirstName = request.FirstName.Trim();
         user.LastName = request.LastName.Trim();
+        user.PhoneNumber = string.IsNullOrWhiteSpace(request.PhoneNumber)
+            ? null
+            : request.PhoneNumber.Trim();
 
         IdentityResultSummary updateResult = await _identityService.UpdateAsync(user);
 

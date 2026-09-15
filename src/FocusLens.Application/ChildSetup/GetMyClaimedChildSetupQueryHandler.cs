@@ -1,4 +1,5 @@
 using FocusLens.Application.Common.Mappings;
+using FocusLens.Application.Parents;
 using FocusLens.Contracts.ChildSetup;
 using FocusLens.Contracts.Students;
 using FocusLens.Domain;
@@ -13,6 +14,7 @@ namespace FocusLens.Application.ChildSetup;
 public sealed class GetMyClaimedChildSetupQueryHandler(
     IBaseRepository<Student> studentRepository,
     IBaseRepository<ChildSetupDraft> draftRepository,
+    IBaseRepository<Parent> parentRepository,
     ICurrentUser currentUser)
     : IRequestHandler<GetMyClaimedChildSetupQuery, Result<ChildSetupDraftResponse>>
 {
@@ -47,6 +49,8 @@ public sealed class GetMyClaimedChildSetupQueryHandler(
                 "The current student does not have a claimed child setup.");
         }
 
+        Parent? parent = await parentRepository.GetByIdAsync(draft.ParentId);
+
         return new ChildSetupDraftResponse(
             draft.Id,
             draft.Status.ToString(),
@@ -70,7 +74,9 @@ public sealed class GetMyClaimedChildSetupQueryHandler(
                 : new StudyTimeGoalResponse(
                     draft.StudyTimeGoal.Period.ToString(),
                     draft.StudyTimeGoal.TargetMinutes,
-                    draft.StudyTimeGoal.Days,
+                    parent?.WeekStartsOn is DayOfWeek weekStartsOn
+                        ? ParentWeekdayOrder.OrderDays(draft.StudyTimeGoal.Days, weekStartsOn)
+                        : draft.StudyTimeGoal.Days,
                     draft.StudyTimeGoal.StartDate));
     }
 }

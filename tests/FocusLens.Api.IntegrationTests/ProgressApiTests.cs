@@ -5,6 +5,7 @@ using FocusLens.Domain;
 using FocusLens.Domain.Access;
 using FocusLens.Domain.Students;
 using FocusLens.Domain.StudySessions;
+using FocusLens.Domain.Identity;
 
 namespace FocusLens.Api.IntegrationTests;
 
@@ -22,6 +23,7 @@ public sealed class ProgressApiTests
 
         await factory.SeedAsync(db =>
         {
+            db.Users.Add(new ApplicationUser { Id = userId, FirstName = "Test", LastName = "Student" });
             db.Students.Add(student);
             db.StudySessions.AddRange(first, second, third);
             return Task.CompletedTask;
@@ -55,6 +57,7 @@ public sealed class ProgressApiTests
         await using CustomWebApplicationFactory factory = new();
         Student child = CreateStudent(Guid.NewGuid(), out StudentSubject math, out _);
         StudySession session = CreateHistoricalSession(child, math, At(2026, 9, 1), StudySessionStatus.Completed);
+        child.SetParentSharingPreferences(false, true);
         Student unlinkedChild = CreateStudent(Guid.NewGuid(), out _, out _);
         Guid parentUserId = Guid.NewGuid();
         Parent parent = new(parentUserId);
@@ -63,6 +66,10 @@ public sealed class ProgressApiTests
 
         await factory.SeedAsync(db =>
         {
+            db.Users.AddRange(
+                new ApplicationUser { Id = parentUserId, FirstName = "Test", LastName = "Parent" },
+                new ApplicationUser { Id = child.UserId, FirstName = "Test", LastName = "Student" },
+                new ApplicationUser { Id = unlinkedChild.UserId, FirstName = "Test", LastName = "Student" });
             db.Students.AddRange(child, unlinkedChild);
             db.Parents.Add(parent);
             db.ParentStudentRelationships.Add(relationship);
@@ -94,6 +101,7 @@ public sealed class ProgressApiTests
 
         await factory.SeedAsync(db =>
         {
+            db.Users.Add(new ApplicationUser { Id = userId, FirstName = "Test", LastName = "Student" });
             db.Students.Add(student);
             db.StudySessions.AddRange(first, second);
             db.StudySessionQuestions.AddRange(oneQuestion, secondQuestion, thirdQuestion);
@@ -126,6 +134,7 @@ public sealed class ProgressApiTests
 
         await factory.SeedAsync(db =>
         {
+            db.Users.Add(new ApplicationUser { Id = userId, FirstName = "Test", LastName = "Student" });
             db.Students.Add(student);
             db.StudySessions.AddRange(recent, older);
             return Task.CompletedTask;
@@ -155,6 +164,7 @@ public sealed class ProgressApiTests
             new DateTimeOffset(2026, 9, 1, 23, 30, 0, TimeSpan.Zero), StudySessionStatus.Completed);
         await factory.SeedAsync(db =>
         {
+            db.Users.Add(new ApplicationUser { Id = userId, FirstName = "Test", LastName = "Student" });
             db.Students.Add(student);
             db.StudySessions.Add(boundary);
             return Task.CompletedTask;

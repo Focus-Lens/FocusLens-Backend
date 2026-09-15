@@ -1,4 +1,5 @@
 using FocusLens.Application.Common.Interfaces;
+using FocusLens.Application.Notifications;
 using FocusLens.Contracts.StudySessions;
 using FocusLens.Domain;
 using FocusLens.Domain.Common.Interfaces;
@@ -17,7 +18,8 @@ public sealed class StudySessionQuestionHandler(
     ICurrentUser currentUser,
     IFocusLensAiClient aiClient,
     IUnitOfWork unitOfWork,
-    TimeProvider timeProvider)
+    TimeProvider timeProvider,
+    StudyNotificationService? studyNotificationService = null)
     : IRequestHandler<GetCurrentStudySessionQuestionQuery, StudySessionCurrentQuestionResponse?>,
       IRequestHandler<SubmitStudySessionQuestionAnswerCommand, Result<StudySessionQuestionAnswerResponse>>,
       IRequestHandler<GenerateStudySessionQuestionExplanationCommand, Result<StudySessionQuestionExplanationResponse>>,
@@ -349,6 +351,11 @@ public sealed class StudySessionQuestionHandler(
                 if (completeResult.IsError)
                 {
                     return completeResult.TopError;
+                }
+
+                if (studyNotificationService is not null)
+                {
+                    await studyNotificationService.NotifySessionCompletedAsync(session.Id, session.StudentId);
                 }
             }
 
