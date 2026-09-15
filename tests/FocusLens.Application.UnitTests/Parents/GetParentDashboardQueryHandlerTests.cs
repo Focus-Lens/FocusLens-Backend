@@ -92,6 +92,7 @@ public sealed class GetParentDashboardQueryHandlerTests
                 previousPeriodSession,
                 otherStudentSession
             ),
+            new InMemoryRepository<StudySessionBehaviorWindow>(),
             new FakeCurrentUser(parentUserId),
             new FixedTimeProvider(Now)
         );
@@ -196,6 +197,7 @@ public sealed class GetParentDashboardQueryHandlerTests
             new InMemoryRepository<Student>(student),
             new InMemoryRepository<StudyGoalProposal>(),
             new InMemoryRepository<StudySession>(session, previousDaySession),
+            new InMemoryRepository<StudySessionBehaviorWindow>(),
             new FakeCurrentUser(parentUserId),
             new FixedTimeProvider(Now)
         );
@@ -280,6 +282,7 @@ public sealed class GetParentDashboardQueryHandlerTests
                 periodStartSession,
                 crossingMidnightSession
             ),
+            new InMemoryRepository<StudySessionBehaviorWindow>(),
             new FakeCurrentUser(parentUserId),
             new FixedTimeProvider(Now)
         );
@@ -364,6 +367,7 @@ public sealed class GetParentDashboardQueryHandlerTests
             new InMemoryRepository<Student>(student),
             new InMemoryRepository<StudyGoalProposal>(),
             new InMemoryRepository<StudySession>(priorDaySession, weekStartSession),
+            new InMemoryRepository<StudySessionBehaviorWindow>(),
             new FakeCurrentUser(parentUserId),
             new FixedTimeProvider(new DateTimeOffset(2026, 9, 19, 12, 0, 0, TimeSpan.Zero))
         );
@@ -421,6 +425,7 @@ public sealed class GetParentDashboardQueryHandlerTests
             new InMemoryRepository<Student>(student),
             new InMemoryRepository<StudyGoalProposal>(),
             new InMemoryRepository<StudySession>(periodEndSession, nextWeekSession),
+            new InMemoryRepository<StudySessionBehaviorWindow>(),
             new FakeCurrentUser(parentUserId),
             new FixedTimeProvider(new DateTimeOffset(2026, 9, 25, 12, 0, 0, TimeSpan.Zero))
         );
@@ -463,6 +468,7 @@ public sealed class GetParentDashboardQueryHandlerTests
             new InMemoryRepository<Student>(student),
             new InMemoryRepository<StudyGoalProposal>(),
             new InMemoryRepository<StudySession>(crossingMidnight),
+            new InMemoryRepository<StudySessionBehaviorWindow>(),
             new FakeCurrentUser(parentUserId),
             new FixedTimeProvider(utcNow)
         );
@@ -502,6 +508,7 @@ public sealed class GetParentDashboardQueryHandlerTests
             new InMemoryRepository<Student>(student),
             new InMemoryRepository<StudyGoalProposal>(),
             new InMemoryRepository<StudySession>(),
+            new InMemoryRepository<StudySessionBehaviorWindow>(),
             new FakeCurrentUser(parentUserId),
             new FixedTimeProvider(Now)
         );
@@ -532,6 +539,7 @@ public sealed class GetParentDashboardQueryHandlerTests
             new InMemoryRepository<Student>(student),
             new InMemoryRepository<StudyGoalProposal>(),
             new InMemoryRepository<StudySession>(),
+            new InMemoryRepository<StudySessionBehaviorWindow>(),
             new FakeCurrentUser(parentUserId),
             new FixedTimeProvider(Now)
         );
@@ -856,6 +864,7 @@ public sealed class GetParentDashboardQueryHandlerTests
             new InMemoryRepository<Student>(),
             new InMemoryRepository<StudyGoalProposal>(),
             new InMemoryRepository<StudySession>(),
+            new InMemoryRepository<StudySessionBehaviorWindow>(),
             new FakeCurrentUser(parentUserId),
             new FixedTimeProvider(Now)
         );
@@ -971,4 +980,94 @@ public sealed class GetParentDashboardQueryHandlerTests
     {
         public override DateTimeOffset GetUtcNow() => utcNow;
     }
+    [Fact]
+public async Task Handle_WhenBehaviorScoresExist_ReturnsRoundedAverageFocusQuality()
+{
+    Guid parentUserId = Guid.NewGuid();
+    Parent parent = CreateParent(parentUserId);
+    Student student = new(Guid.NewGuid());
+    student.SetParentSharingPreferences(true, true);
+
+    ParentStudentRelationship relationship = new(parent.Id, student.Id);
+    relationship.Accept();
+
+    StudySession session = CreateCompletedSession(
+        student.Id,
+        Guid.NewGuid(),
+        new DateTimeOffset(2026, 9, 20, 10, 0, 0, TimeSpan.Zero),
+        30
+    );
+
+    StudySessionBehaviorWindow firstWindow = StudySessionBehaviorWindow.Create(
+        session.Id, 1, Now.AddMinutes(-30), Now.AddMinutes(-15), false
+    ).Value;
+    Assert.True(firstWindow.RecordAnalysis(70, null, null, null, null, null, null, false).IsSuccess);
+
+    StudySessionBehaviorWindow secondWindow = StudySessionBehaviorWindow.Create(
+        session.Id, 2, Now.AddMinutes(-15), Now, true
+    ).Value;
+    Assert.True(secondWindow.RecordAnalysis(81, null, null, null, null, null, null, false).IsSuccess);
+
+    GetParentDashboardQueryHandler handler = new(
+        new InMemoryRepository<Parent>(parent),
+        new InMemoryRepository<ParentStudentRelationship>(relationship),
+        new InMemoryRepository<Student>(student),
+        new InMemoryRepository<StudyGoalProposal>(),
+        new InMemoryRepository<StudySession>(session),
+        new InMemoryRepository<StudySessionBehaviorWindow>(firstWindow, secondWindow),
+        new FakeCurrentUser(parentUserId),
+        new FixedTimeProvider(Now)
+    );
+
+    Result<ParentDashboardResponse> result = await handler.Handle(
+        new GetParentDashboardQuery(student.Id),
+        CancellationToken.None
+    );
+
+    Assert.True(result.IsSuccess);
+    Assert.Equal(76, result.Value.FocusQuality);
+}
+
+[Fact]
+public async Task Handle_WhenParentSummarySharingIsDisabled_ReturnsNullFocusQuality()
+{
+    Guid parentUserId = Guid.NewGuid();
+    Parent parent = CreateParent(parentUserId);
+    Student student = new(Guid.NewGuid());
+    student.SetParentSharingPreferences(true, false);
+
+    ParentStudentRelationship relationship = new(parent.Id, student.Id);
+    relationship.Accept();
+
+    StudySession session = CreateCompletedSession(
+        student.Id,
+        Guid.NewGuid(),
+        new DateTimeOffset(2026, 9, 20, 10, 0, 0, TimeSpan.Zero),
+        30
+    );
+
+    StudySessionBehaviorWindow window = StudySessionBehaviorWindow.Create(
+        session.Id, 1, Now.AddMinutes(-30), Now, true
+    ).Value;
+    Assert.True(window.RecordAnalysis(90, null, null, null, null, null, null, false).IsSuccess);
+
+    GetParentDashboardQueryHandler handler = new(
+        new InMemoryRepository<Parent>(parent),
+        new InMemoryRepository<ParentStudentRelationship>(relationship),
+        new InMemoryRepository<Student>(student),
+        new InMemoryRepository<StudyGoalProposal>(),
+        new InMemoryRepository<StudySession>(session),
+        new InMemoryRepository<StudySessionBehaviorWindow>(window),
+        new FakeCurrentUser(parentUserId),
+        new FixedTimeProvider(Now)
+    );
+
+    Result<ParentDashboardResponse> result = await handler.Handle(
+        new GetParentDashboardQuery(student.Id),
+        CancellationToken.None
+    );
+
+    Assert.True(result.IsSuccess);
+    Assert.Null(result.Value.FocusQuality);
+}
 }

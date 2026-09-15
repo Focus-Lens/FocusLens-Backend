@@ -11,7 +11,9 @@ public sealed record ParentDashboardResponse(
     IReadOnlyCollection<ParentDashboardStudySessionResponse> RecentStudySessions,
     int CompletedSessionsCount,
     int ActiveStudyDaysCount,
-    ParentDashboardWeeklyStudyPulseResponse WeeklyStudyPulse);
+    int? FocusQuality,
+    ParentDashboardWeeklyStudyPulseResponse WeeklyStudyPulse
+);
 
 public sealed record ParentDashboardStudySessionResponse(
     Guid Id,
@@ -24,7 +26,8 @@ public sealed record ParentDashboardStudySessionResponse(
     Guid? SelectedSubjectId,
     string? SubjectName,
     int ActualStudyMinutes,
-    int? PlannedFocusDurationMinutes);
+    int? PlannedFocusDurationMinutes
+);
 
 public sealed record ParentDashboardWeeklyStudyPulseResponse(
     DayOfWeek WeekStartsOn,
@@ -33,11 +36,13 @@ public sealed record ParentDashboardWeeklyStudyPulseResponse(
     int ActualStudyMinutes,
     int PreviousPeriodActualStudyMinutes,
     int ActualStudyMinutesTrend,
-    IReadOnlyCollection<ParentDashboardWeeklyStudyPulseDayResponse> Days);
+    IReadOnlyCollection<ParentDashboardWeeklyStudyPulseDayResponse> Days
+);
 
 public sealed record ParentDashboardWeeklyStudyPulseDayResponse(
     DateOnly Date,
-    int ActualStudyMinutes);
+    int ActualStudyMinutes
+);
 
 public sealed record ParentDashboardStudyGoalProgressResponse(
     int CompletedMinutes,
@@ -45,14 +50,17 @@ public sealed record ParentDashboardStudyGoalProgressResponse(
     int DaysRemaining,
     DateOnly StartsOn,
     DateOnly EndsOn,
-    IReadOnlyCollection<ParentDashboardWeeklyStudyPulseDayResponse> Days);
+    IReadOnlyCollection<ParentDashboardWeeklyStudyPulseDayResponse> Days
+);
 
 public sealed record ParentDashboardSessionHistoryResponse(
     IReadOnlyCollection<ParentDashboardStudySessionResponse> Sessions,
-    ParentDashboardPaginationResponse Pagination);
+    ParentDashboardPaginationResponse Pagination
+);
 
 public sealed record ParentDashboardPaginationResponse(
     int Page,
     int PageSize,
     int TotalCount,
-    int TotalPages);
+    int TotalPages
+);

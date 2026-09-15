@@ -19,6 +19,7 @@ public sealed class GetParentDashboardQueryHandler(
     IBaseRepository<Student> studentRepository,
     IBaseRepository<StudyGoalProposal> studyGoalProposalRepository,
     IBaseRepository<StudySession> studySessionRepository,
+    IBaseRepository<StudySessionBehaviorWindow> behaviorWindowRepository,
     ICurrentUser currentUser,
     TimeProvider timeProvider)
     : IRequestHandler<GetParentDashboardQuery, Result<ParentDashboardResponse>>
@@ -76,6 +77,28 @@ public sealed class GetParentDashboardQueryHandler(
                 session.StartedAtUtc != null))
             .ToArray();
 
+        int? focusQuality = null;
+
+        if (shareTrends && startedSessions.Length > 0)
+        {
+            Guid[] sessionIds = startedSessions
+                .Select(session => session.Id)
+                .ToArray();
+
+            int[] focusScores = (await behaviorWindowRepository.GetAllAsync(window =>
+                    sessionIds.Contains(window.StudySessionId) &&
+                    window.FocusScore != null))
+                .Select(window => window.FocusScore!.Value)
+                .ToArray();
+
+            if (focusScores.Length > 0)
+            {
+                focusQuality = (int)Math.Round(
+                    focusScores.Average(),
+                    MidpointRounding.AwayFromZero);
+            }
+        }
+
         DateTimeOffset utcNow = timeProvider.GetUtcNow();
         IReadOnlyDictionary<Guid, string?> subjectNamesById = ParentDashboardHelpers.GetSubjectNamesById(student);
         ParentDashboardWeeklyStudyPulseResponse weeklyPulse = CreateWeeklyPulse(startedSessions, utcNow, weekStartsOn);
@@ -88,20 +111,21 @@ public sealed class GetParentDashboardQueryHandler(
             acceptedProposal?.ToResponse(acceptedProposalParent?.WeekStartsOn ?? weekStartsOn, acceptedProposalParent),
             shareSummaries
                 ? ParentDashboardHelpers.OrderSessions(startedSessions)
-                .Take(RecentSessionCount)
-                .Select(session => ParentDashboardHelpers.ToSessionResponse(session, subjectNamesById, utcNow))
-                .ToArray()
+                    .Take(RecentSessionCount)
+                    .Select(session => ParentDashboardHelpers.ToSessionResponse(session, subjectNamesById, utcNow))
+                    .ToArray()
                 : [],
             shareSummaries
                 ? startedSessions.Count(session =>
-            {
-                DateOnly sessionDate = DateOnly.FromDateTime(session.StartedAtUtc!.Value.UtcDateTime);
-                return session.Status == StudySessionStatus.Completed &&
-                       sessionDate >= weeklyPulse.StartsOn &&
-                       sessionDate <= weeklyPulse.EndsOn;
-            })
+                {
+                    DateOnly sessionDate = DateOnly.FromDateTime(session.StartedAtUtc!.Value.UtcDateTime);
+                    return session.Status == StudySessionStatus.Completed &&
+                           sessionDate >= weeklyPulse.StartsOn &&
+                           sessionDate <= weeklyPulse.EndsOn;
+                })
                 : 0,
             shareTrends ? weeklyPulse.Days.Count(day => day.ActualStudyMinutes > 0) : 0,
+            focusQuality,
             shareTrends
                 ? weeklyPulse
                 : new ParentDashboardWeeklyStudyPulseResponse(
