@@ -45,21 +45,24 @@ public class Program
 
         WebApplication app = builder.Build();
 
-        // Development
-        if (app.Environment.IsDevelopment())
+        // Apply EF Core migrations and seed the required identity roles in every
+        // environment. The seeders are idempotent, so this is safe for the
+        // single-instance deployment used by the hosted demo.
+        using (IServiceScope scope = app.Services.CreateScope())
         {
-            app.MapOpenApi();
-
-            app.MapScalarApiReference();
-
-            // Seed database
-            using IServiceScope scope = app.Services.CreateScope();
-
             ApplicationDbContextInitialiser initialiser =
                 scope.ServiceProvider
                     .GetRequiredService<ApplicationDbContextInitialiser>();
 
             await initialiser.SeedAsync();
+        }
+
+        // Development-only API documentation
+        if (app.Environment.IsDevelopment())
+        {
+            app.MapOpenApi();
+
+            app.MapScalarApiReference();
         }
 
         // Middleware
