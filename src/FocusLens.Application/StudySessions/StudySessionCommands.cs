@@ -43,6 +43,9 @@ public sealed record ResumeStudySessionCommand(Guid SessionId)
 public sealed record EndStudySessionCommand(Guid SessionId)
     : IRequest<Result<StudySessionResponse>>;
 
+public sealed record ReuseStudySessionCommand(Guid SessionId)
+    : IRequest<Result<StudySessionResponse>>;
+
 public sealed record UpdateStudySessionProgressCommand(
     Guid SessionId,
     UpdateStudySessionProgressRequest Request)

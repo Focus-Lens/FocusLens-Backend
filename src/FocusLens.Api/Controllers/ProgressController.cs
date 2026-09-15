@@ -29,6 +29,17 @@ public sealed class ProgressController(ISender sender) : ControllerBase
         return response is null ? NotFound() : Ok(response);
     }
 
+    [HttpGet("behavioral")]
+    public async Task<IActionResult> GetBehavioral(
+        [FromQuery] Guid? studentId,
+        [FromQuery] string? range,
+        CancellationToken cancellationToken)
+    {
+        BehavioralProgressResponse? response = await sender.Send(
+            new GetBehavioralProgressQuery(studentId, range), cancellationToken);
+        return response is null ? NotFound() : Ok(response);
+    }
+
     private static bool HasValidRange(string? range, DateOnly? dateFrom, DateOnly? dateTo)
     {
         string value = string.IsNullOrWhiteSpace(range) ? "Last30Days" : range.Trim();

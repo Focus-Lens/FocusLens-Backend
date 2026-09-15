@@ -1,5 +1,6 @@
 using FocusLens.Application.StudySessions;
 using FocusLens.Contracts.StudySessions;
+using FocusLens.Contracts.BehavioralIntelligence;
 using FocusLens.Domain.Common.Results;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
@@ -201,6 +202,10 @@ public sealed class StudySessionsController(ISender sender) : ApiController
     public async Task<IActionResult> End(Guid sessionId, CancellationToken cancellationToken) =>
         ToActionResult(await sender.Send(new EndStudySessionCommand(sessionId), cancellationToken));
 
+    [HttpPost("{sessionId:guid}/reuse")]
+    public async Task<IActionResult> Reuse(Guid sessionId, CancellationToken cancellationToken) =>
+        ToActionResult(await sender.Send(new ReuseStudySessionCommand(sessionId), cancellationToken));
+
     [HttpPut("{sessionId:guid}/progress")]
     public async Task<IActionResult> UpdateProgress(
         Guid sessionId,
@@ -214,6 +219,38 @@ public sealed class StudySessionsController(ISender sender) : ApiController
                 cancellationToken
             )
         );
+    }
+
+    [HttpPost("{sessionId:guid}/behavior-events")]
+    public async Task<IActionResult> RecordBehaviorEvents(
+        Guid sessionId,
+        [FromBody] RecordStudySessionBehaviorEventsRequest request,
+        CancellationToken cancellationToken)
+    {
+        return ToActionResult(await sender.Send(
+            new RecordStudySessionBehaviorEventsCommand(sessionId, request),
+            cancellationToken));
+    }
+
+    [HttpPost("{sessionId:guid}/behavior-windows/analyze")]
+    public async Task<IActionResult> AnalyzeBehaviorWindow(
+        Guid sessionId,
+        [FromBody] AnalyzeBehaviorWindowRequest request,
+        CancellationToken cancellationToken)
+    {
+        return ToActionResult(await sender.Send(
+            new AnalyzeStudySessionBehaviorWindowCommand(
+                sessionId,
+                request.IsFinal),
+            cancellationToken));
+    }
+
+    [HttpGet("{sessionId:guid}/behavior-windows")]
+    public async Task<IActionResult> GetBehaviorWindows(Guid sessionId, CancellationToken cancellationToken)
+    {
+        IReadOnlyCollection<BehaviorWindowResultResponse>? windows = await sender.Send(
+            new GetStudySessionBehaviorWindowsQuery(sessionId), cancellationToken);
+        return windows is null ? NotFound() : Ok(windows);
     }
 
     [HttpPost("{sessionId:guid}/upload-material")]

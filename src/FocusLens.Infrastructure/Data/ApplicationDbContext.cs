@@ -43,6 +43,15 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
     public DbSet<StudySessionQuestionAnswer> StudySessionQuestionAnswers =>
         Set<StudySessionQuestionAnswer>();
 
+    public DbSet<StudySessionBehaviorEvent> StudySessionBehaviorEvents =>
+        Set<StudySessionBehaviorEvent>();
+
+    public DbSet<StudySessionBehaviorWindow> StudySessionBehaviorWindows =>
+        Set<StudySessionBehaviorWindow>();
+    public DbSet<StudySessionPauseInterval> StudySessionPauseIntervals => Set<StudySessionPauseInterval>();
+
+    public DbSet<StudySessionBehaviorAnalysisJob> StudySessionBehaviorAnalysisJobs => Set<StudySessionBehaviorAnalysisJob>();
+
 
     public DbSet<ParentStudentRelationship> ParentStudentRelationships =>
         Set<ParentStudentRelationship>();

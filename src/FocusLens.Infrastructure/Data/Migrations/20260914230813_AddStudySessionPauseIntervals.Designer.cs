@@ -4,6 +4,7 @@ using FocusLens.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace FocusLens.Infrastructure.Data.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDBContextModelSnapshot : ModelSnapshot
+    [Migration("20260914230813_AddStudySessionPauseIntervals")]
+    partial class AddStudySessionPauseIntervals
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -669,47 +672,6 @@ namespace FocusLens.Infrastructure.Data.Migrations
                     b.HasIndex("StudentId", "Status");
 
                     b.ToTable("StudySessions", (string)null);
-                });
-
-            modelBuilder.Entity("FocusLens.Domain.StudySessions.StudySessionBehaviorAnalysisJob", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<int>("AttemptCount")
-                        .HasColumnType("int");
-
-                    b.Property<DateTimeOffset?>("CompletedAtUtc")
-                        .HasColumnType("datetimeoffset");
-
-                    b.Property<DateTimeOffset>("CreatedAtUtc")
-                        .HasColumnType("datetimeoffset");
-
-                    b.Property<string>("LastError")
-                        .HasMaxLength(2000)
-                        .HasColumnType("nvarchar(2000)");
-
-                    b.Property<DateTimeOffset?>("NextAttemptAtUtc")
-                        .HasColumnType("datetimeoffset");
-
-                    b.Property<DateTimeOffset?>("ProcessingStartedAtUtc")
-                        .HasColumnType("datetimeoffset");
-
-                    b.Property<int>("Status")
-                        .HasColumnType("int");
-
-                    b.Property<Guid>("StudySessionId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("StudySessionId")
-                        .IsUnique();
-
-                    b.HasIndex("Status", "NextAttemptAtUtc");
-
-                    b.ToTable("StudySessionBehaviorAnalysisJobs", (string)null);
                 });
 
             modelBuilder.Entity("FocusLens.Domain.StudySessions.StudySessionBehaviorEvent", b =>
@@ -1570,15 +1532,6 @@ namespace FocusLens.Infrastructure.Data.Migrations
                         .OnDelete(DeleteBehavior.Restrict);
 
                     b.Navigation("Material");
-                });
-
-            modelBuilder.Entity("FocusLens.Domain.StudySessions.StudySessionBehaviorAnalysisJob", b =>
-                {
-                    b.HasOne("FocusLens.Domain.StudySessions.StudySession", null)
-                        .WithMany()
-                        .HasForeignKey("StudySessionId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
                 });
 
             modelBuilder.Entity("FocusLens.Domain.StudySessions.StudySessionBehaviorEvent", b =>

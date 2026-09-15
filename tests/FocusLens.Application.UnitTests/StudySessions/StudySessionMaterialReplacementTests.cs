@@ -260,6 +260,7 @@ public sealed class StudySessionMaterialReplacementTests
                 imageFileStore,
                 new StubPdfProcessor(),
                 new StubCurrentUser(currentUserId),
+                new InMemoryRepository<StudySessionBehaviorAnalysisJob>(),
                 unitOfWork,
                 Options.Create(new StudySessionImageUploadOptions()));
 

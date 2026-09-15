@@ -14,6 +14,7 @@ public sealed class ReportQueryHandler(
     IBaseRepository<Parent> parentRepository,
     IBaseRepository<ParentStudentRelationship> relationshipRepository,
     IBaseRepository<StudySession> sessionRepository,
+    IBaseRepository<StudySessionBehaviorWindow> behaviorWindowRepository,
     ICurrentUser currentUser,
     ReportSessionMetricsCalculator metricsCalculator)
     : IRequestHandler<GetReportSessionsQuery, ReportSessionListResponse?>,
@@ -43,19 +44,22 @@ public sealed class ReportQueryHandler(
                            session.Status != StudySessionStatus.Ready,
                 session => session.Material!,
                 session => session.Selection!.SelectedSections,
-                session => session.CompletedSections))
+                session => session.CompletedSections,
+                session => session.PauseIntervals))
             .Where(session => MatchesFilters(session, request, status))
             .OrderByDescending(session => session.StartedAtUtc)
             .ToList();
 
         IReadOnlyDictionary<Guid, ReportSessionMetrics> metrics = await metricsCalculator.CalculateAsync(sessions);
+        IReadOnlyDictionary<Guid, StudySessionBehaviorWindow> latestWindows = await GetLatestWindowsAsync(sessions);
         int page = Math.Max(1, request.Page);
         int pageSize = Math.Clamp(request.PageSize, 1, 100);
 
         return new ReportSessionListResponse(
             sessions.Skip((page - 1) * pageSize)
                 .Take(pageSize)
-                .Select(session => ToListItem(session, metrics[session.Id], student))
+                .Select(session => ToListItem(session, metrics[session.Id], student,
+                    latestWindows.GetValueOrDefault(session.Id)))
                 .ToArray(),
             page,
             pageSize,
@@ -86,7 +90,8 @@ public sealed class ReportQueryHandler(
                      item.Status == StudySessionStatus.Cancelled),
             item => item.Material!,
             item => item.Selection!.SelectedSections,
-            item => item.CompletedSections);
+            item => item.CompletedSections,
+            item => item.PauseIntervals);
 
         if (session is null)
         {
@@ -94,7 +99,9 @@ public sealed class ReportQueryHandler(
         }
 
         ReportSessionMetrics metrics = (await metricsCalculator.CalculateAsync([session]))[session.Id];
-        return ToDetail(session, metrics, student);
+        StudySessionBehaviorWindow? latestWindow = (await GetLatestWindowsAsync([session]))
+            .GetValueOrDefault(session.Id);
+        return ToDetail(session, metrics, student, latestWindow);
     }
 
     private async Task<Student?> GetAuthorizedStudentAsync(Guid? requestedStudentId)
@@ -152,17 +159,86 @@ public sealed class ReportQueryHandler(
                 ? parsed
                 : null;
 
-    private static ReportSessionListItemResponse ToListItem(StudySession session, ReportSessionMetrics metrics, Student student) =>
-        new(session.Id, session.StartedAtUtc!.Value, GetSubjectName(student, session.SelectedSubjectId),
-            session.Material?.FileName ?? string.Empty, session.Mode.ToString(), session.Status.ToString(),
-            metrics.DurationMinutes, metrics.CompletionPercentage, metrics.QuestionCount, metrics.CorrectQuestions,
-            metrics.Attempts, metrics.LearningPercentage);
+    private async Task<IReadOnlyDictionary<Guid, StudySessionBehaviorWindow>> GetLatestWindowsAsync(
+        IReadOnlyCollection<StudySession> sessions)
+    {
+        Guid[] sessionIds = sessions.Select(session => session.Id).ToArray();
+        if (sessionIds.Length == 0)
+        {
+            return new Dictionary<Guid, StudySessionBehaviorWindow>();
+        }
 
-    private static ReportSessionDetailResponse ToDetail(StudySession session, ReportSessionMetrics metrics, Student student) =>
+        return (await behaviorWindowRepository.GetAllAsync(item => sessionIds.Contains(item.StudySessionId)))
+            .GroupBy(item => item.StudySessionId)
+            .ToDictionary(group => group.Key, group => group
+                .OrderByDescending(item => item.WindowIndex)
+                .First());
+    }
+
+    private static ReportSessionListItemResponse ToListItem(
+        StudySession session,
+        ReportSessionMetrics metrics,
+        Student student,
+        StudySessionBehaviorWindow? behaviorWindow) =>
         new(session.Id, session.StartedAtUtc!.Value, GetSubjectName(student, session.SelectedSubjectId),
             session.Material?.FileName ?? string.Empty, session.Mode.ToString(), session.Status.ToString(),
             metrics.DurationMinutes, metrics.CompletionPercentage, metrics.QuestionCount, metrics.CorrectQuestions,
-            metrics.Attempts, metrics.LearningPercentage, metrics.CompletedSections, metrics.TotalSelectedSections);
+            metrics.Attempts, metrics.LearningPercentage, behaviorWindow?.FocusScore, behaviorWindow?.FocusState,
+            behaviorWindow?.UnderstandingScore, behaviorWindow?.UnderstandingTrend);
+
+    private static ReportSessionDetailResponse ToDetail(
+        StudySession session,
+        ReportSessionMetrics metrics,
+        Student student,
+        StudySessionBehaviorWindow? behaviorWindow)
+    {
+        string summary = CreateSummary(metrics, behaviorWindow);
+        string[] highlights = CreateHighlights(session, metrics, behaviorWindow);
+        return new ReportSessionDetailResponse(
+            session.Id, session.StartedAtUtc!.Value, GetSubjectName(student, session.SelectedSubjectId),
+            session.Material?.FileName ?? string.Empty, session.Mode.ToString(), session.Status.ToString(),
+            metrics.DurationMinutes, metrics.CompletionPercentage, metrics.QuestionCount, metrics.CorrectQuestions,
+            metrics.Attempts, metrics.LearningPercentage, metrics.CompletedSections, metrics.TotalSelectedSections,
+            session.PauseIntervals.Count, behaviorWindow?.FocusScore, behaviorWindow?.FocusState,
+            behaviorWindow?.FocusTrend, behaviorWindow?.UnderstandingScore, behaviorWindow?.UnderstandingTrend,
+            summary, highlights);
+    }
+
+    private static string CreateSummary(ReportSessionMetrics metrics, StudySessionBehaviorWindow? window)
+    {
+        if (window?.FocusState is not null)
+        {
+            return $"Focus was {window.FocusState.Replace('_', ' ').ToLowerInvariant()} in the latest analyzed study window.";
+        }
+
+        return metrics.TotalSelectedSections == 0
+            ? "No selected sections were available for this session."
+            : $"Completed {metrics.CompletedSections} of {metrics.TotalSelectedSections} selected study sections.";
+    }
+
+    private static string[] CreateHighlights(
+        StudySession session,
+        ReportSessionMetrics metrics,
+        StudySessionBehaviorWindow? window)
+    {
+        List<string> highlights = [$"{metrics.DurationMinutes} min focused study time", $"{session.PauseIntervals.Count} pauses"];
+        if (window?.FocusScore is int focus)
+        {
+            highlights.Add($"Focus score {focus}%");
+        }
+
+        if (window?.UnderstandingScore is int understanding)
+        {
+            highlights.Add($"Understanding score {understanding}%");
+        }
+
+        if (metrics.QuestionCount > 0)
+        {
+            highlights.Add($"Learning result {metrics.LearningPercentage}%");
+        }
+
+        return highlights.ToArray();
+    }
 
     private static string GetSubjectName(Student student, Guid? subjectId)
     {

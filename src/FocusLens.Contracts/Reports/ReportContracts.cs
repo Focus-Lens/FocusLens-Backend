@@ -12,7 +12,11 @@ public sealed record ReportSessionListItemResponse(
     int QuestionsGenerated,
     int CorrectQuestions,
     int Attempts,
-    int LearningPercentage);
+    int LearningPercentage,
+    int? FocusScore,
+    string? FocusState,
+    int? UnderstandingScore,
+    string? UnderstandingTrend);
 
 public sealed record ReportSessionListResponse(
     IReadOnlyCollection<ReportSessionListItemResponse> Items,
@@ -34,4 +38,12 @@ public sealed record ReportSessionDetailResponse(
     int Attempts,
     int LearningPercentage,
     int CompletedSections,
-    int TotalSelectedSections);
+    int TotalSelectedSections,
+    int PauseCount,
+    int? FocusScore,
+    string? FocusState,
+    string? FocusTrend,
+    int? UnderstandingScore,
+    string? UnderstandingTrend,
+    string Summary,
+    IReadOnlyCollection<string> Highlights);

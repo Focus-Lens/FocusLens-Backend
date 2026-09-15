@@ -69,6 +69,22 @@ public static class DependencyInjection
                   client.BaseAddress = new Uri(options.BaseUrl, UriKind.Absolute);
               });
 
+        services.AddOptions<BehavioralIntelligenceOptions>()
+            .Bind(configuration.GetRequiredSection(BehavioralIntelligenceOptions.SectionName))
+            .Validate(
+                options => Uri.TryCreate(options.BaseUrl, UriKind.Absolute, out _),
+                "BehavioralIntelligence:BaseUrl must be a valid absolute URI.")
+            .ValidateOnStart();
+
+        services.AddHttpClient<IBehavioralIntelligenceClient, BehavioralIntelligenceClient>(
+            (serviceProvider, client) =>
+            {
+                BehavioralIntelligenceOptions options =
+                    serviceProvider.GetRequiredService<IOptions<BehavioralIntelligenceOptions>>().Value;
+
+                client.BaseAddress = new Uri(options.BaseUrl, UriKind.Absolute);
+            });
+
         services.AddScoped<IStudyMaterialFileStore, LocalStudyMaterialFileStore>();
         services.AddScoped<IStudySessionImageFileStore, LocalStudySessionImageFileStore>();
         services.AddScoped<IStudyMaterialPdfProcessor, PdfSharpStudyMaterialPdfProcessor>();
@@ -170,6 +186,8 @@ public static class DependencyInjection
             });
 
         services.AddAuthorization();
+
+        services.AddHostedService<StudySessionBehaviorAnalysisWorker>();
 
         return services;
     }

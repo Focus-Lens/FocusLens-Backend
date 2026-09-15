@@ -100,7 +100,9 @@ public class StudySessionTests
         Assert.True(session.Resume(startedAt.AddMinutes(20)).IsSuccess);
 
         Assert.Equal(StudySessionStatus.Active, session.Status);
-        Assert.Equal(TimeSpan.FromMinutes(10), session.GetRemainingDuration(startedAt.AddMinutes(25)));
+        // 10 active minutes before pause + 5 after resume exhaust the 15-minute AI estimate.
+        Assert.Equal(TimeSpan.Zero, session.GetRemainingDuration(startedAt.AddMinutes(25)));
+        Assert.Equal(TimeSpan.Zero, session.GetOvertimeDuration(startedAt.AddMinutes(25)));
     }
 
     [Fact]
@@ -158,7 +160,9 @@ public class StudySessionTests
         session.Pause(startedAt.AddMinutes(10));
 
         Assert.Equal(StudySessionStatus.Paused, session.Status);
-        Assert.Equal(TimeSpan.FromMinutes(15), session.GetRemainingDuration(startedAt.AddHours(1)));
+        // While paused, elapsed active time remains frozen at 10 minutes.
+        Assert.Equal(TimeSpan.FromMinutes(5), session.GetRemainingDuration(startedAt.AddHours(1)));
+        Assert.Equal(TimeSpan.Zero, session.GetOvertimeDuration(startedAt.AddHours(1)));
     }
 
     [Fact]
@@ -302,6 +306,62 @@ public class StudySessionTests
         session.SetSelection(replacement);
 
         Assert.Equal(replacement.Id, session.Selection!.Id);
+    }
+
+    [Fact]
+    public void PauseResume_RecordsAndClosesOnePauseInterval()
+    {
+        StudySession session = CreateReadyDigitalSession();
+        DateTimeOffset start = new(2026, 9, 15, 10, 0, 0, TimeSpan.Zero);
+        Assert.True(session.Start(start).IsSuccess);
+        Assert.True(session.Pause(start.AddMinutes(3)).IsSuccess);
+
+        Assert.Equal(StudySessionStatus.Paused, session.Status);
+        Assert.Single(session.PauseIntervals);
+        Assert.Null(session.PauseIntervals.Single().EndedAtUtc);
+
+        Assert.True(session.Resume(start.AddMinutes(8)).IsSuccess);
+        StudySessionPauseInterval interval = session.PauseIntervals.Single();
+        Assert.Equal(StudySessionStatus.Active, session.Status);
+        Assert.Equal(start.AddMinutes(8), interval.EndedAtUtc);
+        Assert.Equal(300, session.AccumulatedPausedSeconds);
+        Assert.DoesNotContain(session.PauseIntervals, item => item.EndedAtUtc is null);
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void EndingOrCompletingWhilePaused_ClosesTheOpenPauseInterval(bool complete)
+    {
+        StudySession session = CreateReadyDigitalSession();
+        DateTimeOffset start = new(2026, 9, 15, 10, 0, 0, TimeSpan.Zero);
+        session.Start(start);
+        session.Pause(start.AddMinutes(2));
+
+        Result<Success> result = complete
+            ? session.CompleteSuccessfully(start.AddMinutes(7))
+            : session.End(start.AddMinutes(7));
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(300, session.AccumulatedPausedSeconds);
+        Assert.Equal(start.AddMinutes(7), session.PauseIntervals.Single().EndedAtUtc);
+        Assert.DoesNotContain(session.PauseIntervals, item => item.EndedAtUtc is null);
+    }
+
+    [Fact]
+    public void MultiplePauseCycles_CreateOneClosedIntervalPerCycle()
+    {
+        StudySession session = CreateReadyDigitalSession();
+        DateTimeOffset start = new(2026, 9, 15, 10, 0, 0, TimeSpan.Zero);
+        session.Start(start);
+        session.Pause(start.AddMinutes(1));
+        session.Resume(start.AddMinutes(3));
+        session.Pause(start.AddMinutes(5));
+        session.Resume(start.AddMinutes(9));
+
+        Assert.Equal(2, session.PauseIntervals.Count);
+        Assert.All(session.PauseIntervals, item => Assert.NotNull(item.EndedAtUtc));
+        Assert.Equal(360, session.AccumulatedPausedSeconds);
     }
 
     private static StudySession CreateReadyDigitalSession()

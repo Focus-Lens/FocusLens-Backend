@@ -69,6 +69,35 @@ public sealed class StudySessionSetupApiTests
     }
 
     [Fact]
+    public async Task Reuse_CreatesFreshDraftWithSameMaterialAndSelectedSections()
+    {
+        await using CustomWebApplicationFactory factory = new();
+        (Guid userId, StudySession source) = await SeedReusableSessionAsync(factory);
+        using HttpClient client = CreateStudentClient(factory, userId);
+
+        HttpResponseMessage response = await client.PostAsync(
+            $"/api/study-sessions/{source.Id}/reuse", null);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        using JsonDocument document = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        Guid reusedId = document.RootElement.GetProperty("id").GetGuid();
+        Assert.NotEqual(source.Id, reusedId);
+        Assert.Equal("Draft", document.RootElement.GetProperty("status").GetString());
+
+        using IServiceScope scope = factory.Services.CreateScope();
+        ApplicationDbContext db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        StudySession reused = db.StudySessions.Single(item => item.Id == reusedId);
+        Assert.Equal(source.StudyMaterialId, reused.StudyMaterialId);
+        Assert.Equal(source.SelectedSubjectId, reused.SelectedSubjectId);
+        Assert.Empty(db.StudySessionQuestions.Where(item => item.StudySessionId == reusedId));
+        Assert.Empty(db.StudySessionBehaviorWindows.Where(item => item.StudySessionId == reusedId));
+        Guid reusedSelectionId = db.StudySessionSelections
+            .Single(item => item.StudySessionId == reusedId).Id;
+        Assert.Equal(1, db.Set<StudySessionSelectedSection>()
+            .Count(item => item.StudySessionSelectionId == reusedSelectionId));
+    }
+
+    [Fact]
     public async Task UploadImages_WithMultipleValidImages_ReturnsMetadataAndDoesNotMarkSessionReady()
     {
         await using CustomWebApplicationFactory factory = new();
@@ -127,13 +156,53 @@ public sealed class StudySessionSetupApiTests
                 Assert.True(session.SetSubject(subject).IsSuccess);
                 Assert.True(session.SetDuration(25).IsSuccess);
                 Assert.True(session.SetStudyMaterial(material).IsSuccess);
+                StudyMaterialSection section = StudyMaterialSection.Create(
+                    material.Id, "Section 1", 15, 1, 1).Value;
+                Assert.True(session.SetSelection(
+                    StudySessionSelection.Create(session, material, 1, 1).Value).IsSuccess);
+                Assert.True(session.SetSelectedSections([section]).IsSuccess);
                 db.StudyMaterials.Add(material);
+                db.StudyMaterialSections.Add(section);
             }
 
             return Task.CompletedTask;
         });
 
         return (userId, session, subject);
+    }
+
+    private static async Task<(Guid UserId, StudySession Session)> SeedReusableSessionAsync(
+        CustomWebApplicationFactory factory)
+    {
+        Guid userId = Guid.NewGuid();
+        StudentSubject subject = StudentSubject.Predefined(StudentSubjectType.Math);
+        Student student = new(userId);
+        student.ReplaceSubjects([subject]);
+        StudySession session = StudySession.Create(student.Id, StudySessionMode.Digital).Value;
+        StudyMaterial material = StudyMaterial.Create(student.Id, "reuse.pdf", 1, 1,
+            "materials/reuse.pdf", StudyMaterialSource.Upload).Value;
+        StudyMaterialSection section = StudyMaterialSection.Create(material.Id, "Section", 10, 1, 1).Value;
+        Assert.True(session.SetSubject(subject).IsSuccess);
+        Assert.True(session.SetDuration(25).IsSuccess);
+        Assert.True(session.SetStudyMaterial(material).IsSuccess);
+        StudySessionSelection selection = StudySessionSelection.Create(session, material, 1, 1).Value;
+        Assert.True(session.SetSelection(selection).IsSuccess);
+        Assert.True(session.SetSelectedSections([section]).IsSuccess);
+        Assert.True(session.MarkReady().IsSuccess);
+        DateTimeOffset now = new(2026, 9, 15, 10, 0, 0, TimeSpan.Zero);
+        Assert.True(session.Start(now).IsSuccess);
+        Assert.True(session.End(now.AddMinutes(1)).IsSuccess);
+
+        await factory.SeedAsync(db =>
+        {
+            db.Students.Add(student);
+            db.StudyMaterials.Add(material);
+            db.StudyMaterialSections.Add(section);
+            db.StudySessions.Add(session);
+            db.StudySessionSelections.Add(selection);
+            return Task.CompletedTask;
+        });
+        return (userId, session);
     }
 
     private static HttpClient CreateStudentClient(CustomWebApplicationFactory factory, Guid userId)

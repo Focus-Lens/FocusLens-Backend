@@ -26,6 +26,7 @@ public sealed class StudySessionCommandHandler(
     IStudySessionImageFileStore imageFileStore,
     IStudyMaterialPdfProcessor pdfProcessor,
     ICurrentUser currentUser,
+    IBaseRepository<StudySessionBehaviorAnalysisJob> behaviorAnalysisJobRepository,
     IUnitOfWork unitOfWork,
     IOptions<StudySessionImageUploadOptions> imageUploadOptions,
     TimeProvider timeProvider = null!)
@@ -42,6 +43,7 @@ public sealed class StudySessionCommandHandler(
         IRequestHandler<PauseStudySessionCommand, Result<StudySessionResponse>>,
         IRequestHandler<ResumeStudySessionCommand, Result<StudySessionResponse>>,
         IRequestHandler<EndStudySessionCommand, Result<StudySessionResponse>>,
+        IRequestHandler<ReuseStudySessionCommand, Result<StudySessionResponse>>,
         IRequestHandler<UpdateStudySessionProgressCommand, Result<StudySessionResponse>>
 {
     public async Task<Result<StudyMaterialResponse>> Handle(ChangeStudySessionMaterialCommand request,
@@ -97,9 +99,150 @@ public sealed class StudySessionCommandHandler(
         return sessionResult.Value.ToResponse(timeProvider.GetUtcNow());
     }
 
-    public Task<Result<StudySessionResponse>> Handle(EndStudySessionCommand request,
-        CancellationToken cancellationToken) =>
-        HandleRuntimeAsync(request.SessionId, session => session.End(timeProvider.GetUtcNow()));
+    public async Task<Result<StudySessionResponse>> Handle(
+        EndStudySessionCommand request,
+        CancellationToken cancellationToken)
+    {
+        Result<StudySession> sessionResult =
+            await GetSessionAsync(
+                request.SessionId,
+                includeMaterial: true);
+
+        if (sessionResult.IsError)
+        {
+            return sessionResult.TopError;
+        }
+
+        StudySession session = sessionResult.Value;
+        DateTimeOffset now = timeProvider.GetUtcNow();
+
+        Result<Success> endResult = session.End(now);
+
+        if (endResult.IsError)
+        {
+            return endResult.TopError;
+        }
+
+        Result<StudySessionBehaviorAnalysisJob> jobResult =
+            StudySessionBehaviorAnalysisJob.Create(
+                session.Id,
+                now);
+
+        if (jobResult.IsError)
+        {
+            return jobResult.TopError;
+        }
+
+        behaviorAnalysisJobRepository.Add(jobResult.Value);
+
+        await unitOfWork.SaveChangesAsync();
+
+        return session.ToResponse(now);
+    }
+
+    public async Task<Result<StudySessionResponse>> Handle(
+        ReuseStudySessionCommand request,
+        CancellationToken cancellationToken)
+    {
+        Result<Student> studentResult = await GetCurrentStudentAsync();
+        if (studentResult.IsError)
+        {
+            return studentResult.TopError;
+        }
+
+        StudySession? source = await studySessionRepository.FirstOrDefaultAsync(
+            item => item.Id == request.SessionId && item.StudentId == studentResult.Value.Id &&
+                    (item.Status == StudySessionStatus.Paused ||
+                     item.Status == StudySessionStatus.Completed ||
+                     item.Status == StudySessionStatus.Cancelled),
+            item => item.Material!, item => item.Selection!.SelectedSections);
+        if (source?.Material is null || source.Selection is null || source.SelectedSubjectId is null ||
+            source.FocusDurationMinutes is null)
+        {
+            return Error.NotFound("StudySessions.NotFound", "Study session was not found.");
+        }
+
+        Guid[] materialSectionIds = source.Selection.SelectedSections
+            .OrderBy(item => item.Order)
+            .Select(item => item.StudyMaterialSectionId)
+            .ToArray();
+        if (materialSectionIds.Length == 0)
+        {
+            return Error.Validation("StudySessionReuse.SectionsRequired",
+                "A session with no selected sections cannot be reused.");
+        }
+
+        StudyMaterialSection[] materialSections = (await materialSectionRepository.GetAllAsync(
+                item => materialSectionIds.Contains(item.Id)))
+            .OrderBy(item => Array.IndexOf(materialSectionIds, item.Id))
+            .ToArray();
+        if (materialSections.Length != materialSectionIds.Length)
+        {
+            return Error.Validation("StudySessionReuse.SectionsUnavailable",
+                "One or more selected study sections are no longer available.");
+        }
+
+        Result<StudySession> newSessionResult = StudySession.Create(source.StudentId, source.Mode);
+        if (newSessionResult.IsError)
+        {
+            return newSessionResult.TopError;
+        }
+
+        StudySession reused = newSessionResult.Value;
+        Result<Success> subjectResult = reused.SetSubjectId(source.SelectedSubjectId.Value);
+        if (subjectResult.IsError)
+            return subjectResult.TopError;
+        Result<Success> durationResult = reused.SetDuration(source.FocusDurationMinutes.Value);
+        if (durationResult.IsError)
+            return durationResult.TopError;
+        Result<Success> materialResult = reused.SetStudyMaterial(source.Material);
+        if (materialResult.IsError)
+            return materialResult.TopError;
+
+        Result<StudySessionSelection> selectionResult = StudySessionSelection.Create(
+            reused, source.Material, source.Selection.FromPage, source.Selection.ToPage);
+        if (selectionResult.IsError)
+        {
+            return selectionResult.TopError;
+        }
+
+        StudySessionSelection selection = selectionResult.Value;
+        if (source.Selection.DerivedStorageReference is not null)
+        {
+            Result<Success> derivedResult = selection.SetDerivedStorageReference(source.Selection.DerivedStorageReference);
+            if (derivedResult.IsError)
+            {
+                return derivedResult.TopError;
+            }
+        }
+
+        if (source.Selection.AiExtractedText is not null && source.Selection.AiAnalysisJson is not null)
+        {
+            Result<Success> analysisResult = selection.SetAiAnalysis(
+                source.Selection.AiExtractedText, source.Selection.AiAnalysisJson);
+            if (analysisResult.IsError)
+            {
+                return analysisResult.TopError;
+            }
+        }
+
+        Result<Success> setSelection = reused.SetSelection(selection);
+        if (setSelection.IsError)
+        {
+            return setSelection.TopError;
+        }
+
+        Result<Success> setSections = reused.SetSelectedSections(materialSections);
+        if (setSections.IsError)
+        {
+            return setSections.TopError;
+        }
+
+        studySessionRepository.Add(reused);
+        selectionRepository.Add(selection);
+        await unitOfWork.SaveChangesAsync();
+        return reused.ToResponse(timeProvider.GetUtcNow());
+    }
 
     public async Task<Result<StudySessionResponse>> Handle(
         PauseStudySessionCommand request,

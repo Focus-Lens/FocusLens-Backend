@@ -16,6 +16,7 @@ public sealed class StudySessionQuestionHandler(
     IBaseRepository<StudySessionSelectedSection> selectedSectionRepository,
     ICurrentUser currentUser,
     IFocusLensAiClient aiClient,
+    IBaseRepository<StudySessionBehaviorAnalysisJob> behaviorAnalysisJobRepository,
     IUnitOfWork unitOfWork,
     TimeProvider timeProvider)
     : IRequestHandler<GetCurrentStudySessionQuestionQuery, StudySessionCurrentQuestionResponse?>,
@@ -350,6 +351,18 @@ public sealed class StudySessionQuestionHandler(
                 {
                     return completeResult.TopError;
                 }
+
+                Result<StudySessionBehaviorAnalysisJob> jobResult =
+                    StudySessionBehaviorAnalysisJob.Create(
+                        session.Id,
+                        now);
+
+                if (jobResult.IsError)
+                {
+                    return jobResult.TopError;
+                }
+
+                behaviorAnalysisJobRepository.Add(jobResult.Value);
             }
 
             await unitOfWork.SaveChangesAsync();
