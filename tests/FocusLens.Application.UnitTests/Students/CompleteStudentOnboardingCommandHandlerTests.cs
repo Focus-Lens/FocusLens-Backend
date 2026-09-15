@@ -50,7 +50,7 @@ public class CompleteStudentOnboardingCommandHandlerTests
                         StudyTimeGoalPeriod.Daily,
                         60,
                         [DayOfWeek.Monday],
-                        null))),
+                        new DateOnly(2026, 9, 14)))),
             CancellationToken.None)).Value;
 
         Assert.True(student.IsOnboardingCompleted);

@@ -6,4 +6,5 @@ namespace FocusLens.Application.Features.Users.Commands.UpdateCurrentUser;
 
 public sealed record UpdateCurrentUserCommand(
     string FirstName,
-    string LastName) : IRequest<Result<UserProfileDto>>;
+    string LastName,
+    string? PhoneNumber) : IRequest<Result<UserProfileDto>>;

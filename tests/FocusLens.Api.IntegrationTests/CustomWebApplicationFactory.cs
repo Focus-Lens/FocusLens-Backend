@@ -1,6 +1,9 @@
 using FocusLens.API;
 using FocusLens.API.Infrastructure;
 using FocusLens.Application.Common.Interfaces;
+using FocusLens.Infrastructure.Authentication;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Http;
 using FocusLens.Infrastructure.Data;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -45,6 +48,31 @@ public sealed class CustomWebApplicationFactory
                     .ConfigureWarnings(warnings =>
                         warnings.Ignore(InMemoryEventId.TransactionIgnoredWarning)));
             services.AddScoped<IEmailSender, LoggingEmailSender>();
+
+            services.PostConfigure<JwtBearerOptions>(
+                JwtBearerDefaults.AuthenticationScheme,
+                options =>
+                {
+                    options.Events = new JwtBearerEvents
+                    {
+                        OnTokenValidated = context =>
+                        {
+                            string? tokenType = context.Principal?.FindFirst(
+                                TokenProvider.TokenTypeClaim)?.Value;
+
+                            if (tokenType == TokenProvider.OnboardingTokenType
+                                && !(HttpMethods.IsPost(context.HttpContext.Request.Method)
+                                     && context.HttpContext.Request.Path.Equals(
+                                         "/api/students/onboarding",
+                                         StringComparison.OrdinalIgnoreCase)))
+                            {
+                                context.Fail("Onboarding token is only valid for student onboarding.");
+                            }
+
+                            return Task.CompletedTask;
+                        }
+                    };
+                });
         });
     }
 

@@ -19,10 +19,15 @@ public static class StudyTimeGoalErrors
             "StudyTimeGoals.DaysRequired",
             "A daily study-time goal must contain at least one day.");
 
-    public static readonly Error DaysNotAllowed =
+    public static readonly Error WeeklyStartDayRequired =
         Error.Validation(
-            "StudyTimeGoals.DaysNotAllowed",
-            "A weekly study-time goal cannot contain selected days.");
+            "StudyTimeGoals.WeeklyStartDayRequired",
+            "A weekly study-time goal must contain exactly one week start day.");
+
+    public static readonly Error StartDateRequired =
+        Error.Validation(
+            "StudyTimeGoals.StartDateRequired",
+            "Study-time goal start date is required.");
 
     public static readonly Error DuplicateDays =
         Error.Validation(

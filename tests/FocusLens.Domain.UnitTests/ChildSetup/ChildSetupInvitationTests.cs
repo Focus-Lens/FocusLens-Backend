@@ -22,6 +22,7 @@ public class ChildSetupInvitationTests
             "CHILD@EXAMPLE.COM",
             invitation.TargetEmailNormalized);
         Assert.Equal("HASH", invitation.TokenHash);
+        Assert.Null(invitation.ProtectedToken);
         Assert.Equal(expiresAt, invitation.ExpiresAtUtc);
         Assert.Equal(
             ChildSetupInvitationStatus.Pending,
@@ -98,9 +99,10 @@ public class ChildSetupInvitationTests
         DateTimeOffset newExpiry =
             DateTimeOffset.UtcNow.AddDays(7);
 
-        invitation.Renew("NEW_HASH", newExpiry);
+        invitation.Renew("NEW_HASH", newExpiry, "PROTECTED_TOKEN");
 
         Assert.Equal("NEW_HASH", invitation.TokenHash);
+        Assert.Equal("PROTECTED_TOKEN", invitation.ProtectedToken);
         Assert.Equal(newExpiry, invitation.ExpiresAtUtc);
     }
 
@@ -136,5 +138,19 @@ public class ChildSetupInvitationTests
         Assert.Throws<InvalidOperationException>(() => invitation.Renew(
             "NEW_HASH",
             now.AddDays(14)));
+    }
+
+    [Fact]
+    public void MarkInvitationCancelled_ForInvitedDraft_ReturnsToDraft()
+    {
+        ChildSetupDraft draft = new(Guid.NewGuid());
+        draft.SetName("Karim", "Mahmoud");
+        draft.MarkInvited();
+
+        draft.MarkInvitationCancelled();
+
+        Assert.Equal(ChildSetupStatus.Draft, draft.Status);
+        Assert.Equal("Karim", draft.FirstName);
+        Assert.Equal("Mahmoud", draft.LastName);
     }
 }

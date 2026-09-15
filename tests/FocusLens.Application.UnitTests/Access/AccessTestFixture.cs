@@ -1,6 +1,7 @@
 using System.Linq.Expressions;
 using System.Reflection;
 using FocusLens.Application.Common.Interfaces;
+using FocusLens.Domain.Notifications;
 using DomainInterfaces = FocusLens.Domain.Common.Interfaces;
 
 namespace FocusLens.Application.UnitTests.Access;
@@ -102,6 +103,19 @@ public sealed class FakeUnitOfWork : DomainInterfaces.IUnitOfWork
     public void Dispose() { }
 }
 
+public sealed class FakeNotificationWriter : INotificationWriter
+{
+    public Task AddAsync(
+        Guid recipientUserId,
+        NotificationAudience audience,
+        NotificationCategory category,
+        string title,
+        string message,
+        string? actionUrl = null,
+        string? actionText = null,
+        string? dedupeKey = null) => Task.CompletedTask;
+}
+
 public sealed class FakeEmailSender : IEmailSender
 {
     public List<(string StudentEmail, string ParentEmail, Guid InvitationId)> Invitations { get; } = [];
@@ -158,6 +172,23 @@ public sealed class FakeInvitationUrlBuilder : IInvitationUrlBuilder
 
     public string CreateChildSetupInvitationUrl(string token) =>
         $"https://child.focuslens.test/invitations/child-setup/{token}";
+}
+
+public sealed class FakeChildSetupInvitationTokenProtector : IChildSetupInvitationTokenProtector
+{
+    private const string Prefix = "protected:";
+
+    public string Protect(string token) => $"{Prefix}{token}";
+
+    public string Unprotect(string protectedToken)
+    {
+        if (!protectedToken.StartsWith(Prefix, StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException("The token is not protected by this fake protector.");
+        }
+
+        return protectedToken[Prefix.Length..];
+    }
 }
 
 public static class AccessTestObjectExtensions

@@ -71,21 +71,22 @@ public class StudyTimeGoalTests
             StudyTimeGoalPeriod.Daily,
             60,
             [],
-            null);
+            new DateOnly(2026, 9, 14));
 
         Assert.True(result.IsError);
     }
 
     [Fact]
-    public void Create_WithWeeklyGoalAndDays_ReturnsError()
+    public void Create_WithWeeklyGoalAndMultipleDays_ReturnsError()
     {
         Result<StudyTimeGoal> result = StudyTimeGoal.Create(
             StudyTimeGoalPeriod.Weekly,
             60,
-            [DayOfWeek.Monday],
-            null);
+            [DayOfWeek.Monday, DayOfWeek.Tuesday],
+            new DateOnly(2026, 9, 14));
 
         Assert.True(result.IsError);
+        Assert.Equal("StudyTimeGoals.WeeklyStartDayRequired", result.TopError.Code);
     }
 
     [Fact]
@@ -95,7 +96,7 @@ public class StudyTimeGoalTests
             StudyTimeGoalPeriod.Daily,
             60,
             [DayOfWeek.Monday, DayOfWeek.Monday],
-            null);
+            new DateOnly(2026, 9, 14));
 
         Assert.True(result.IsError);
     }
@@ -107,19 +108,45 @@ public class StudyTimeGoalTests
             StudyTimeGoalPeriod.Daily,
             60,
             [(DayOfWeek)999],
-            null);
+            new DateOnly(2026, 9, 14));
 
         Assert.True(result.IsError);
     }
 
     [Fact]
-    public void Create_WithWeeklyGoalAndNoDays_CreatesGoal()
+    public void Create_WithMissingStartDate_ReturnsError()
+    {
+        var result = StudyTimeGoal.Create(
+            StudyTimeGoalPeriod.Daily,
+            60,
+            [DayOfWeek.Monday],
+            null);
+
+        Assert.True(result.IsError);
+        Assert.Equal("StudyTimeGoals.StartDateRequired", result.TopError.Code);
+    }
+
+    [Fact]
+    public void Create_WithWeeklyGoalAndNoDays_ReturnsError()
     {
         Result<StudyTimeGoal> result = StudyTimeGoal.Create(
             StudyTimeGoalPeriod.Weekly,
             480,
             [],
-            null);
+            new DateOnly(2026, 9, 14));
+
+        Assert.True(result.IsError);
+        Assert.Equal("StudyTimeGoals.WeeklyStartDayRequired", result.TopError.Code);
+    }
+
+    [Fact]
+    public void Create_WithWeeklyGoalAndOneStartDay_CreatesGoal()
+    {
+        var result = StudyTimeGoal.Create(
+            StudyTimeGoalPeriod.Weekly,
+            480,
+            [DayOfWeek.Saturday],
+            new DateOnly(2026, 9, 12));
 
         Assert.True(result.IsSuccess);
 
@@ -127,7 +154,7 @@ public class StudyTimeGoalTests
 
         Assert.Equal(StudyTimeGoalPeriod.Weekly, goal.Period);
         Assert.Equal(480, goal.TargetMinutes);
-        Assert.Empty(goal.Days);
-        Assert.Null(goal.StartDate);
+        Assert.Equal([DayOfWeek.Saturday], goal.Days);
+        Assert.Equal(new DateOnly(2026, 9, 12), goal.StartDate);
     }
 }

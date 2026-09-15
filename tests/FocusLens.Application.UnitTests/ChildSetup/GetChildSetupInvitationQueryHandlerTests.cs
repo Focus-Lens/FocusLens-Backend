@@ -20,6 +20,7 @@ public sealed class GetChildSetupInvitationQueryHandlerTests
     {
         const string token = "valid-child-setup-token";
         Parent parent = new(Guid.NewGuid());
+        parent.SetWeekStartsOn(DayOfWeek.Saturday);
         ChildSetupDraft draft = CreateCompleteDraft(parent.Id);
         ChildSetupInvitation invitation = new(
             draft.Id,
@@ -30,6 +31,7 @@ public sealed class GetChildSetupInvitationQueryHandlerTests
         GetChildSetupInvitationQueryHandler handler = new(
             new InMemoryRepository<ChildSetupInvitation>(invitation),
             new InMemoryRepository<ChildSetupDraft>(draft),
+            new InMemoryRepository<Parent>(parent),
             TimeProvider.System);
 
         Result<ChildSetupInvitationDetailsResponse> result = await handler.Handle(
@@ -46,6 +48,7 @@ public sealed class GetChildSetupInvitationQueryHandlerTests
         Assert.Equal(StudyPriority.BuildStudyRoutine, result.Value.StudyPriorities.Single());
         Assert.Equal("Daily", result.Value.StudyTimeGoal!.Period);
         Assert.Equal(60, result.Value.StudyTimeGoal.TargetMinutes);
+        Assert.Equal([DayOfWeek.Saturday, DayOfWeek.Monday], result.Value.StudyTimeGoal.Days);
     }
 
     [Fact]
@@ -61,6 +64,7 @@ public sealed class GetChildSetupInvitationQueryHandlerTests
         GetChildSetupInvitationQueryHandler handler = new(
             new InMemoryRepository<ChildSetupInvitation>(invitation),
             new InMemoryRepository<ChildSetupDraft>(draft),
+            new InMemoryRepository<Parent>(),
             TimeProvider.System);
 
         Result<ChildSetupInvitationDetailsResponse> result = await handler.Handle(
@@ -85,6 +89,7 @@ public sealed class GetChildSetupInvitationQueryHandlerTests
         GetChildSetupInvitationQueryHandler handler = new(
             new InMemoryRepository<ChildSetupInvitation>(invitation),
             new InMemoryRepository<ChildSetupDraft>(draft),
+            new InMemoryRepository<Parent>(),
             TimeProvider.System);
 
         Result<ChildSetupInvitationDetailsResponse> result = await handler.Handle(
@@ -110,6 +115,7 @@ public sealed class GetChildSetupInvitationQueryHandlerTests
         GetChildSetupInvitationQueryHandler handler = new(
             new InMemoryRepository<ChildSetupInvitation>(invitation),
             new InMemoryRepository<ChildSetupDraft>(draft),
+            new InMemoryRepository<Parent>(),
             TimeProvider.System);
 
         Result<ChildSetupInvitationDetailsResponse> result = await handler.Handle(
@@ -134,6 +140,7 @@ public sealed class GetChildSetupInvitationQueryHandlerTests
         GetChildSetupInvitationQueryHandler handler = new(
             new InMemoryRepository<ChildSetupInvitation>(invitation),
             new InMemoryRepository<ChildSetupDraft>(),
+            new InMemoryRepository<Parent>(),
             TimeProvider.System);
 
         Result<ChildSetupInvitationDetailsResponse> result = await handler.Handle(
@@ -156,7 +163,11 @@ public sealed class GetChildSetupInvitationQueryHandlerTests
             Domain.Students.StudyPriority.BuildStudyRoutine
         ]);
         draft.SetStudyTimeGoal(
-            StudyTimeGoal.Create(StudyTimeGoalPeriod.Daily, 60, [DayOfWeek.Monday], null).Value);
+            StudyTimeGoal.Create(
+                StudyTimeGoalPeriod.Daily,
+                60,
+                [DayOfWeek.Monday, DayOfWeek.Saturday],
+                new DateOnly(2026, 9, 14)).Value);
         return draft;
     }
 

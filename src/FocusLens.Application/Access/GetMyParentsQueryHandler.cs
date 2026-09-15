@@ -49,12 +49,17 @@ public sealed class GetMyParentsQueryHandler(
                 parent => parentIds.Contains(parent.Id),
                 parent => parent.User);
 
+        IReadOnlyDictionary<Guid, ParentStudentRelationship> relationshipsByParentId =
+            relationships.ToDictionary(relationship => relationship.ParentId);
+
         return parents
             .Select(parent => new StudentParentSummaryResponse(
                 parent.Id,
                 parent.User.FirstName,
                 parent.User.LastName,
-                parent.User.Email))
+                parent.User.Email,
+                relationshipsByParentId[parent.Id].Id,
+                relationshipsByParentId[parent.Id].Status.ToString()))
             .ToList();
     }
 }

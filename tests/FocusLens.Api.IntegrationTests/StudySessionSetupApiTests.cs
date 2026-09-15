@@ -69,35 +69,6 @@ public sealed class StudySessionSetupApiTests
     }
 
     [Fact]
-    public async Task Reuse_CreatesFreshDraftWithSameMaterialAndSelectedSections()
-    {
-        await using CustomWebApplicationFactory factory = new();
-        (Guid userId, StudySession source) = await SeedReusableSessionAsync(factory);
-        using HttpClient client = CreateStudentClient(factory, userId);
-
-        HttpResponseMessage response = await client.PostAsync(
-            $"/api/study-sessions/{source.Id}/reuse", null);
-
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        using JsonDocument document = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
-        Guid reusedId = document.RootElement.GetProperty("id").GetGuid();
-        Assert.NotEqual(source.Id, reusedId);
-        Assert.Equal("Draft", document.RootElement.GetProperty("status").GetString());
-
-        using IServiceScope scope = factory.Services.CreateScope();
-        ApplicationDbContext db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-        StudySession reused = db.StudySessions.Single(item => item.Id == reusedId);
-        Assert.Equal(source.StudyMaterialId, reused.StudyMaterialId);
-        Assert.Equal(source.SelectedSubjectId, reused.SelectedSubjectId);
-        Assert.Empty(db.StudySessionQuestions.Where(item => item.StudySessionId == reusedId));
-        Assert.Empty(db.StudySessionBehaviorWindows.Where(item => item.StudySessionId == reusedId));
-        Guid reusedSelectionId = db.StudySessionSelections
-            .Single(item => item.StudySessionId == reusedId).Id;
-        Assert.Equal(1, db.Set<StudySessionSelectedSection>()
-            .Count(item => item.StudySessionSelectionId == reusedSelectionId));
-    }
-
-    [Fact]
     public async Task UploadImages_WithMultipleValidImages_ReturnsMetadataAndDoesNotMarkSessionReady()
     {
         await using CustomWebApplicationFactory factory = new();
@@ -153,16 +124,26 @@ public sealed class StudySessionSetupApiTests
                     1,
                     "materials/original.pdf",
                     StudyMaterialSource.Upload).Value;
+                StudyMaterialSection section = StudyMaterialSection.Create(
+                    material.Id,
+                    "Section",
+                    10,
+                    1,
+                    1).Value;
+
                 Assert.True(session.SetSubject(subject).IsSuccess);
                 Assert.True(session.SetDuration(25).IsSuccess);
                 Assert.True(session.SetStudyMaterial(material).IsSuccess);
-                StudyMaterialSection section = StudyMaterialSection.Create(
-                    material.Id, "Section 1", 15, 1, 1).Value;
-                Assert.True(session.SetSelection(
-                    StudySessionSelection.Create(session, material, 1, 1).Value).IsSuccess);
+
+                StudySessionSelection selection =
+                    StudySessionSelection.Create(session, material, 1, 1).Value;
+
+                Assert.True(session.SetSelection(selection).IsSuccess);
                 Assert.True(session.SetSelectedSections([section]).IsSuccess);
+
                 db.StudyMaterials.Add(material);
                 db.StudyMaterialSections.Add(section);
+                db.StudySessionSelections.Add(selection);
             }
 
             return Task.CompletedTask;
@@ -171,7 +152,65 @@ public sealed class StudySessionSetupApiTests
         return (userId, session, subject);
     }
 
-    private static async Task<(Guid UserId, StudySession Session)> SeedReusableSessionAsync(
+    private static HttpClient CreateStudentClient(CustomWebApplicationFactory factory, Guid userId)
+    {
+        HttpClient client = factory.CreateClient();
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue(
+            "Bearer",
+            TestJwtTokenFactory.Create(userId, "Student"));
+        return client;
+    }
+
+    private static StringContent JsonContent(string json) => new(json, Encoding.UTF8, "application/json");
+
+    private static ByteArrayContent ImageContent(byte[] bytes)
+    {
+        ByteArrayContent content = new(bytes);
+        content.Headers.ContentType = new MediaTypeHeaderValue("application/octet-stream");
+        return content;
+    }
+
+   private static async Task AssertNoContentAsync(HttpResponseMessage response)
+{
+    string body = await response.Content.ReadAsStringAsync();
+
+    Assert.True(
+        response.StatusCode == HttpStatusCode.NoContent,
+        $"Expected NoContent, got {(int)response.StatusCode} ({response.StatusCode}). Body: {body}");
+
+    Assert.Equal(string.Empty, body);
+}
+
+[Fact]
+    public async Task Reuse_CreatesFreshDraftWithSameMaterialAndSelectedSections()
+    {
+        await using CustomWebApplicationFactory factory = new();
+        (Guid userId, StudySession source) = await SeedReusableSessionAsync(factory);
+        using HttpClient client = CreateStudentClient(factory, userId);
+
+        HttpResponseMessage response = await client.PostAsync(
+            $"/api/study-sessions/{source.Id}/reuse", null);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        using JsonDocument document = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        Guid reusedId = document.RootElement.GetProperty("id").GetGuid();
+        Assert.NotEqual(source.Id, reusedId);
+        Assert.Equal("Draft", document.RootElement.GetProperty("status").GetString());
+
+        using IServiceScope scope = factory.Services.CreateScope();
+        ApplicationDbContext db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        StudySession reused = db.StudySessions.Single(item => item.Id == reusedId);
+        Assert.Equal(source.StudyMaterialId, reused.StudyMaterialId);
+        Assert.Equal(source.SelectedSubjectId, reused.SelectedSubjectId);
+        Assert.Empty(db.StudySessionQuestions.Where(item => item.StudySessionId == reusedId));
+        Assert.Empty(db.StudySessionBehaviorWindows.Where(item => item.StudySessionId == reusedId));
+        Guid reusedSelectionId = db.StudySessionSelections
+            .Single(item => item.StudySessionId == reusedId).Id;
+        Assert.Equal(1, db.Set<StudySessionSelectedSection>()
+            .Count(item => item.StudySessionSelectionId == reusedSelectionId));
+    }
+
+private static async Task<(Guid UserId, StudySession Session)> SeedReusableSessionAsync(
         CustomWebApplicationFactory factory)
     {
         Guid userId = Guid.NewGuid();
@@ -203,29 +242,5 @@ public sealed class StudySessionSetupApiTests
             return Task.CompletedTask;
         });
         return (userId, session);
-    }
-
-    private static HttpClient CreateStudentClient(CustomWebApplicationFactory factory, Guid userId)
-    {
-        HttpClient client = factory.CreateClient();
-        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue(
-            "Bearer",
-            TestJwtTokenFactory.Create(userId, "Student"));
-        return client;
-    }
-
-    private static StringContent JsonContent(string json) => new(json, Encoding.UTF8, "application/json");
-
-    private static ByteArrayContent ImageContent(byte[] bytes)
-    {
-        ByteArrayContent content = new(bytes);
-        content.Headers.ContentType = new MediaTypeHeaderValue("application/octet-stream");
-        return content;
-    }
-
-    private static async Task AssertNoContentAsync(HttpResponseMessage response)
-    {
-        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
-        Assert.Equal(string.Empty, await response.Content.ReadAsStringAsync());
     }
 }

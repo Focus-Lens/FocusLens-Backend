@@ -20,27 +20,24 @@ public sealed class CancelChildSetupInvitationCommandHandlerTests
         ChildSetupDraft draft = CreateInvitedDraft(parent.Id);
         ChildSetupInvitation invitation = CreatePendingInvitation(draft.Id);
 
-        InMemoryRepository<ChildSetupInvitation> invitations =
-            new(invitation);
+        InMemoryRepository<ChildSetupInvitation> invitations = new(invitation);
 
         CancelChildSetupInvitationCommandHandler handler = new(
             new InMemoryRepository<Parent>(parent),
             new InMemoryRepository<ChildSetupDraft>(draft),
             invitations,
             new FakeCurrentUser(parentUserId),
-            new FakeUnitOfWork());
+            new FakeUnitOfWork()
+        );
 
         Result<Success> result = await handler.Handle(
             new CancelChildSetupInvitationCommand(draft.Id),
-            CancellationToken.None);
+            CancellationToken.None
+        );
 
         Assert.True(result.IsSuccess);
-        Assert.Equal(
-            ChildSetupInvitationStatus.Cancelled,
-            invitation.Status);
-        Assert.Equal(
-            ChildSetupStatus.Draft,
-            draft.Status);
+        Assert.Equal(ChildSetupInvitationStatus.Cancelled, invitation.Status);
+        Assert.Equal(ChildSetupStatus.Draft, draft.Status);
     }
 
     [Fact]
@@ -56,17 +53,19 @@ public sealed class CancelChildSetupInvitationCommandHandlerTests
             new InMemoryRepository<ChildSetupDraft>(draft),
             new InMemoryRepository<ChildSetupInvitation>(invitation),
             new FakeCurrentUser(parentUserId),
-            new FakeUnitOfWork());
+            new FakeUnitOfWork()
+        );
+
 
         Result<Success> cancelResult = await cancelHandler.Handle(
             new CancelChildSetupInvitationCommand(draft.Id),
-            CancellationToken.None);
+            CancellationToken.None
+        );
+
 
         Assert.True(cancelResult.IsSuccess);
         Assert.Equal(ChildSetupStatus.Draft, draft.Status);
-        Assert.Equal(
-            ChildSetupInvitationStatus.Cancelled,
-            invitation.Status);
+        Assert.Equal(ChildSetupInvitationStatus.Cancelled, invitation.Status);
     }
 
     [Fact]
@@ -74,31 +73,31 @@ public sealed class CancelChildSetupInvitationCommandHandlerTests
     {
         Guid parentUserId = Guid.NewGuid();
         Parent parent = new(parentUserId);
+        parent.SetWeekStartsOn(DayOfWeek.Monday);
         ChildSetupDraft draft = CreateCompleteDraft(parent.Id);
         draft.MarkInvited();
 
-        ChildSetupInvitation cancelledInvitation =
-            CreatePendingInvitation(draft.Id);
+        ChildSetupInvitation cancelledInvitation = CreatePendingInvitation(draft.Id);
 
-        InMemoryRepository<ChildSetupInvitation> invitations =
-            new(cancelledInvitation);
+        InMemoryRepository<ChildSetupInvitation> invitations = new(cancelledInvitation);
 
         CancelChildSetupInvitationCommandHandler cancelHandler = new(
             new InMemoryRepository<Parent>(parent),
             new InMemoryRepository<ChildSetupDraft>(draft),
             invitations,
             new FakeCurrentUser(parentUserId),
-            new FakeUnitOfWork());
+            new FakeUnitOfWork()
+        );
 
         Result<Success> cancelResult = await cancelHandler.Handle(
             new CancelChildSetupInvitationCommand(draft.Id),
-            CancellationToken.None);
+            CancellationToken.None
+        );
 
         Assert.True(cancelResult.IsSuccess);
         Assert.Equal(ChildSetupStatus.Draft, draft.Status);
-        Assert.Equal(
-            ChildSetupInvitationStatus.Cancelled,
-            cancelledInvitation.Status);
+        Assert.Equal(ChildSetupInvitationStatus.Cancelled, cancelledInvitation.Status);
+
 
         CreateChildSetupInvitationCommandHandler createHandler = new(
             new InMemoryRepository<Parent>(parent),
@@ -108,26 +107,30 @@ public sealed class CancelChildSetupInvitationCommandHandlerTests
             new FakeUnitOfWork(),
             new FakeEmailSender(),
             new FakeInvitationUrlBuilder(),
-            TimeProvider.System);
+            new FakeChildSetupInvitationTokenProtector(),
+            TimeProvider.System
+        );
 
-        Result<ChildSetupInvitationResponse> createResult =
-            await createHandler.Handle(
-                new CreateChildSetupInvitationCommand(
-                    draft.Id,
-                    new CreateChildSetupInvitationRequest(
-                        "child@example.com")),
-                CancellationToken.None);
+        Result<ChildSetupInvitationResponse> createResult = await createHandler.Handle(
+            new CreateChildSetupInvitationCommand(
+                draft.Id,
+                new CreateChildSetupInvitationRequest("child@example.com")
+            ),
+            CancellationToken.None
+        );
 
-        Assert.True(createResult.IsSuccess);
+        Assert.True(createResult.IsSuccess, createResult.TopError.ToString());
         Assert.Equal("Pending", createResult.Value.Status);
         Assert.Equal(ChildSetupStatus.Invited, draft.Status);
         Assert.Equal(2, (await invitations.GetAllAsync()).Count());
         Assert.Contains(
             await invitations.GetAllAsync(),
-            item => item.Status == ChildSetupInvitationStatus.Cancelled);
+            item => item.Status == ChildSetupInvitationStatus.Cancelled
+        );
         Assert.Contains(
             await invitations.GetAllAsync(),
-            item => item.Status == ChildSetupInvitationStatus.Pending);
+            item => item.Status == ChildSetupInvitationStatus.Pending
+        );
     }
 
     [Fact]
@@ -143,17 +146,17 @@ public sealed class CancelChildSetupInvitationCommandHandlerTests
             new InMemoryRepository<ChildSetupDraft>(draft),
             new InMemoryRepository<ChildSetupInvitation>(invitation),
             new FakeCurrentUser(currentParent.UserId),
-            new FakeUnitOfWork());
+            new FakeUnitOfWork()
+        );
 
         Result<Success> result = await handler.Handle(
             new CancelChildSetupInvitationCommand(draft.Id),
-            CancellationToken.None);
+            CancellationToken.None
+        );
 
         Assert.False(result.IsSuccess);
         Assert.Equal("ChildSetup.NotFound", result.TopError.Code);
-        Assert.Equal(
-            ChildSetupInvitationStatus.Pending,
-            invitation.Status);
+        Assert.Equal(ChildSetupInvitationStatus.Pending, invitation.Status);
     }
 
     [Fact]
@@ -168,11 +171,13 @@ public sealed class CancelChildSetupInvitationCommandHandlerTests
             new InMemoryRepository<ChildSetupDraft>(draft),
             new InMemoryRepository<ChildSetupInvitation>(),
             new FakeCurrentUser(parentUserId),
-            new FakeUnitOfWork());
+            new FakeUnitOfWork()
+        );
 
         Result<Success> result = await handler.Handle(
             new CancelChildSetupInvitationCommand(draft.Id),
-            CancellationToken.None);
+            CancellationToken.None
+        );
 
         Assert.False(result.IsSuccess);
         Assert.Equal("ChildSetup.NotInvited", result.TopError.Code);
@@ -185,8 +190,7 @@ public sealed class CancelChildSetupInvitationCommandHandlerTests
         Parent parent = new(parentUserId);
         ChildSetupDraft draft = CreateInvitedDraft(parent.Id);
 
-        ChildSetupInvitation cancelledInvitation =
-            CreatePendingInvitation(draft.Id);
+        ChildSetupInvitation cancelledInvitation = CreatePendingInvitation(draft.Id);
 
         cancelledInvitation.Cancel();
 
@@ -195,16 +199,16 @@ public sealed class CancelChildSetupInvitationCommandHandlerTests
             new InMemoryRepository<ChildSetupDraft>(draft),
             new InMemoryRepository<ChildSetupInvitation>(cancelledInvitation),
             new FakeCurrentUser(parentUserId),
-            new FakeUnitOfWork());
+            new FakeUnitOfWork()
+        );
 
         Result<Success> result = await handler.Handle(
             new CancelChildSetupInvitationCommand(draft.Id),
-            CancellationToken.None);
+            CancellationToken.None
+        );
 
         Assert.False(result.IsSuccess);
-        Assert.Equal(
-            "ChildSetupInvitation.NotFound",
-            result.TopError.Code);
+        Assert.Equal("ChildSetupInvitation.NotFound", result.TopError.Code);
     }
 
     [Fact]
@@ -218,11 +222,13 @@ public sealed class CancelChildSetupInvitationCommandHandlerTests
             new InMemoryRepository<ChildSetupDraft>(),
             new InMemoryRepository<ChildSetupInvitation>(),
             new FakeCurrentUser(parentUserId),
-            new FakeUnitOfWork());
+            new FakeUnitOfWork()
+        );
 
         Result<Success> result = await handler.Handle(
             new CancelChildSetupInvitationCommand(Guid.Empty),
-            CancellationToken.None);
+            CancellationToken.None
+        );
 
         Assert.False(result.IsSuccess);
         Assert.Equal("ChildSetup.InvalidDraftId", result.TopError.Code);
@@ -233,24 +239,23 @@ public sealed class CancelChildSetupInvitationCommandHandlerTests
     {
         Parent parent = new(Guid.NewGuid());
         ChildSetupDraft draft = CreateInvitedDraft(parent.Id);
-        ChildSetupInvitation invitation =
-            CreatePendingInvitation(draft.Id);
+        ChildSetupInvitation invitation = CreatePendingInvitation(draft.Id);
 
         CancelChildSetupInvitationCommandHandler handler = new(
             new InMemoryRepository<Parent>(parent),
             new InMemoryRepository<ChildSetupDraft>(draft),
             new InMemoryRepository<ChildSetupInvitation>(invitation),
             new FakeCurrentUser(Guid.Empty),
-            new FakeUnitOfWork());
+            new FakeUnitOfWork()
+        );
 
         Result<Success> result = await handler.Handle(
             new CancelChildSetupInvitationCommand(draft.Id),
-            CancellationToken.None);
+            CancellationToken.None
+        );
 
         Assert.False(result.IsSuccess);
-        Assert.Equal(
-            "Parents.CurrentUserUnavailable",
-            result.TopError.Code);
+        Assert.Equal("Parents.CurrentUserUnavailable", result.TopError.Code);
     }
 
     private static ChildSetupDraft CreateCompleteDraft(Guid parentId)
@@ -258,20 +263,22 @@ public sealed class CancelChildSetupInvitationCommandHandlerTests
         ChildSetupDraft draft = new(parentId);
         draft.SetName("Karim", "Mahmoud");
         draft.SetGrade(StudentGrade.Grade10);
-        draft.ReplaceSubjects([
-            ChildSetupSubject.Predefined(StudentSubjectType.Math)
-        ]);
+        draft.ReplaceSubjects([ChildSetupSubject.Predefined(StudentSubjectType.Math)]);
         draft.ReplaceStudyPriorities([
             DomainStudyPriority.BuildStudyRoutine,
             DomainStudyPriority.StayFocused,
-            DomainStudyPriority.ExamPreparation
+            DomainStudyPriority.ExamPreparation,
         ]);
         draft.SetStudyTimeGoal(
-            StudyTimeGoal.Create(
-                DomainStudyTimeGoalPeriod.Daily,
-                60,
-                [DayOfWeek.Monday],
-                null).Value);
+            StudyTimeGoal
+                .Create(
+                    DomainStudyTimeGoalPeriod.Daily,
+                    60,
+                    [DayOfWeek.Monday],
+                    new DateOnly(2026, 9, 14)
+                )
+                .Value
+        );
 
         return draft;
     }
@@ -289,6 +296,7 @@ public sealed class CancelChildSetupInvitationCommandHandlerTests
             draftId,
             "child@example.com",
             "test-hash",
-            DateTimeOffset.UtcNow.AddDays(7));
+            DateTimeOffset.UtcNow.AddDays(7)
+        );
     }
 }

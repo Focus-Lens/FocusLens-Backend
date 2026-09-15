@@ -137,6 +137,7 @@ public sealed class ReportsApiTests
         biology = StudentSubject.Predefined(StudentSubjectType.Biology);
         Student student = new(userId);
         student.ReplaceSubjects([math, biology]);
+        student.SetParentSharingPreferences(true, true);
         return student;
     }
 

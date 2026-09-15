@@ -25,6 +25,8 @@ public class Student : AuditableEntity
 
     public string? PreferredName { get; private set; }
 
+    public string? ProfileImageStorageReference { get; private set; }
+
     public DateOnly? DateOfBirth { get; private set; }
 
     public ICollection<StudentGoal> Goals { get; } = [];
@@ -36,6 +38,10 @@ public class Student : AuditableEntity
     public ICollection<StudyPriority> StudyPriorities { get; } = [];
 
     public StudyTimeGoal? StudyTimeGoal { get; private set; }
+
+    public bool ShareSessionSummariesWithParents { get; private set; }
+
+    public bool ShareSubjectTrendsWithParents { get; private set; }
 
     public bool IsOnboardingCompleted { get; private set; }
 
@@ -107,6 +113,19 @@ public class Student : AuditableEntity
     public void SetStudyTimeGoal(StudyTimeGoal? studyTimeGoal) => StudyTimeGoal = studyTimeGoal;
 
     public void SetPreferredName(string? preferredName) => PreferredName = preferredName?.Trim();
+
+    public void SetProfileImageStorageReference(string? storageReference) =>
+        ProfileImageStorageReference = string.IsNullOrWhiteSpace(storageReference)
+            ? null
+            : storageReference.Trim();
+
+    public void SetParentSharingPreferences(
+        bool shareSessionSummaries,
+        bool shareSubjectTrends)
+    {
+        ShareSessionSummariesWithParents = shareSessionSummaries;
+        ShareSubjectTrendsWithParents = shareSubjectTrends;
+    }
 
     public void CompleteOnboarding(
         IEnumerable<StudentGoal> goals,

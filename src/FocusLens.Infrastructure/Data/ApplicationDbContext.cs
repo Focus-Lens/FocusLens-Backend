@@ -2,6 +2,7 @@ using FocusLens.Domain;
 using FocusLens.Domain.Access;
 using FocusLens.Domain.ChildSetup;
 using FocusLens.Domain.Identity;
+using FocusLens.Domain.Students;
 using FocusLens.Domain.StudySessions;
 using FocusLens.Infrastructure.Identity.Verification;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
@@ -64,6 +65,8 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
     public DbSet<ChildSetupDraft> ChildSetupDrafts => Set<ChildSetupDraft>();
 
     public DbSet<ChildSetupInvitation> ChildSetupInvitations => Set<ChildSetupInvitation>();
+
+    public DbSet<StudyGoalProposal> StudyGoalProposals => Set<StudyGoalProposal>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

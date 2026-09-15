@@ -26,6 +26,9 @@ public class StudentConfiguration : IEntityTypeConfiguration<Student>
         builder.Property(student => student.PreferredName)
             .HasMaxLength(100);
 
+        builder.Property(student => student.ProfileImageStorageReference)
+            .HasMaxLength(500);
+
         builder.Property(student => student.DateOfBirth);
 
         builder.PrimitiveCollection(student => student.Goals)
@@ -63,6 +66,14 @@ public class StudentConfiguration : IEntityTypeConfiguration<Student>
             .HasMaxLength(50);
 
         builder.Property(student => student.IsOnboardingCompleted)
+            .IsRequired()
+            .HasDefaultValue(false);
+
+        builder.Property(student => student.ShareSessionSummariesWithParents)
+            .IsRequired()
+            .HasDefaultValue(false);
+
+        builder.Property(student => student.ShareSubjectTrendsWithParents)
             .IsRequired()
             .HasDefaultValue(false);
 

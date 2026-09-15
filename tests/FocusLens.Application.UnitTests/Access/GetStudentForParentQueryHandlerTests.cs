@@ -2,6 +2,7 @@ using FocusLens.Application.Access;
 using FocusLens.Contracts.Students;
 using FocusLens.Domain;
 using FocusLens.Domain.Access;
+using FocusLens.Domain.Identity;
 using FocusLens.Domain.Students;
 using ContractStudentGoal = FocusLens.Contracts.Students.StudentGoal;
 using ContractStudentGrade = FocusLens.Contracts.Students.StudentGrade;
@@ -22,6 +23,17 @@ public class GetStudentForParentQueryHandlerTests
 
         Parent parent = new(parentUserId);
         Student student = new(studentUserId);
+
+        student.SetPrivateProperty(
+            "User",
+            new ApplicationUser
+            {
+                Id = studentUserId,
+                Email = "student@example.com",
+                UserName = "student@example.com",
+                FirstName = "Youssef",
+                LastName = "Mahmoud"
+            });
 
         student.CompleteOnboarding(
             new[] { StudentGoal.FocusBetter },

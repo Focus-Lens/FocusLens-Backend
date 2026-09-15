@@ -4,6 +4,8 @@ using System.Text.Json;
 using FocusLens.Domain;
 using FocusLens.Domain.Access;
 using FocusLens.Domain.Identity;
+using FocusLens.Infrastructure.Data;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace FocusLens.Api.IntegrationTests;
 
@@ -29,7 +31,9 @@ public class StudentInvitationApiTests
     public async Task AcceptInvitation_OnlyInvitedStudentCanAccept()
     {
         InvitationFixture fixture = await CreateFixtureAsync();
-        using HttpClient otherStudentClient = CreateStudentClient(fixture.Factory, Guid.NewGuid());
+        Guid otherStudentUserId = Guid.NewGuid();
+
+        using HttpClient otherStudentClient = CreateStudentClient(fixture.Factory, otherStudentUserId);
 
         HttpResponseMessage forbidden = await otherStudentClient.PostAsync(
             $"/api/access/invitations/{fixture.RelationshipId}/accept",
@@ -73,10 +77,20 @@ public class StudentInvitationApiTests
 
         await factory.SeedAsync(db =>
         {
-            db.Users.Add(new ApplicationUser
-            {
-                Id = parentUserId, Email = "parent@example.com", UserName = "parent@example.com"
-            });
+            db.Users.AddRange(
+                new ApplicationUser
+                {
+                    Id = parentUserId,
+                    Email = "parent@example.com",
+                    UserName = "parent@example.com"
+                },
+                new ApplicationUser
+                {
+                    Id = studentUserId,
+                    Email = "student@example.com",
+                    UserName = "student@example.com"
+                });
+
             db.Parents.Add(parent);
             db.Students.Add(student);
             db.ParentStudentRelationships.Add(relationship);

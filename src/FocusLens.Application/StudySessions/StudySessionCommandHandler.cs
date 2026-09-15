@@ -1,5 +1,6 @@
 using FocusLens.Contracts.StudySessions;
 using FocusLens.Application.Common.Interfaces;
+using FocusLens.Application.Notifications;
 using FocusLens.Domain;
 using FocusLens.Domain.Common.Interfaces;
 using FocusLens.Domain.Common.Results;

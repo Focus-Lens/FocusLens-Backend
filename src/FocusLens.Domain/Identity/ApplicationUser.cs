@@ -16,6 +16,10 @@ public sealed class ApplicationUser : IdentityUser<Guid>
 
     public bool IsDisabled { get; set; }
 
+    public DateTimeOffset? DeletedAtUtc { get; private set; }
+
+    public DateTimeOffset? RestoreUntilUtc { get; private set; }
+
     public DateTimeOffset? TermsAcceptedAtUtc { get; private set; }
 
     public string? TermsVersion { get; private set; }
@@ -35,5 +39,24 @@ public sealed class ApplicationUser : IdentityUser<Guid>
 
         TermsVersion = termsVersion.Trim();
         TermsAcceptedAtUtc = acceptedAtUtc;
+    }
+
+    public void SoftDelete(DateTimeOffset deletedAtUtc, TimeSpan restoreWindow)
+    {
+        IsDisabled = true;
+        DeletedAtUtc = deletedAtUtc;
+        RestoreUntilUtc = deletedAtUtc.Add(restoreWindow);
+    }
+
+    public bool CanSelfRestore(DateTimeOffset utcNow) =>
+        DeletedAtUtc is not null &&
+        RestoreUntilUtc is not null &&
+        utcNow <= RestoreUntilUtc.Value;
+
+    public void Restore()
+    {
+        IsDisabled = false;
+        DeletedAtUtc = null;
+        RestoreUntilUtc = null;
     }
 }

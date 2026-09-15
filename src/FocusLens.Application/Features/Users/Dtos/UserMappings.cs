@@ -13,6 +13,9 @@ internal static class UserMappings
             user.Email ?? string.Empty,
             user.FirstName,
             user.LastName,
+            user.PhoneNumber,
+            user.EmailConfirmed,
+            user.IsDisabled,
             roles);
     }
 }

@@ -137,9 +137,18 @@ public sealed class ReportQueryHandler(
             item.StudentId == studentId &&
             item.Status == RelationshipStatus.Active);
 
-        return relationship is null
-            ? null
-            : await studentRepository.FirstOrDefaultAsync(student => student.Id == studentId, student => student.Subjects);
+        if (relationship is null)
+        {
+            return null;
+        }
+
+        Student? connectedStudent = await studentRepository.FirstOrDefaultAsync(
+            student => student.Id == studentId,
+            student => student.Subjects);
+
+        return connectedStudent?.ShareSessionSummariesWithParents == true
+            ? connectedStudent
+            : null;
     }
 
     private static bool MatchesFilters(StudySession session, GetReportSessionsQuery request, StudySessionStatus? status)

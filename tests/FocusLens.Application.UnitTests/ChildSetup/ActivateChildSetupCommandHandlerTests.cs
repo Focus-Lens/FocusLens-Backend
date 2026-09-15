@@ -41,6 +41,8 @@ public sealed class ActivateChildSetupCommandHandlerTests
             LastName = "Name"
         };
 
+        student.SetPrivateProperty("User", user);
+
         ActivateChildSetupCommandHandler handler = new(
             new InMemoryRepository<Student>(student),
             new InMemoryRepository<ChildSetupDraft>(draft),
@@ -95,6 +97,8 @@ public sealed class ActivateChildSetupCommandHandlerTests
             LastName = "Name"
         };
 
+        student.SetPrivateProperty("User", user);
+
         ActivateChildSetupCommandHandler handler = new(
             new InMemoryRepository<Student>(student),
             new InMemoryRepository<ChildSetupDraft>(draft),
@@ -144,6 +148,8 @@ public sealed class ActivateChildSetupCommandHandlerTests
             FirstName = "Old",
             LastName = "Name"
         };
+
+        student.SetPrivateProperty("User", user);
 
         ActivateChildSetupCommandHandler handler = new(
             new InMemoryRepository<Student>(student),

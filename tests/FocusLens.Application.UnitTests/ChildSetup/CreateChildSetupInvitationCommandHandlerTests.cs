@@ -18,7 +18,7 @@ public sealed class CreateChildSetupInvitationCommandHandlerTests
     public async Task Create_WithCompleteDraft_CreatesInvitationAndEmailsChild()
     {
         Guid parentUserId = Guid.NewGuid();
-        Parent parent = new(parentUserId);
+        Parent parent = CreateParent(parentUserId);
         ChildSetupDraft draft = CreateCompleteDraft(parent.Id);
 
         InMemoryRepository<ChildSetupInvitation> invitations = new();
@@ -31,6 +31,7 @@ public sealed class CreateChildSetupInvitationCommandHandlerTests
             new FakeUnitOfWork(),
             emailSender,
             new FakeInvitationUrlBuilder(),
+            new FakeChildSetupInvitationTokenProtector(),
             TimeProvider.System);
 
         Result<ChildSetupInvitationResponse> result = await handler.Handle(
@@ -53,7 +54,7 @@ public sealed class CreateChildSetupInvitationCommandHandlerTests
     public async Task Create_WithCompleteDraft_StoresHashOfGeneratedToken()
     {
         Guid parentUserId = Guid.NewGuid();
-        Parent parent = new(parentUserId);
+        Parent parent = CreateParent(parentUserId);
         ChildSetupDraft draft = CreateCompleteDraft(parent.Id);
         InMemoryRepository<ChildSetupInvitation> invitations = new();
         FakeEmailSender emailSender = new();
@@ -66,6 +67,7 @@ public sealed class CreateChildSetupInvitationCommandHandlerTests
             new FakeUnitOfWork(),
             emailSender,
             new FakeInvitationUrlBuilder(),
+            new FakeChildSetupInvitationTokenProtector(),
             TimeProvider.System);
 
         Result<ChildSetupInvitationResponse> result = await handler.Handle(
@@ -83,6 +85,8 @@ public sealed class CreateChildSetupInvitationCommandHandlerTests
             Hash(token),
             invitation.TokenHash);
         Assert.NotEqual(token, invitation.TokenHash);
+        Assert.Equal($"protected:{token}", invitation.ProtectedToken);
+        Assert.NotEqual(token, invitation.ProtectedToken);
     }
 
     [Fact]
@@ -100,6 +104,7 @@ public sealed class CreateChildSetupInvitationCommandHandlerTests
             new FakeUnitOfWork(),
             new FakeEmailSender(),
             new FakeInvitationUrlBuilder(),
+            new FakeChildSetupInvitationTokenProtector(),
             TimeProvider.System);
 
         Result<ChildSetupInvitationResponse> result = await handler.Handle(
@@ -117,7 +122,7 @@ public sealed class CreateChildSetupInvitationCommandHandlerTests
     public async Task Create_WithIncompleteDraft_ReturnsValidationError()
     {
         Guid parentUserId = Guid.NewGuid();
-        Parent parent = new(parentUserId);
+        Parent parent = CreateParent(parentUserId);
         ChildSetupDraft draft = new(parent.Id);
 
         CreateChildSetupInvitationCommandHandler handler = new(
@@ -128,6 +133,7 @@ public sealed class CreateChildSetupInvitationCommandHandlerTests
             new FakeUnitOfWork(),
             new FakeEmailSender(),
             new FakeInvitationUrlBuilder(),
+            new FakeChildSetupInvitationTokenProtector(),
             TimeProvider.System);
 
         Result<ChildSetupInvitationResponse> result = await handler.Handle(
@@ -145,7 +151,7 @@ public sealed class CreateChildSetupInvitationCommandHandlerTests
     public async Task Create_WithInvalidEmail_ReturnsValidationError()
     {
         Guid parentUserId = Guid.NewGuid();
-        Parent parent = new(parentUserId);
+        Parent parent = CreateParent(parentUserId);
         ChildSetupDraft draft = CreateCompleteDraft(parent.Id);
 
         CreateChildSetupInvitationCommandHandler handler = new(
@@ -156,6 +162,7 @@ public sealed class CreateChildSetupInvitationCommandHandlerTests
             new FakeUnitOfWork(),
             new FakeEmailSender(),
             new FakeInvitationUrlBuilder(),
+            new FakeChildSetupInvitationTokenProtector(),
             TimeProvider.System);
 
         Result<ChildSetupInvitationResponse> result = await handler.Handle(
@@ -172,7 +179,7 @@ public sealed class CreateChildSetupInvitationCommandHandlerTests
     public async Task Create_WhenDraftAlreadyInvited_ReturnsConflict()
     {
         Guid parentUserId = Guid.NewGuid();
-        Parent parent = new(parentUserId);
+        Parent parent = CreateParent(parentUserId);
         ChildSetupDraft draft = CreateCompleteDraft(parent.Id);
         draft.MarkInvited();
 
@@ -184,6 +191,7 @@ public sealed class CreateChildSetupInvitationCommandHandlerTests
             new FakeUnitOfWork(),
             new FakeEmailSender(),
             new FakeInvitationUrlBuilder(),
+            new FakeChildSetupInvitationTokenProtector(),
             TimeProvider.System);
 
         Result<ChildSetupInvitationResponse> result = await handler.Handle(
@@ -194,6 +202,35 @@ public sealed class CreateChildSetupInvitationCommandHandlerTests
 
         Assert.False(result.IsSuccess);
         Assert.Equal("ChildSetup.DraftAlreadyInvited", result.TopError.Code);
+    }
+
+    [Fact]
+    public async Task Create_WhenParentHasNotSelectedWeekStart_ReturnsValidationError()
+    {
+        Guid parentUserId = Guid.NewGuid();
+        Parent parent = new(parentUserId);
+        ChildSetupDraft draft = CreateCompleteDraft(parent.Id);
+
+        CreateChildSetupInvitationCommandHandler handler = new(
+            new InMemoryRepository<Parent>(parent),
+            new InMemoryRepository<ChildSetupDraft>(draft),
+            new InMemoryRepository<ChildSetupInvitation>(),
+            new FakeCurrentUser(parentUserId),
+            new FakeUnitOfWork(),
+            new FakeEmailSender(),
+            new FakeInvitationUrlBuilder(),
+            new FakeChildSetupInvitationTokenProtector(),
+            TimeProvider.System);
+
+        Result<ChildSetupInvitationResponse> result = await handler.Handle(
+            new CreateChildSetupInvitationCommand(
+                draft.Id,
+                new CreateChildSetupInvitationRequest("child@example.com")),
+            CancellationToken.None);
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal("ChildSetup.WeekStartsOnRequired", result.TopError.Code);
+        Assert.Equal(ChildSetupStatus.Draft, draft.Status);
     }
 
     private static ChildSetupDraft CreateCompleteDraft(Guid parentId)
@@ -210,7 +247,11 @@ public sealed class CreateChildSetupInvitationCommandHandlerTests
             DomainStudyPriority.ExamPreparation
         ]);
         draft.SetStudyTimeGoal(
-            StudyTimeGoal.Create(DomainStudyTimeGoalPeriod.Daily, 60, [DayOfWeek.Monday], null).Value);
+            StudyTimeGoal.Create(
+                DomainStudyTimeGoalPeriod.Daily,
+                60,
+                [DayOfWeek.Monday],
+                new DateOnly(2026, 9, 14)).Value);
         return draft;
     }
 
@@ -218,5 +259,12 @@ public sealed class CreateChildSetupInvitationCommandHandlerTests
     {
         return Convert.ToHexString(
             SHA256.HashData(Encoding.UTF8.GetBytes(token)));
+    }
+
+    private static Parent CreateParent(Guid userId)
+    {
+        Parent parent = new(userId);
+        parent.SetWeekStartsOn(DayOfWeek.Monday);
+        return parent;
     }
 }

@@ -1,4 +1,5 @@
 ﻿using System.Text;
+using System.Security.Claims;
 using FocusLens.Domain.Common.Interfaces;
 using FocusLens.Domain.Identity;
 using FocusLens.Domain.Interfaces;
@@ -10,6 +11,7 @@ using FocusLens.Infrastructure.Data;
 using FocusLens.Infrastructure.Data.Interceptors;
 using FocusLens.Infrastructure.Identity;
 using FocusLens.Infrastructure.Identity.Seed;
+using FocusLens.Infrastructure.Notifications;
 using FocusLens.Infrastructure.StudySessions;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Http;
@@ -88,6 +90,9 @@ public static class DependencyInjection
         services.AddScoped<IStudyMaterialFileStore, LocalStudyMaterialFileStore>();
         services.AddScoped<IStudySessionImageFileStore, LocalStudySessionImageFileStore>();
         services.AddScoped<IStudyMaterialPdfProcessor, PdfSharpStudyMaterialPdfProcessor>();
+        services.AddSingleton<IPushNotificationProvider, NoopPushNotificationProvider>();
+        services.AddHostedService<ScheduledNotificationWorker>();
+        services.AddHostedService<PushNotificationDispatcher>();
 
         services.AddDbContext<ApplicationDbContext>((serviceProvider, options) =>
             {
@@ -169,7 +174,7 @@ public static class DependencyInjection
                 };
                 options.Events = new JwtBearerEvents
                 {
-                    OnTokenValidated = context =>
+                    OnTokenValidated = async context =>
                     {
                         string? tokenType = context.Principal?.FindFirst(
                             TokenProvider.TokenTypeClaim)?.Value;
@@ -178,9 +183,27 @@ public static class DependencyInjection
                             && !IsStudentOnboardingRequest(context.HttpContext))
                         {
                             context.Fail("Onboarding token is only valid for student onboarding.");
+                            return;
                         }
 
-                        return Task.CompletedTask;
+                        string? userIdValue = context.Principal?.FindFirstValue(
+                            ClaimTypes.NameIdentifier);
+                        if (!Guid.TryParse(userIdValue, out Guid userId))
+                        {
+                            context.Fail("The token does not identify a valid user.");
+                            return;
+                        }
+
+                        ApplicationDbContext dbContext =
+                            context.HttpContext.RequestServices.GetRequiredService<ApplicationDbContext>();
+                        ApplicationUser? user = await dbContext.Users.FindAsync(
+                            [userId],
+                            context.HttpContext.RequestAborted);
+
+                        if (user is null || user.IsDisabled)
+                        {
+                            context.Fail("The user account is disabled or unavailable.");
+                        }
                     }
                 };
             });

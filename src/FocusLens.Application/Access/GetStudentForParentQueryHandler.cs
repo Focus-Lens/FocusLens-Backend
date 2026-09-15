@@ -49,6 +49,7 @@ public sealed class GetStudentForParentQueryHandler(
 
         Student? student = await studentRepository.FirstOrDefaultAsync(
             student => student.Id == request.StudentId,
+            student => student.User,
             student => student.Subjects);
 
         if (student is null)

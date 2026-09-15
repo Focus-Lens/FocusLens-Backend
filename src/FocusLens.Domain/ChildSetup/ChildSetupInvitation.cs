@@ -12,7 +12,8 @@ public sealed class ChildSetupInvitation : AuditableEntity
         Guid childSetupDraftId,
         string targetEmailNormalized,
         string tokenHash,
-        DateTimeOffset expiresAtUtc)
+        DateTimeOffset expiresAtUtc,
+        string? protectedToken = null)
         : base(Guid.CreateVersion7())
     {
         if (childSetupDraftId == Guid.Empty)
@@ -39,6 +40,7 @@ public sealed class ChildSetupInvitation : AuditableEntity
         ChildSetupDraftId = childSetupDraftId;
         TargetEmailNormalized = targetEmailNormalized;
         TokenHash = tokenHash;
+        ProtectedToken = protectedToken;
         ExpiresAtUtc = expiresAtUtc;
         Status = ChildSetupInvitationStatus.Pending;
     }
@@ -50,6 +52,8 @@ public sealed class ChildSetupInvitation : AuditableEntity
 
     public string TokenHash { get; private set; }
         = string.Empty;
+
+    public string? ProtectedToken { get; private set; }
 
     public DateTimeOffset ExpiresAtUtc { get; private set; }
 
@@ -96,7 +100,8 @@ public sealed class ChildSetupInvitation : AuditableEntity
 
     public void Renew(
         string tokenHash,
-        DateTimeOffset expiresAtUtc)
+        DateTimeOffset expiresAtUtc,
+        string? protectedToken = null)
     {
         if (Status != ChildSetupInvitationStatus.Pending)
         {
@@ -112,6 +117,7 @@ public sealed class ChildSetupInvitation : AuditableEntity
         }
 
         TokenHash = tokenHash;
+        ProtectedToken = protectedToken;
         ExpiresAtUtc = expiresAtUtc;
     }
 }

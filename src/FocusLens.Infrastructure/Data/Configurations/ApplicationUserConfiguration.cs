@@ -17,6 +17,10 @@ public class ApplicationUserConfiguration : IEntityTypeConfiguration<Application
         builder.Property(user => user.TermsVersion)
             .HasMaxLength(50);
 
+        builder.Property(user => user.DeletedAtUtc);
+
+        builder.Property(user => user.RestoreUntilUtc);
+
         builder.HasMany(user => user.RefreshTokens)
             .WithOne()
             .HasForeignKey(refreshToken => refreshToken.UserId)
