@@ -152,76 +152,156 @@ public sealed class SmtpEmailSender : IEmailSender
         string htmlBody,
         CancellationToken cancellationToken)
     {
-        MimeMessage message = new();
-
-        message.From.Add(new MailboxAddress(
-            _settings.DisplayName,
-            _settings.Mail));
-
-        message.To.Add(MailboxAddress.Parse(email));
-        message.Subject = subject;
-
-        BodyBuilder bodyBuilder = new()
+        try
         {
-            HtmlBody = htmlBody
-        };
+            Console.WriteLine(
+                $"SMTP: Starting email send to {email}");
 
-        string logoPath = Path.Combine(
-            Directory.GetCurrentDirectory(),
-            "wwwroot",
-            "images",
-            "focuslens-logo.png");
+            _logger.LogInformation(
+                "SMTP: Starting email send to {Email}",
+                email);
 
-        string mascotPath = Path.Combine(
-            Directory.GetCurrentDirectory(),
-            "wwwroot",
-            "images",
-            "focuslens-mascot.png");
+            MimeMessage message = new();
 
-        MimeEntity logo = bodyBuilder.LinkedResources.Add(logoPath);
-        logo.ContentId = "focuslens-logo";
-        logo.ContentDisposition =
-            new ContentDisposition(ContentDisposition.Inline);
+            message.From.Add(new MailboxAddress(
+                _settings.DisplayName,
+                _settings.Mail));
 
-        MimeEntity mascot = bodyBuilder.LinkedResources.Add(mascotPath);
-        mascot.ContentId = "focuslens-mascot";
-        mascot.ContentDisposition =
-            new ContentDisposition(ContentDisposition.Inline);
+            message.To.Add(MailboxAddress.Parse(email));
+            message.Subject = subject;
 
-        message.Body = bodyBuilder.ToMessageBody();
+            BodyBuilder bodyBuilder = new()
+            {
+                HtmlBody = htmlBody
+            };
 
-        using SmtpClient smtpClient = new();
+            string logoPath = Path.Combine(
+                Directory.GetCurrentDirectory(),
+                "wwwroot",
+                "images",
+                "focuslens-logo.png");
 
-        _logger.LogInformation(
-            "SMTP: Connecting to {Host}:{Port}",
-            _settings.Host,
-            _settings.Port);
+            string mascotPath = Path.Combine(
+                Directory.GetCurrentDirectory(),
+                "wwwroot",
+                "images",
+                "focuslens-mascot.png");
 
-        await smtpClient.ConnectAsync(
-            _settings.Host,
-            _settings.Port,
-            SecureSocketOptions.StartTls,
-            cancellationToken);
+            MimeEntity logo = bodyBuilder.LinkedResources.Add(logoPath);
+            logo.ContentId = "focuslens-logo";
+            logo.ContentDisposition =
+                new ContentDisposition(ContentDisposition.Inline);
 
-        _logger.LogInformation("SMTP: Connected successfully");
+            MimeEntity mascot = bodyBuilder.LinkedResources.Add(mascotPath);
+            mascot.ContentId = "focuslens-mascot";
+            mascot.ContentDisposition =
+                new ContentDisposition(ContentDisposition.Inline);
 
-        await smtpClient.AuthenticateAsync(
-            _settings.Mail,
-            _settings.Password,
-            cancellationToken);
+            message.Body = bodyBuilder.ToMessageBody();
 
-        _logger.LogInformation("SMTP: Authenticated successfully");
+            using SmtpClient smtpClient = new();
 
-        await smtpClient.SendAsync(
-            message,
-            cancellationToken);
+            Console.WriteLine(
+                $"SMTP: Connecting to {_settings.Host}:{_settings.Port}");
 
-        _logger.LogInformation("SMTP: Email sent successfully");
+            _logger.LogInformation(
+                "SMTP: Connecting to {Host}:{Port}",
+                _settings.Host,
+                _settings.Port);
 
-        await smtpClient.DisconnectAsync(
-            true,
-            cancellationToken);
+            await smtpClient.ConnectAsync(
+                _settings.Host,
+                _settings.Port,
+                SecureSocketOptions.StartTls,
+                cancellationToken);
 
-        _logger.LogInformation("SMTP: Disconnected successfully");
+            Console.WriteLine("SMTP: Connected successfully");
+
+            _logger.LogInformation(
+                "SMTP: Connected successfully");
+
+            Console.WriteLine("SMTP: Authenticating");
+
+            _logger.LogInformation(
+                "SMTP: Authenticating");
+
+            await smtpClient.AuthenticateAsync(
+                _settings.Mail,
+                _settings.Password,
+                cancellationToken);
+
+            Console.WriteLine("SMTP: Authenticated successfully");
+
+            _logger.LogInformation(
+                "SMTP: Authenticated successfully");
+
+            Console.WriteLine("SMTP: Sending email");
+
+            _logger.LogInformation(
+                "SMTP: Sending email");
+
+            await smtpClient.SendAsync(
+                message,
+                cancellationToken);
+
+            Console.WriteLine("SMTP: Email sent successfully");
+
+            _logger.LogInformation(
+                "SMTP: Email sent successfully");
+
+            await smtpClient.DisconnectAsync(
+                true,
+                cancellationToken);
+
+            Console.WriteLine("SMTP: Disconnected successfully");
+
+            _logger.LogInformation(
+                "SMTP: Disconnected successfully");
+        }
+        catch (OperationCanceledException ex)
+        {
+            Console.WriteLine(
+                $"SMTP: Operation cancelled. {ex.Message}");
+
+            _logger.LogError(
+                ex,
+                "SMTP: Operation cancelled while sending email");
+
+            throw;
+        }
+        catch (SmtpCommandException ex)
+        {
+            Console.WriteLine(
+                $"SMTP: Command error. StatusCode={ex.StatusCode}, Message={ex.Message}");
+
+            _logger.LogError(
+                ex,
+                "SMTP: Command error. StatusCode={StatusCode}",
+                ex.StatusCode);
+
+            throw;
+        }
+        catch (SmtpProtocolException ex)
+        {
+            Console.WriteLine(
+                $"SMTP: Protocol error. {ex.Message}");
+
+            _logger.LogError(
+                ex,
+                "SMTP: Protocol error");
+
+            throw;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine(
+                $"SMTP: ERROR. Type={ex.GetType().Name}, Message={ex.Message}");
+
+            _logger.LogError(
+                ex,
+                "SMTP: Unexpected error while sending email");
+
+            throw;
+        }
     }
 }
