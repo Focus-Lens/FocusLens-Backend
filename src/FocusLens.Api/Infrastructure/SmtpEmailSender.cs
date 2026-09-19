@@ -3,6 +3,7 @@ using FocusLens.Application.Common.Interfaces;
 using FocusLens.Settings;
 using MailKit.Net.Smtp;
 using MailKit.Security;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using MimeKit;
 
@@ -14,19 +15,22 @@ public sealed class SmtpEmailSender : IEmailSender
     private const string PasswordResetTemplate = "PasswordReset.html";
     private const string ParentStudentInvitationTemplate = "ParentStudentInvitation.html";
     private const string ChildSetupInvitationTemplate = "ChildSetupInvitation.html";
-    private readonly InvitationSettings _invitationSettings;
 
+    private readonly InvitationSettings _invitationSettings;
     private readonly MailSettings _settings;
     private readonly EmailTemplateRenderer _templateRenderer;
+    private readonly ILogger<SmtpEmailSender> _logger;
 
     public SmtpEmailSender(
         IOptions<MailSettings> settings,
         EmailTemplateRenderer templateRenderer,
-        IOptions<InvitationSettings> invitationSettings)
+        IOptions<InvitationSettings> invitationSettings,
+        ILogger<SmtpEmailSender> logger)
     {
         _settings = settings.Value;
         _templateRenderer = templateRenderer;
         _invitationSettings = invitationSettings.Value;
+        _logger = logger;
     }
 
     public async Task SendEmailVerificationCodeAsync(
@@ -81,11 +85,16 @@ public sealed class SmtpEmailSender : IEmailSender
         Guid invitationId,
         CancellationToken cancellationToken = default)
     {
-        string invitationUrl = $"{_invitationSettings.BaseUrl.TrimEnd('/')}/{invitationId}";
+        string invitationUrl =
+            $"{_invitationSettings.BaseUrl.TrimEnd('/')}/{invitationId}";
 
         string htmlBody = await _templateRenderer.RenderAsync(
             ParentStudentInvitationTemplate,
-            new Dictionary<string, string> { ["{{ParentEmail}}"] = parentEmail, ["{{InvitationUrl}}"] = invitationUrl },
+            new Dictionary<string, string>
+            {
+                ["{{ParentEmail}}"] = parentEmail,
+                ["{{InvitationUrl}}"] = invitationUrl
+            },
             cancellationToken);
 
         await SendAsync(
@@ -103,6 +112,7 @@ public sealed class SmtpEmailSender : IEmailSender
     {
         string encodedName = WebUtility.HtmlEncode(studentDisplayName);
         string encodedUrl = WebUtility.HtmlEncode(invitationUrl);
+
         string htmlBody = $"""
                            <p>{encodedName} invited you to connect on FocusLens.</p>
                            <p><a href=\"{encodedUrl}\">Review invitation</a></p>
@@ -123,7 +133,10 @@ public sealed class SmtpEmailSender : IEmailSender
     {
         string htmlBody = await _templateRenderer.RenderAsync(
             ChildSetupInvitationTemplate,
-            new Dictionary<string, string> { ["{{InvitationUrl}}"] = invitationUrl },
+            new Dictionary<string, string>
+            {
+                ["{{InvitationUrl}}"] = invitationUrl
+            },
             cancellationToken);
 
         await SendAsync(
@@ -148,21 +161,22 @@ public sealed class SmtpEmailSender : IEmailSender
         message.To.Add(MailboxAddress.Parse(email));
         message.Subject = subject;
 
-        BodyBuilder bodyBuilder = new() { HtmlBody = htmlBody };
+        BodyBuilder bodyBuilder = new()
+        {
+            HtmlBody = htmlBody
+        };
 
         string logoPath = Path.Combine(
             Directory.GetCurrentDirectory(),
             "wwwroot",
             "images",
-            "focuslens-logo.png"
-        );
+            "focuslens-logo.png");
 
         string mascotPath = Path.Combine(
             Directory.GetCurrentDirectory(),
             "wwwroot",
             "images",
-            "focuslens-mascot.png"
-        );
+            "focuslens-mascot.png");
 
         MimeEntity logo = bodyBuilder.LinkedResources.Add(logoPath);
         logo.ContentId = "focuslens-logo";
@@ -178,23 +192,36 @@ public sealed class SmtpEmailSender : IEmailSender
 
         using SmtpClient smtpClient = new();
 
+        _logger.LogInformation(
+            "SMTP: Connecting to {Host}:{Port}",
+            _settings.Host,
+            _settings.Port);
+
         await smtpClient.ConnectAsync(
             _settings.Host,
             _settings.Port,
             SecureSocketOptions.StartTls,
             cancellationToken);
 
+        _logger.LogInformation("SMTP: Connected successfully");
+
         await smtpClient.AuthenticateAsync(
             _settings.Mail,
             _settings.Password,
             cancellationToken);
 
+        _logger.LogInformation("SMTP: Authenticated successfully");
+
         await smtpClient.SendAsync(
             message,
             cancellationToken);
 
+        _logger.LogInformation("SMTP: Email sent successfully");
+
         await smtpClient.DisconnectAsync(
             true,
             cancellationToken);
+
+        _logger.LogInformation("SMTP: Disconnected successfully");
     }
 }
