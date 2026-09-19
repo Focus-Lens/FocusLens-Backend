@@ -27,6 +27,7 @@ public class Program
         builder.Host.UseSerilog((context, configuration) =>
             configuration.ReadFrom.Configuration(context.Configuration)
         );
+        builder.Services.AddHttpClient();
 
         // CORS
         builder.Services.AddCors(options =>
