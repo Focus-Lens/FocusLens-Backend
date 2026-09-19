@@ -207,6 +207,7 @@ using FocusLens.Application.Common.Interfaces;
 using FocusLens.Settings;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using MimeKit;
 
 namespace FocusLens.API.Infrastructure;
 
@@ -218,21 +219,18 @@ public sealed class SmtpEmailSender : IEmailSender
     private const string ChildSetupInvitationTemplate = "ChildSetupInvitation.html";
 
     private readonly InvitationSettings _invitationSettings;
-    private readonly MailSettings _settings;
     private readonly EmailTemplateRenderer _templateRenderer;
     private readonly ILogger<SmtpEmailSender> _logger;
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly IConfiguration _configuration;
 
     public SmtpEmailSender(
-        IOptions<MailSettings> settings,
         EmailTemplateRenderer templateRenderer,
         IOptions<InvitationSettings> invitationSettings,
         ILogger<SmtpEmailSender> logger,
         IHttpClientFactory httpClientFactory,
         IConfiguration configuration)
     {
-        _settings = settings.Value;
         _templateRenderer = templateRenderer;
         _invitationSettings = invitationSettings.Value;
         _logger = logger;
@@ -319,8 +317,11 @@ public sealed class SmtpEmailSender : IEmailSender
         string invitationUrl,
         CancellationToken cancellationToken = default)
     {
-        string encodedName = WebUtility.HtmlEncode(studentDisplayName);
-        string encodedUrl = WebUtility.HtmlEncode(invitationUrl);
+        string encodedName =
+            WebUtility.HtmlEncode(studentDisplayName);
+
+        string encodedUrl =
+            WebUtility.HtmlEncode(invitationUrl);
 
         string htmlBody = $"""
                            <p>{encodedName} invited you to connect on FocusLens.</p>
@@ -363,43 +364,99 @@ public sealed class SmtpEmailSender : IEmailSender
     {
         try
         {
-            string? apiKey =
-                _configuration["Resend:ApiKey"];
-
-            if (string.IsNullOrWhiteSpace(apiKey))
-            {
-                throw new InvalidOperationException(
-                    "Resend:ApiKey is not configured.");
-            }
-
             Console.WriteLine(
-                $"RESEND: Starting email send to {email}");
+                $"GMAIL API: Starting email send to {email}");
 
             _logger.LogInformation(
-                "RESEND: Starting email send to {Email}",
+                "GMAIL API: Starting email send to {Email}",
                 email);
+
+            string accessToken =
+                await GetAccessTokenAsync(cancellationToken);
+
+            string senderEmail =
+                _configuration["Gmail:SenderEmail"]
+                ?? throw new InvalidOperationException(
+                    "Gmail:SenderEmail is not configured.");
+
+            MimeMessage message = new();
+
+            message.From.Add(
+                new MailboxAddress(
+                    "FocusLens",
+                    senderEmail));
+
+            message.To.Add(
+                MailboxAddress.Parse(email));
+
+            message.Subject = subject;
+
+            BodyBuilder bodyBuilder = new()
+            {
+                HtmlBody = htmlBody
+            };
+
+            string logoPath = Path.Combine(
+                Directory.GetCurrentDirectory(),
+                "wwwroot",
+                "images",
+                "focuslens-logo.png");
+
+            string mascotPath = Path.Combine(
+                Directory.GetCurrentDirectory(),
+                "wwwroot",
+                "images",
+                "focuslens-mascot.png");
+
+            if (File.Exists(logoPath))
+            {
+                MimeEntity logo =
+                    bodyBuilder.LinkedResources.Add(logoPath);
+
+                logo.ContentId = "focuslens-logo";
+
+                logo.ContentDisposition =
+                    new ContentDisposition(
+                        ContentDisposition.Inline);
+            }
+
+            if (File.Exists(mascotPath))
+            {
+                MimeEntity mascot =
+                    bodyBuilder.LinkedResources.Add(mascotPath);
+
+                mascot.ContentId = "focuslens-mascot";
+
+                mascot.ContentDisposition =
+                    new ContentDisposition(
+                        ContentDisposition.Inline);
+            }
+
+            message.Body = bodyBuilder.ToMessageBody();
+
+            using MemoryStream stream = new();
+
+            await message.WriteToAsync(
+                stream,
+                cancellationToken);
+
+            string rawMessage =
+                Convert.ToBase64String(stream.ToArray())
+                    .Replace("+", "-")
+                    .Replace("/", "_")
+                    .TrimEnd('=');
 
             using HttpClient client =
                 _httpClientFactory.CreateClient();
 
-            client.BaseAddress =
-                new Uri("https://api.resend.com");
-
             client.DefaultRequestHeaders.Authorization =
                 new AuthenticationHeaderValue(
                     "Bearer",
-                    apiKey);
-
-            string from =
-                _configuration["Resend:From"]
-                ?? "FocusLens <onboarding@resend.dev>";
+                    accessToken);
 
             var requestBody = new
             {
-                from,
-                to = new[] { email },
-                subject,
-                html = htmlBody
+                raw = rawMessage
             };
 
             string json =
@@ -412,14 +469,14 @@ public sealed class SmtpEmailSender : IEmailSender
                     "application/json");
 
             Console.WriteLine(
-                "RESEND: Sending request to Resend API");
+                "GMAIL API: Sending HTTPS request");
 
             _logger.LogInformation(
-                "RESEND: Sending request to Resend API");
+                "GMAIL API: Sending HTTPS request");
 
             using HttpResponseMessage response =
                 await client.PostAsync(
-                    "/emails",
+                    "https://gmail.googleapis.com/gmail/v1/users/me/messages/send",
                     content,
                     cancellationToken);
 
@@ -430,45 +487,109 @@ public sealed class SmtpEmailSender : IEmailSender
             if (!response.IsSuccessStatusCode)
             {
                 Console.WriteLine(
-                    $"RESEND: ERROR. Status={(int)response.StatusCode}, Response={responseBody}");
+                    $"GMAIL API: ERROR. Status={(int)response.StatusCode}, Response={responseBody}");
 
                 _logger.LogError(
-                    "RESEND: Failed. Status={StatusCode}, Response={Response}",
+                    "GMAIL API: Failed. Status={StatusCode}, Response={Response}",
                     response.StatusCode,
                     responseBody);
 
                 throw new InvalidOperationException(
-                    $"Resend API failed with status {(int)response.StatusCode}: {responseBody}");
+                    $"Gmail API failed with status {(int)response.StatusCode}: {responseBody}");
             }
 
             Console.WriteLine(
-                $"RESEND: Email sent successfully. Response={responseBody}");
+                $"GMAIL API: Email sent successfully. Response={responseBody}");
 
             _logger.LogInformation(
-                "RESEND: Email sent successfully");
-
+                "GMAIL API: Email sent successfully");
         }
         catch (OperationCanceledException ex)
         {
             Console.WriteLine(
-                $"RESEND: Operation cancelled. {ex.Message}");
+                $"GMAIL API: Operation cancelled. {ex.Message}");
 
             _logger.LogError(
                 ex,
-                "RESEND: Operation cancelled");
+                "GMAIL API: Operation cancelled");
 
             throw;
         }
         catch (Exception ex)
         {
             Console.WriteLine(
-                $"RESEND: ERROR. Type={ex.GetType().Name}, Message={ex.Message}");
+                $"GMAIL API: ERROR. Type={ex.GetType().Name}, Message={ex.Message}");
 
             _logger.LogError(
                 ex,
-                "RESEND: Unexpected error while sending email");
+                "GMAIL API: Unexpected error");
 
             throw;
         }
+    }
+
+    private async Task<string> GetAccessTokenAsync(
+        CancellationToken cancellationToken)
+    {
+        string clientId =
+            _configuration["Gmail:ClientId"]
+            ?? throw new InvalidOperationException(
+                "Gmail:ClientId is not configured.");
+
+        string clientSecret =
+            _configuration["Gmail:ClientSecret"]
+            ?? throw new InvalidOperationException(
+                "Gmail:ClientSecret is not configured.");
+
+        string refreshToken =
+            _configuration["Gmail:RefreshToken"]
+            ?? throw new InvalidOperationException(
+                "Gmail:RefreshToken is not configured.");
+
+        using HttpClient client =
+            _httpClientFactory.CreateClient();
+
+        using FormUrlEncodedContent content =
+            new(new Dictionary<string, string>
+            {
+                ["client_id"] = clientId,
+                ["client_secret"] = clientSecret,
+                ["refresh_token"] = refreshToken,
+                ["grant_type"] = "refresh_token"
+            });
+
+        Console.WriteLine(
+            "GMAIL API: Requesting access token");
+
+        using HttpResponseMessage response =
+            await client.PostAsync(
+                "https://oauth2.googleapis.com/token",
+                content,
+                cancellationToken);
+
+        string responseBody =
+            await response.Content.ReadAsStringAsync(
+                cancellationToken);
+
+        if (!response.IsSuccessStatusCode)
+        {
+            throw new InvalidOperationException(
+                $"Google token endpoint failed with status {(int)response.StatusCode}: {responseBody}");
+        }
+
+        using JsonDocument document =
+            JsonDocument.Parse(responseBody);
+
+        if (!document.RootElement.TryGetProperty(
+                "access_token",
+                out JsonElement accessTokenElement))
+        {
+            throw new InvalidOperationException(
+                "Google token response did not contain an access_token.");
+        }
+
+        return accessTokenElement.GetString()
+            ?? throw new InvalidOperationException(
+                "Google returned an empty access_token.");
     }
 }

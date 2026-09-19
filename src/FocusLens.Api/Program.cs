@@ -15,6 +15,8 @@ public class Program
         // API services
         builder.Services.AddApiServices(builder.Configuration);
 
+        builder.Services.AddHttpClient();
+
         // OpenAPI
         builder.Services.AddOpenApi();
 
