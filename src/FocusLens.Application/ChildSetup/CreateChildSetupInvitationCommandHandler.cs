@@ -39,7 +39,8 @@ public sealed class CreateChildSetupInvitationCommandHandler(
             );
         }
 
-        Parent? parent = await parentRepository.FirstOrDefaultAsync(item => item.UserId == userId);
+        Parent? parent = await parentRepository.FirstOrDefaultAsync(
+            item => item.UserId == userId);
 
         if (parent is null)
         {
@@ -104,10 +105,13 @@ public sealed class CreateChildSetupInvitationCommandHandler(
         }
 
         string normalizedEmail = childEmail.ToUpperInvariant();
+
         string token = CreateToken();
         string tokenHash = HashToken(token);
         string protectedToken = tokenProtector.Protect(token);
-        DateTimeOffset expiresAtUtc = timeProvider.GetUtcNow().Add(InvitationLifetime);
+
+        DateTimeOffset expiresAtUtc =
+            timeProvider.GetUtcNow().Add(InvitationLifetime);
 
         ChildSetupInvitation invitation = new(
             draft.Id,
@@ -121,13 +125,20 @@ public sealed class CreateChildSetupInvitationCommandHandler(
 
         await unitOfWork.SaveChangesAsync();
 
-        string invitationUrl = invitationUrlBuilder.CreateChildSetupInvitationUrl(token);
+        string invitationUrl =
+            invitationUrlBuilder.CreateChildSetupInvitationUrl(token);
+
+        Console.WriteLine(
+            $"CHILD INVITATION: Sending invitation email to {childEmail}");
 
         await emailSender.SendChildSetupInvitationAsync(
             childEmail,
             invitationUrl,
             cancellationToken
         );
+
+        Console.WriteLine(
+            $"CHILD INVITATION: Invitation email send completed for {childEmail}");
 
         return new ChildSetupInvitationResponse(
             invitation.Id,
@@ -151,7 +162,9 @@ public sealed class CreateChildSetupInvitationCommandHandler(
     {
         try
         {
-            return new MailAddress(email).Address.Equals(email, StringComparison.OrdinalIgnoreCase);
+            return new MailAddress(email).Address.Equals(
+                email,
+                StringComparison.OrdinalIgnoreCase);
         }
         catch (FormatException)
         {
@@ -159,8 +172,12 @@ public sealed class CreateChildSetupInvitationCommandHandler(
         }
     }
 
-    private static string CreateToken() => Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
+    private static string CreateToken() =>
+        Convert.ToHexString(
+            RandomNumberGenerator.GetBytes(32));
 
     private static string HashToken(string token) =>
-        Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(token)));
+        Convert.ToHexString(
+            SHA256.HashData(
+                Encoding.UTF8.GetBytes(token)));
 }
