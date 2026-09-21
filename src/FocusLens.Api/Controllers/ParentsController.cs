@@ -8,6 +8,7 @@ using FocusLens.Domain.Common.Results;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace FocusLens.API.Controllers;
 
@@ -155,13 +156,29 @@ public sealed class ParentsController(ISender sender) : ApiController
     }
 
     [HttpPost("child-setups/{draftId:guid}/invite/link")]
-    public async Task<IActionResult> GetChildInvitationLink(
+    [EnableRateLimiting("InvitationMutation")]
+    public async Task<IActionResult> RegenerateChildInvitationLink(
         Guid draftId,
         CancellationToken cancellationToken
     )
     {
         Result<ChildSetupInvitationResponse> result = await sender.Send(
-            new GetChildSetupInvitationLinkCommand(draftId),
+            new RegenerateChildSetupInvitationLinkCommand(draftId),
+            cancellationToken
+        );
+
+        return result.Match(Ok, Problem);
+    }
+
+    [HttpPost("child-setups/{draftId:guid}/invite/link/create")]
+    [EnableRateLimiting("InvitationMutation")]
+    public async Task<IActionResult> CreateChildInvitationLink(
+        Guid draftId,
+        CancellationToken cancellationToken
+    )
+    {
+        Result<ChildSetupInvitationResponse> result = await sender.Send(
+            new CreateChildSetupLinkInvitationCommand(draftId),
             cancellationToken
         );
 
@@ -169,6 +186,7 @@ public sealed class ParentsController(ISender sender) : ApiController
     }
 
     [HttpPost("child-setups/{draftId:guid}/invite/resend")]
+    [EnableRateLimiting("InvitationMutation")]
     public async Task<IActionResult> ResendChildInvitation(
         Guid draftId,
         CancellationToken cancellationToken
@@ -237,6 +255,7 @@ public sealed class ParentsController(ISender sender) : ApiController
     }
 
     [HttpPost("child-setups/{draftId:guid}/invite")]
+    [EnableRateLimiting("InvitationMutation")]
     public async Task<IActionResult> InviteChild(
         Guid draftId,
         CreateChildSetupInvitationRequest request,

@@ -205,19 +205,22 @@ public sealed class CreateChildSetupInvitationCommandHandlerTests
     }
 
     [Fact]
-    public async Task Create_WhenParentHasNotSelectedWeekStart_ReturnsValidationError()
+    public async Task Create_WhenParentHasNotSelectedWeekStart_CreatesInvitation()
     {
         Guid parentUserId = Guid.NewGuid();
         Parent parent = new(parentUserId);
         ChildSetupDraft draft = CreateCompleteDraft(parent.Id);
 
+        InMemoryRepository<ChildSetupInvitation> invitations = new();
+        FakeEmailSender emailSender = new();
+
         CreateChildSetupInvitationCommandHandler handler = new(
             new InMemoryRepository<Parent>(parent),
             new InMemoryRepository<ChildSetupDraft>(draft),
-            new InMemoryRepository<ChildSetupInvitation>(),
+            invitations,
             new FakeCurrentUser(parentUserId),
             new FakeUnitOfWork(),
-            new FakeEmailSender(),
+            emailSender,
             new FakeInvitationUrlBuilder(),
             new FakeChildSetupInvitationTokenProtector(),
             TimeProvider.System);
@@ -228,9 +231,11 @@ public sealed class CreateChildSetupInvitationCommandHandlerTests
                 new CreateChildSetupInvitationRequest("child@example.com")),
             CancellationToken.None);
 
-        Assert.False(result.IsSuccess);
-        Assert.Equal("ChildSetup.WeekStartsOnRequired", result.TopError.Code);
-        Assert.Equal(ChildSetupStatus.Draft, draft.Status);
+        Assert.True(result.IsSuccess);
+        Assert.Equal("Pending", result.Value.Status);
+        Assert.Equal(ChildSetupStatus.Invited, draft.Status);
+        Assert.Single(await invitations.GetAllAsync());
+        Assert.Single(emailSender.ChildSetupInvitations);
     }
 
     private static ChildSetupDraft CreateCompleteDraft(Guid parentId)

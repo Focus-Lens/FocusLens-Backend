@@ -12,6 +12,40 @@ namespace FocusLens.Application.UnitTests.ChildSetup;
 public sealed class ClaimChildSetupInvitationCommandHandlerTests
 {
     [Fact]
+    public async Task Claim_LinkInvitation_DoesNotRequireEmailMatch()
+    {
+        const string token = "valid-link-token";
+        Guid userId = Guid.NewGuid();
+        Student student = new(userId);
+        ChildSetupDraft draft = CreateInvitedDraft(Guid.NewGuid());
+        ChildSetupInvitation invitation = new(
+            draft.Id,
+            ChildSetupInvitationType.Link,
+            null,
+            Hash(token),
+            DateTimeOffset.UtcNow.AddDays(1)
+        );
+
+        ClaimChildSetupInvitationCommandHandler handler = new(
+            new InMemoryRepository<Student>(student),
+            new InMemoryRepository<ChildSetupInvitation>(invitation),
+            new InMemoryRepository<ChildSetupDraft>(draft),
+            new FakeCurrentUser(userId, "different@example.com"),
+            new FakeUnitOfWork(),
+            TimeProvider.System
+        );
+
+        Result<ClaimChildSetupInvitationResponse> result = await handler.Handle(
+            new ClaimChildSetupInvitationCommand(token),
+            CancellationToken.None
+        );
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(ChildSetupStatus.Claimed, draft.Status);
+        Assert.Equal(ChildSetupInvitationStatus.Claimed, invitation.Status);
+    }
+
+    [Fact]
     public async Task Claim_WithValidTokenAndMatchingEmail_ClaimsDraftAndInvitation()
     {
         const string token = "valid-child-token";
@@ -23,7 +57,8 @@ public sealed class ClaimChildSetupInvitationCommandHandlerTests
             draft.Id,
             email.ToUpperInvariant(),
             Hash(token),
-            DateTimeOffset.UtcNow.AddDays(1));
+            DateTimeOffset.UtcNow.AddDays(1)
+        );
 
         ClaimChildSetupInvitationCommandHandler handler = new(
             new InMemoryRepository<Student>(student),
@@ -31,11 +66,13 @@ public sealed class ClaimChildSetupInvitationCommandHandlerTests
             new InMemoryRepository<ChildSetupDraft>(draft),
             new FakeCurrentUser(userId, email),
             new FakeUnitOfWork(),
-            TimeProvider.System);
+            TimeProvider.System
+        );
 
         Result<ClaimChildSetupInvitationResponse> result = await handler.Handle(
             new ClaimChildSetupInvitationCommand(token),
-            CancellationToken.None);
+            CancellationToken.None
+        );
 
         Assert.True(result.IsSuccess);
         Assert.Equal("Claimed", result.Value.DraftStatus);
@@ -56,7 +93,8 @@ public sealed class ClaimChildSetupInvitationCommandHandlerTests
             draft.Id,
             "CHILD@EXAMPLE.COM",
             Hash("different-token"),
-            DateTimeOffset.UtcNow.AddDays(1));
+            DateTimeOffset.UtcNow.AddDays(1)
+        );
 
         ClaimChildSetupInvitationCommandHandler handler = new(
             new InMemoryRepository<Student>(student),
@@ -64,11 +102,13 @@ public sealed class ClaimChildSetupInvitationCommandHandlerTests
             new InMemoryRepository<ChildSetupDraft>(draft),
             new FakeCurrentUser(userId, "child@example.com"),
             new FakeUnitOfWork(),
-            TimeProvider.System);
+            TimeProvider.System
+        );
 
         Result<ClaimChildSetupInvitationResponse> result = await handler.Handle(
             new ClaimChildSetupInvitationCommand("unknown-token"),
-            CancellationToken.None);
+            CancellationToken.None
+        );
 
         Assert.False(result.IsSuccess);
         Assert.Equal("ChildSetupInvitation.NotFound", result.TopError.Code);
@@ -86,7 +126,8 @@ public sealed class ClaimChildSetupInvitationCommandHandlerTests
             draft.Id,
             "CHILD@EXAMPLE.COM",
             Hash(token),
-            DateTimeOffset.UtcNow.AddDays(1));
+            DateTimeOffset.UtcNow.AddDays(1)
+        );
 
         ClaimChildSetupInvitationCommandHandler handler = new(
             new InMemoryRepository<Student>(student),
@@ -94,14 +135,16 @@ public sealed class ClaimChildSetupInvitationCommandHandlerTests
             new InMemoryRepository<ChildSetupDraft>(draft),
             new FakeCurrentUser(userId, "different@example.com"),
             new FakeUnitOfWork(),
-            TimeProvider.System);
+            TimeProvider.System
+        );
 
         Result<ClaimChildSetupInvitationResponse> result = await handler.Handle(
             new ClaimChildSetupInvitationCommand(token),
-            CancellationToken.None);
+            CancellationToken.None
+        );
 
         Assert.False(result.IsSuccess);
-        Assert.Equal("ChildSetupInvitation.EmailMismatch", result.TopError.Code);
+        Assert.Equal("ChildSetupInvitation.NotFound", result.TopError.Code);
         Assert.Equal(ChildSetupStatus.Invited, draft.Status);
         Assert.Equal(ChildSetupInvitationStatus.Pending, invitation.Status);
     }
@@ -117,7 +160,8 @@ public sealed class ClaimChildSetupInvitationCommandHandlerTests
             draft.Id,
             "CHILD@EXAMPLE.COM",
             Hash(token),
-            DateTimeOffset.UtcNow.AddMinutes(-1));
+            DateTimeOffset.UtcNow.AddMinutes(-1)
+        );
 
         ClaimChildSetupInvitationCommandHandler handler = new(
             new InMemoryRepository<Student>(student),
@@ -125,14 +169,16 @@ public sealed class ClaimChildSetupInvitationCommandHandlerTests
             new InMemoryRepository<ChildSetupDraft>(draft),
             new FakeCurrentUser(userId, "child@example.com"),
             new FakeUnitOfWork(),
-            TimeProvider.System);
+            TimeProvider.System
+        );
 
         Result<ClaimChildSetupInvitationResponse> result = await handler.Handle(
             new ClaimChildSetupInvitationCommand(token),
-            CancellationToken.None);
+            CancellationToken.None
+        );
 
         Assert.False(result.IsSuccess);
-        Assert.Equal("ChildSetupInvitation.Expired", result.TopError.Code);
+        Assert.Equal("ChildSetupInvitation.NotFound", result.TopError.Code);
         Assert.Equal(ChildSetupStatus.Invited, draft.Status);
     }
 
@@ -147,7 +193,8 @@ public sealed class ClaimChildSetupInvitationCommandHandlerTests
             draft.Id,
             "CHILD@EXAMPLE.COM",
             Hash(token),
-            DateTimeOffset.UtcNow.AddDays(1));
+            DateTimeOffset.UtcNow.AddDays(1)
+        );
         invitation.Claim(DateTimeOffset.UtcNow);
 
         ClaimChildSetupInvitationCommandHandler handler = new(
@@ -156,14 +203,16 @@ public sealed class ClaimChildSetupInvitationCommandHandlerTests
             new InMemoryRepository<ChildSetupDraft>(draft),
             new FakeCurrentUser(userId, "child@example.com"),
             new FakeUnitOfWork(),
-            TimeProvider.System);
+            TimeProvider.System
+        );
 
         Result<ClaimChildSetupInvitationResponse> result = await handler.Handle(
             new ClaimChildSetupInvitationCommand(token),
-            CancellationToken.None);
+            CancellationToken.None
+        );
 
         Assert.False(result.IsSuccess);
-        Assert.Equal("ChildSetupInvitation.NoLongerPending", result.TopError.Code);
+        Assert.Equal("ChildSetupInvitation.NotFound", result.TopError.Code);
         Assert.Equal(ChildSetupStatus.Invited, draft.Status);
     }
 
@@ -177,7 +226,8 @@ public sealed class ClaimChildSetupInvitationCommandHandlerTests
             draft.Id,
             "CHILD@EXAMPLE.COM",
             Hash(token),
-            DateTimeOffset.UtcNow.AddDays(1));
+            DateTimeOffset.UtcNow.AddDays(1)
+        );
 
         ClaimChildSetupInvitationCommandHandler handler = new(
             new InMemoryRepository<Student>(),
@@ -185,11 +235,13 @@ public sealed class ClaimChildSetupInvitationCommandHandlerTests
             new InMemoryRepository<ChildSetupDraft>(draft),
             new FakeCurrentUser(userId, "child@example.com"),
             new FakeUnitOfWork(),
-            TimeProvider.System);
+            TimeProvider.System
+        );
 
         Result<ClaimChildSetupInvitationResponse> result = await handler.Handle(
             new ClaimChildSetupInvitationCommand(token),
-            CancellationToken.None);
+            CancellationToken.None
+        );
 
         Assert.False(result.IsSuccess);
         Assert.Equal("Students.NotFound", result.TopError.Code);
@@ -205,7 +257,6 @@ public sealed class ClaimChildSetupInvitationCommandHandlerTests
 
     private static string Hash(string token)
     {
-        return Convert.ToHexString(
-            SHA256.HashData(Encoding.UTF8.GetBytes(token)));
+        return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(token)));
     }
 }

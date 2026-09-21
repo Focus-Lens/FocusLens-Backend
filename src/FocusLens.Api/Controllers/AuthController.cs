@@ -1,3 +1,4 @@
+using FocusLens.Application.Features.Identity.Commands.CheckEmail;
 using FocusLens.Application.Features.Identity.Commands.ForgotPassword;
 using FocusLens.Application.Features.Identity.Commands.GoogleLogin;
 using FocusLens.Application.Features.Identity.Commands.Login;
@@ -29,157 +30,160 @@ public sealed class AuthController : ApiController
     }
 
     [AllowAnonymous]
+    [HttpPost("check-email")]
+    public async Task<IActionResult> CheckEmail(
+        CheckEmailCommand command,
+        CancellationToken cancellationToken
+    )
+    {
+        bool available = await _sender.Send(command, cancellationToken);
+
+        return Ok(new { available });
+    }
+
+    [AllowAnonymous]
     [HttpPost("register/student")]
     public async Task<IActionResult> RegisterStudent(
         RegisterStudentCommand command,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken
+    )
     {
         Result<Success> result = await _sender.Send(command, cancellationToken);
 
-        return result.Match(
-            _ => NoContent(),
-            Problem);
+        return result.Match(_ => NoContent(), Problem);
     }
 
     [AllowAnonymous]
     [HttpPost("register/parent")]
     public async Task<IActionResult> RegisterParent(
         RegisterParentCommand command,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken
+    )
     {
         Result<Success> result = await _sender.Send(command, cancellationToken);
 
-        return result.Match(
-            _ => NoContent(),
-            Problem);
+        return result.Match(_ => NoContent(), Problem);
     }
 
     [AllowAnonymous]
     [HttpPost("login")]
     public async Task<IActionResult> Login(
         LoginCommand command,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken
+    )
     {
         Result<AuthResponse> result = await _sender.Send(command, cancellationToken);
 
-        return result.Match(
-            Ok,
-            Problem);
+        return result.Match(Ok, Problem);
     }
 
     [AllowAnonymous]
     [HttpPost("google/student")]
     public async Task<IActionResult> ContinueWithGoogleStudent(
         GoogleLoginRequest request,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken
+    )
     {
         Result<AuthResponse> result = await _sender.Send(
             new GoogleLoginCommand(request.IdToken, LegalDocumentAudience.Student),
-            cancellationToken);
+            cancellationToken
+        );
 
-        return result.Match(
-            Ok,
-            Problem);
+        return result.Match(Ok, Problem);
     }
 
     [AllowAnonymous]
     [HttpPost("google/parent")]
     public async Task<IActionResult> ContinueWithGoogleParent(
         GoogleLoginRequest request,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken
+    )
     {
         Result<AuthResponse> result = await _sender.Send(
             new GoogleLoginCommand(request.IdToken, LegalDocumentAudience.Parent),
-            cancellationToken);
+            cancellationToken
+        );
 
-        return result.Match(
-            Ok,
-            Problem);
+        return result.Match(Ok, Problem);
     }
 
     [AllowAnonymous]
     [HttpPost("refresh")]
     public async Task<IActionResult> RefreshToken(
         RefreshTokenCommand command,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken
+    )
     {
         Result<TokenResponse> result = await _sender.Send(command, cancellationToken);
 
-        return result.Match(
-            Ok,
-            Problem);
+        return result.Match(Ok, Problem);
     }
-
 
     [HttpPost("logout")]
     public async Task<IActionResult> RevokeRefreshToken(
         RevokeRefreshTokenCommand command,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken
+    )
     {
         Result<Success> result = await _sender.Send(command, cancellationToken);
 
-        return result.Match(
-            _ => NoContent(),
-            Problem);
+        return result.Match(_ => NoContent(), Problem);
     }
 
     [AllowAnonymous]
     [HttpPost("verify-email")]
     public async Task<IActionResult> VerifyEmail(
         VerifyEmailCommand command,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken
+    )
     {
         Result<Success> result = await _sender.Send(command, cancellationToken);
 
-        return result.Match(
-            _ => NoContent(),
-            Problem);
+        return result.Match(_ => NoContent(), Problem);
     }
 
     [AllowAnonymous]
     [HttpPost("resend-verification")]
     public async Task<IActionResult> ResendVerificationCode(
         ResendVerificationCodeCommand command,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken
+    )
     {
         Result<Success> result = await _sender.Send(command, cancellationToken);
 
-        return result.Match(
-            _ => NoContent(),
-            Problem);
+        return result.Match(_ => NoContent(), Problem);
     }
 
     [AllowAnonymous]
     [HttpPost("forgot-password")]
     public async Task<IActionResult> ForgotPassword(
         ForgotPasswordCommand command,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken
+    )
     {
         Result<Success> result = await _sender.Send(command, cancellationToken);
 
-        return result.Match(
-            _ => NoContent(),
-            Problem);
+        return result.Match(_ => NoContent(), Problem);
     }
 
     [AllowAnonymous]
     [HttpPost("reset-password")]
     public async Task<IActionResult> ResetPassword(
         ResetPasswordCommand command,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken
+    )
     {
         Result<Success> result = await _sender.Send(command, cancellationToken);
 
-        return result.Match(
-            _ => NoContent(),
-            Problem);
+        return result.Match(_ => NoContent(), Problem);
     }
 
     [AllowAnonymous]
     [HttpPost("restore-account")]
     public async Task<IActionResult> RestoreAccount(
         RestoreAccountCommand command,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken
+    )
     {
         Result<Success> result = await _sender.Send(command, cancellationToken);
 

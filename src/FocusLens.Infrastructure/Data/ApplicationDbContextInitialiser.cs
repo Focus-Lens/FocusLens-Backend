@@ -14,7 +14,8 @@ public sealed class ApplicationDbContextInitialiser
         ApplicationDbContext dbContext,
         RoleSeeder roleSeeder,
         UserSeeder userSeeder,
-        UserRoleSeeder userRoleSeeder)
+        UserRoleSeeder userRoleSeeder
+    )
     {
         _dbContext = dbContext;
         _roleSeeder = roleSeeder;
@@ -24,7 +25,10 @@ public sealed class ApplicationDbContextInitialiser
 
     public async Task SeedAsync(CancellationToken cancellationToken = default)
     {
-        await _dbContext.Database.MigrateAsync(cancellationToken);
+        if (_dbContext.Database.IsRelational())
+        {
+            await _dbContext.Database.MigrateAsync(cancellationToken);
+        }
 
         await _roleSeeder.SeedAsync(cancellationToken);
         await _userSeeder.SeedAsync(cancellationToken);

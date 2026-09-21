@@ -4,7 +4,9 @@ namespace FocusLens.Contracts.Access;
 ///     The privacy-safe preview displayed after an invitation link is opened.
 /// </summary>
 public sealed record ResolveStudentParentInvitationResponse(
+    Guid InvitationId,
     string Status,
     string StudentPreferredName,
+    string? AgeRange,
     DateTimeOffset ExpiresAtUtc,
     bool RequiresSignIn);

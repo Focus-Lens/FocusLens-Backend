@@ -42,7 +42,7 @@ public sealed class ChildSetupApiTests
                     Email = "youssef@example.com",
                     UserName = "youssef@example.com",
                     FirstName = "Old",
-                    LastName = "Name"
+                    LastName = "Name",
                 }
             );
 
@@ -53,7 +53,7 @@ public sealed class ChildSetupApiTests
                     Email = "parent@example.com",
                     UserName = "parent@example.com",
                     FirstName = "Mariam",
-                    LastName = "Parent"
+                    LastName = "Parent",
                 }
             );
 
@@ -104,10 +104,9 @@ public sealed class ChildSetupApiTests
             item.Id == draft.Id
         );
 
-        ParentStudentRelationship relationship =
-            await db.ParentStudentRelationships.SingleAsync(item =>
-                item.ParentId == parent.Id && item.StudentId == student.Id
-            );
+        ParentStudentRelationship relationship = await db.ParentStudentRelationships.SingleAsync(
+            item => item.ParentId == parent.Id && item.StudentId == student.Id
+        );
 
         Assert.Equal(ChildSetupStatus.Activated, persistedDraft.Status);
 
@@ -144,7 +143,7 @@ public sealed class ChildSetupApiTests
                     Email = "parent@example.com",
                     UserName = "parent@example.com",
                     FirstName = "Mariam",
-                    LastName = "Parent"
+                    LastName = "Parent",
                 }
             );
 
@@ -216,7 +215,7 @@ public sealed class ChildSetupApiTests
                     Email = "parent@example.com",
                     UserName = "parent@example.com",
                     FirstName = "Mariam",
-                    LastName = "Parent"
+                    LastName = "Parent",
                 }
             );
 
@@ -243,9 +242,9 @@ public sealed class ChildSetupApiTests
             item.Id == draft.Id
         );
 
-        ChildSetupInvitation persistedInvitation =
-            await db.ChildSetupInvitations.SingleAsync(item => item.Id == invitation.Id
-            );
+        ChildSetupInvitation persistedInvitation = await db.ChildSetupInvitations.SingleAsync(
+            item => item.Id == invitation.Id
+        );
 
         Assert.Equal(ChildSetupStatus.Draft, persistedDraft.Status);
 
@@ -266,7 +265,8 @@ public sealed class ChildSetupApiTests
 
         ChildSetupInvitation invitation = new(
             draft.Id,
-            "YOUSSEF@EXAMPLE.COM",
+            ChildSetupInvitationType.Link,
+            null,
             "OLD-HASH",
             DateTimeOffset.UtcNow.AddDays(1)
         );
@@ -285,7 +285,7 @@ public sealed class ChildSetupApiTests
                     Email = "parent@example.com",
                     UserName = "parent@example.com",
                     FirstName = "Mariam",
-                    LastName = "Parent"
+                    LastName = "Parent",
                 }
             );
 
@@ -320,9 +320,9 @@ public sealed class ChildSetupApiTests
         using IServiceScope scope = factory.Services.CreateScope();
         ApplicationDbContext db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
 
-        ChildSetupInvitation persistedInvitation =
-            await db.ChildSetupInvitations.SingleAsync(item => item.Id == invitation.Id
-            );
+        ChildSetupInvitation persistedInvitation = await db.ChildSetupInvitations.SingleAsync(
+            item => item.Id == invitation.Id
+        );
 
         Assert.Equal(ChildSetupInvitationStatus.Pending, persistedInvitation.Status);
 
@@ -331,9 +331,7 @@ public sealed class ChildSetupApiTests
 
         string token = invitationUrl.TrimEnd('/').Split('/').Last();
 
-        string expectedHash = Convert.ToHexString(
-            SHA256.HashData(Encoding.UTF8.GetBytes(token))
-        );
+        string expectedHash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(token)));
 
         Assert.Equal(expectedHash, persistedInvitation.TokenHash);
     }
@@ -371,7 +369,7 @@ public sealed class ChildSetupApiTests
                     Email = "parent@example.com",
                     UserName = "parent@example.com",
                     FirstName = "Mariam",
-                    LastName = "Parent"
+                    LastName = "Parent",
                 }
             );
 
@@ -409,9 +407,9 @@ public sealed class ChildSetupApiTests
 
         ApplicationDbContext db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
 
-        ChildSetupInvitation persistedInvitation =
-            await db.ChildSetupInvitations.SingleAsync(item => item.Id == invitation.Id
-            );
+        ChildSetupInvitation persistedInvitation = await db.ChildSetupInvitations.SingleAsync(
+            item => item.Id == invitation.Id
+        );
 
         Assert.Equal(ChildSetupInvitationStatus.Pending, persistedInvitation.Status);
 

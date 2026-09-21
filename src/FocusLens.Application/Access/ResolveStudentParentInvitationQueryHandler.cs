@@ -30,7 +30,9 @@ public sealed class ResolveStudentParentInvitationQueryHandler(
             item => item.Student,
             item => item.Student.User);
 
-        if (invitation is null || invitation.IsExpired(timeProvider.GetUtcNow()))
+        DateTimeOffset now = timeProvider.GetUtcNow();
+
+        if (invitation is null || invitation.IsExpired(now))
         {
             return InvalidInvitation();
         }
@@ -43,13 +45,40 @@ public sealed class ResolveStudentParentInvitationQueryHandler(
         }
 
         string displayName = invitation.Student.PreferredName
-                             ?? $"{invitation.Student.User.FirstName} {invitation.Student.User.LastName}".Trim();
+                             ?? invitation.Student.User.FirstName.Trim();
 
         return new ResolveStudentParentInvitationResponse(
+            invitation.Id,
             invitation.Status.ToString(),
             displayName,
+            GetAgeRange(invitation.Student.DateOfBirth, now),
             invitation.ExpiresAtUtc,
             true);
+    }
+
+    private static string? GetAgeRange(DateOnly? dateOfBirth, DateTimeOffset now)
+    {
+        if (dateOfBirth is null)
+        {
+            return null;
+        }
+
+        DateOnly today = DateOnly.FromDateTime(now.UtcDateTime);
+        int age = today.Year - dateOfBirth.Value.Year;
+
+        if (dateOfBirth.Value > today.AddYears(-age))
+        {
+            age--;
+        }
+
+        return age switch
+        {
+            >= 8 and <= 10 => "8–10",
+            >= 11 and <= 12 => "11–12",
+            >= 13 and <= 15 => "13–15",
+            >= 16 and <= 18 => "16–18",
+            _ => null
+        };
     }
 
     private static Error InvalidInvitation()

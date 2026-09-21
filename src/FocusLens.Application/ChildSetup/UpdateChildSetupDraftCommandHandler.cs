@@ -20,7 +20,8 @@ public sealed class UpdateChildSetupDraftCommandHandler(
     IBaseRepository<Parent> parentRepository,
     IBaseRepository<ChildSetupDraft> childSetupDraftRepository,
     ICurrentUser currentUser,
-    IUnitOfWork unitOfWork)
+    IUnitOfWork unitOfWork,
+    TimeProvider timeProvider)
     : IRequestHandler<UpdateChildSetupDraftCommand, Result<ChildSetupDraftResponse>>
 {
     public async Task<Result<ChildSetupDraftResponse>> Handle(
@@ -129,9 +130,13 @@ public sealed class UpdateChildSetupDraftCommandHandler(
             return prioritiesError!.Value;
         }
 
+        DateOnly today =
+            DateOnly.FromDateTime(timeProvider.GetUtcNow().UtcDateTime);
+
         if (!TryCreateStudyTimeGoal(
                 request.Request.StudyTimeGoal,
                 parent.WeekStartsOn,
+                today,
                 out StudyTimeGoal? studyTimeGoal,
                 out Error? studyTimeGoalError))
         {
@@ -251,6 +256,7 @@ public sealed class UpdateChildSetupDraftCommandHandler(
     private static bool TryCreateStudyTimeGoal(
         StudyTimeGoalRequest? request,
         DayOfWeek? weekStartsOn,
+        DateOnly today,
         out StudyTimeGoal? goal,
         out Error? error)
     {
@@ -290,13 +296,26 @@ public sealed class UpdateChildSetupDraftCommandHandler(
             return false;
         }
 
+        DateOnly startDate =
+            request.StartDate ??
+            ParentWeekdayOrder.GetWeekStart(
+                today,
+                weekStartsOn ?? DayOfWeek.Monday);
+
         Result<StudyTimeGoal> result = StudyTimeGoal.Create(
             period,
             request.TargetMinutes,
             period == StudyTimeGoalPeriod.Weekly
                 ? [weekStartsOn!.Value]
-                : request.Days ?? [],
-            request.StartDate);
+                : request.Days ??
+                    [
+                        DayOfWeek.Monday,
+                        DayOfWeek.Tuesday,
+                        DayOfWeek.Wednesday,
+                        DayOfWeek.Thursday,
+                        DayOfWeek.Friday
+                    ],
+            startDate);
 
         if (result.IsError)
         {

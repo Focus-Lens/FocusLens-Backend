@@ -59,7 +59,7 @@ public class AuthorizationTests
     }
 
     [Fact]
-    public async Task CreateInvitation_WithStudentToken_ReturnsForbidden()
+    public async Task CreateInvitation_WithStudentToken_AllowsAccess()
     {
         await using CustomWebApplicationFactory factory = new();
         using HttpClient client = factory.CreateClient();
@@ -69,7 +69,7 @@ public class AuthorizationTests
                 TestJwtTokenFactory.Create(Guid.NewGuid(), "Student"));
 
         using StringContent content = new(
-            """{"studentEmail":"student@example.com"}""",
+            """{"email":"parent@example.com"}""",
             Encoding.UTF8,
             "application/json");
 
@@ -77,11 +77,11 @@ public class AuthorizationTests
             "/api/access/invitations",
             content);
 
-        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
 
     [Fact]
-    public async Task AcceptInvitation_WithParentToken_ReturnsForbidden()
+    public async Task AcceptInvitation_WithParentToken_AllowsAccess()
     {
         await using CustomWebApplicationFactory factory = new();
         using HttpClient client = factory.CreateClient();
@@ -94,7 +94,7 @@ public class AuthorizationTests
             $"/api/access/invitations/{Guid.NewGuid()}/accept",
             null);
 
-        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
 
 

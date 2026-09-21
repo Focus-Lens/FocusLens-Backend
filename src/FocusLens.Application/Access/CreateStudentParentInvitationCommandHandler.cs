@@ -19,9 +19,9 @@ public sealed class CreateStudentParentInvitationCommandHandler(
     IEmailSender emailSender,
     IInvitationUrlBuilder invitationUrlBuilder,
     TimeProvider timeProvider)
-    : IRequestHandler<CreateStudentParentInvitationCommand, Result<StudentParentInvitationResponse>>
+    : IRequestHandler<CreateStudentParentInvitationCommand, Result<InvitationResponse>>
 {
-    public async Task<Result<StudentParentInvitationResponse>> Handle(
+    public async Task<Result<InvitationResponse>> Handle(
         CreateStudentParentInvitationCommand request,
         CancellationToken cancellationToken)
     {
@@ -30,7 +30,7 @@ public sealed class CreateStudentParentInvitationCommandHandler(
             return Error.Unauthorized("Access.Unauthorized", "The current user could not be identified.");
         }
 
-        string email = request.Request.ParentEmail?.Trim() ?? string.Empty;
+        string email = request.Request.Email?.Trim() ?? string.Empty;
         if (!IsValidEmail(email))
         {
             return Error.Validation("Access.ParentEmailInvalid", "A valid parent email is required.");
@@ -78,10 +78,17 @@ public sealed class CreateStudentParentInvitationCommandHandler(
             invitationUrl,
             cancellationToken);
 
-        return new StudentParentInvitationResponse(
+        return new InvitationResponse(
             invitation.Id,
+            null,
+            invitation.StudentId,
             invitation.Status.ToString(),
+            InvitationInitiator.Student.ToString(),
+            "Outgoing",
+            "StudentParent",
+            email,
             invitation.ExpiresAtUtc,
+            null,
             invitationUrl);
     }
 

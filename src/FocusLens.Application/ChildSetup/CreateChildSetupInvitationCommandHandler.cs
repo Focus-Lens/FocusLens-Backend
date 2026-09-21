@@ -88,13 +88,6 @@ public sealed class CreateChildSetupInvitationCommandHandler(
             );
         }
 
-        if (parent.WeekStartsOn is null)
-        {
-            return Error.Validation(
-                "ChildSetup.WeekStartsOnRequired",
-                "Choose a week start day before sending a child setup invitation.");
-        }
-
         if (!IsComplete(draft))
         {
             return Error.Validation(
@@ -104,17 +97,21 @@ public sealed class CreateChildSetupInvitationCommandHandler(
         }
 
         string normalizedEmail = childEmail.ToUpperInvariant();
+
         string token = CreateToken();
         string tokenHash = HashToken(token);
         string protectedToken = tokenProtector.Protect(token);
+
         DateTimeOffset expiresAtUtc = timeProvider.GetUtcNow().Add(InvitationLifetime);
 
         ChildSetupInvitation invitation = new(
             draft.Id,
+            ChildSetupInvitationType.Email,
             normalizedEmail,
             tokenHash,
             expiresAtUtc,
-            protectedToken);
+            protectedToken
+        );
 
         invitationRepository.Add(invitation);
         draft.MarkInvited();
@@ -140,11 +137,11 @@ public sealed class CreateChildSetupInvitationCommandHandler(
     private static bool IsComplete(ChildSetupDraft draft)
     {
         return !string.IsNullOrWhiteSpace(draft.FirstName)
-               && !string.IsNullOrWhiteSpace(draft.LastName)
-               && draft.Grade is not null
-               && draft.Subjects.Count > 0
-               && draft.StudyPriorities.Count > 0
-               && draft.StudyTimeGoal is not null;
+            && !string.IsNullOrWhiteSpace(draft.LastName)
+            && draft.Grade is not null
+            && draft.Subjects.Count > 0
+            && draft.StudyPriorities.Count > 0
+            && draft.StudyTimeGoal is not null;
     }
 
     private static bool IsValidEmail(string email)

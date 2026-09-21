@@ -7,5 +7,5 @@ public sealed record StudyTimeGoalRequest(
     StudyTimeGoalPeriod Period,
     int TargetMinutes,
     IReadOnlyCollection<DayOfWeek>? Days,
-    DateOnly? StartDate
+    DateOnly? StartDate = null
 );

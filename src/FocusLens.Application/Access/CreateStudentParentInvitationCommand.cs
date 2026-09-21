@@ -5,5 +5,5 @@ using MediatR;
 namespace FocusLens.Application.Access;
 
 public sealed record CreateStudentParentInvitationCommand(
-    CreateStudentParentInvitationRequest Request)
-    : IRequest<Result<StudentParentInvitationResponse>>;
+    CreateInvitationRequest Request
+) : IRequest<Result<InvitationResponse>>;

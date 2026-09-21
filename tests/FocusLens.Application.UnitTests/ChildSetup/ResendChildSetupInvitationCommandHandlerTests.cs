@@ -12,6 +12,43 @@ namespace FocusLens.Application.UnitTests.ChildSetup;
 public sealed class ResendChildSetupInvitationCommandHandlerTests
 {
     [Fact]
+    public async Task Resend_WithLinkInvitation_ReturnsConflictWithoutEmail()
+    {
+        Guid parentUserId = Guid.NewGuid();
+        Parent parent = new(parentUserId);
+        ChildSetupDraft draft = CreateInvitedDraft(parent.Id);
+        ChildSetupInvitation invitation = new(
+            draft.Id,
+            ChildSetupInvitationType.Link,
+            null,
+            Hash("token"),
+            DateTimeOffset.UtcNow.AddDays(1)
+        );
+        FakeEmailSender emailSender = new();
+
+        ResendChildSetupInvitationCommandHandler handler = new(
+            new InMemoryRepository<Parent>(parent),
+            new InMemoryRepository<ChildSetupDraft>(draft),
+            new InMemoryRepository<ChildSetupInvitation>(invitation),
+            new FakeCurrentUser(parentUserId),
+            new FakeUnitOfWork(),
+            emailSender,
+            new FakeInvitationUrlBuilder(),
+            new FakeChildSetupInvitationTokenProtector(),
+            TimeProvider.System
+        );
+
+        Result<ChildSetupInvitationResponse> result = await handler.Handle(
+            new ResendChildSetupInvitationCommand(draft.Id),
+            CancellationToken.None
+        );
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal("ChildSetupInvitation.LinkCannotBeResent", result.TopError.Code);
+        Assert.Empty(emailSender.ChildSetupInvitations);
+    }
+
+    [Fact]
     public async Task Resend_WithPendingInvitation_RenewsInvitationAndEmailsChild()
     {
         Guid parentUserId = Guid.NewGuid();
@@ -23,10 +60,10 @@ public sealed class ResendChildSetupInvitationCommandHandlerTests
             draft.Id,
             "CHILD@EXAMPLE.COM",
             oldHash,
-            DateTimeOffset.UtcNow.AddDays(1));
+            DateTimeOffset.UtcNow.AddDays(1)
+        );
 
-        InMemoryRepository<ChildSetupInvitation> invitations =
-            new(invitation);
+        InMemoryRepository<ChildSetupInvitation> invitations = new(invitation);
 
         FakeEmailSender emailSender = new();
 
@@ -39,34 +76,31 @@ public sealed class ResendChildSetupInvitationCommandHandlerTests
             emailSender,
             new FakeInvitationUrlBuilder(),
             new FakeChildSetupInvitationTokenProtector(),
-            TimeProvider.System);
+            TimeProvider.System
+        );
 
         DateTimeOffset oldExpiry = invitation.ExpiresAtUtc;
 
-        Result<ChildSetupInvitationResponse> result =
-            await handler.Handle(
-                new ResendChildSetupInvitationCommand(draft.Id),
-                CancellationToken.None);
+        Result<ChildSetupInvitationResponse> result = await handler.Handle(
+            new ResendChildSetupInvitationCommand(draft.Id),
+            CancellationToken.None
+        );
 
         Assert.True(result.IsSuccess);
         Assert.Equal("Pending", result.Value.Status);
         Assert.Equal(invitation.Id, result.Value.Id);
         Assert.NotEqual(oldHash, invitation.TokenHash);
         Assert.NotEqual(oldExpiry, invitation.ExpiresAtUtc);
-        Assert.Contains(
-            "/invitations/child-setup/",
-            result.Value.InvitationUrl);
+        Assert.Contains("/invitations/child-setup/", result.Value.InvitationUrl);
 
         Assert.Single(emailSender.ChildSetupInvitations);
-        Assert.Equal(
-            "CHILD@EXAMPLE.COM",
-            emailSender.ChildSetupInvitations[0].ChildEmail);
+        Assert.Equal("CHILD@EXAMPLE.COM", emailSender.ChildSetupInvitations[0].ChildEmail);
         Assert.Equal(
             result.Value.InvitationUrl,
-            emailSender.ChildSetupInvitations[0].InvitationUrl);
+            emailSender.ChildSetupInvitations[0].InvitationUrl
+        );
 
-        string token =
-            result.Value.InvitationUrl.Split((char)47).Last();
+        string token = result.Value.InvitationUrl.Split((char)47).Last();
 
         Assert.Equal(Hash(token), invitation.TokenHash);
         Assert.NotEqual(token, invitation.TokenHash);
@@ -83,7 +117,8 @@ public sealed class ResendChildSetupInvitationCommandHandlerTests
             draft.Id,
             "child@example.com",
             Hash("token"),
-            DateTimeOffset.UtcNow.AddDays(1));
+            DateTimeOffset.UtcNow.AddDays(1)
+        );
 
         FakeEmailSender emailSender = new();
 
@@ -96,12 +131,13 @@ public sealed class ResendChildSetupInvitationCommandHandlerTests
             emailSender,
             new FakeInvitationUrlBuilder(),
             new FakeChildSetupInvitationTokenProtector(),
-            TimeProvider.System);
+            TimeProvider.System
+        );
 
-        Result<ChildSetupInvitationResponse> result =
-            await handler.Handle(
-                new ResendChildSetupInvitationCommand(draft.Id),
-                CancellationToken.None);
+        Result<ChildSetupInvitationResponse> result = await handler.Handle(
+            new ResendChildSetupInvitationCommand(draft.Id),
+            CancellationToken.None
+        );
 
         Assert.False(result.IsSuccess);
         Assert.Equal("ChildSetup.NotFound", result.TopError.Code);
@@ -126,17 +162,16 @@ public sealed class ResendChildSetupInvitationCommandHandlerTests
             emailSender,
             new FakeInvitationUrlBuilder(),
             new FakeChildSetupInvitationTokenProtector(),
-            TimeProvider.System);
+            TimeProvider.System
+        );
 
-        Result<ChildSetupInvitationResponse> result =
-            await handler.Handle(
-                new ResendChildSetupInvitationCommand(draft.Id),
-                CancellationToken.None);
+        Result<ChildSetupInvitationResponse> result = await handler.Handle(
+            new ResendChildSetupInvitationCommand(draft.Id),
+            CancellationToken.None
+        );
 
         Assert.False(result.IsSuccess);
-        Assert.Equal(
-            "ChildSetupInvitation.NotFound",
-            result.TopError.Code);
+        Assert.Equal("ChildSetupInvitation.NotFound", result.TopError.Code);
         Assert.Empty(emailSender.ChildSetupInvitations);
     }
 
@@ -149,7 +184,6 @@ public sealed class ResendChildSetupInvitationCommandHandlerTests
 
     private static string Hash(string token)
     {
-        return Convert.ToHexString(
-            SHA256.HashData(Encoding.UTF8.GetBytes(token)));
+        return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(token)));
     }
 }

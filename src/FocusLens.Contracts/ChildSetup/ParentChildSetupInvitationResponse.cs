@@ -7,7 +7,8 @@ public sealed record ParentChildSetupInvitationResponse(
     Guid InvitationId,
     string? FirstName,
     string? LastName,
-    string TargetEmail,
+    string? TargetEmail,
+    string Type,
     string Status,
     DateTimeOffset ExpiresAtUtc,
     StudentGrade? Grade
