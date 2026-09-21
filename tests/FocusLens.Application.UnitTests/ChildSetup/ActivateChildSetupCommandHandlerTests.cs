@@ -16,6 +16,48 @@ namespace FocusLens.Application.UnitTests.ChildSetup;
 public sealed class ActivateChildSetupCommandHandlerTests
 {
     [Fact]
+    public async Task Activate_WithEmptyClaimedDraft_PreservesStudentOnboardingProfile()
+    {
+        Guid studentUserId = Guid.NewGuid();
+        Guid parentUserId = Guid.NewGuid();
+        Student student = new(studentUserId);
+        Parent parent = new(parentUserId);
+        ChildSetupDraft draft = new(parent.Id);
+        draft.MarkInvited();
+        draft.MarkClaimed(student.Id);
+
+        ApplicationUser user = new()
+        {
+            Id = studentUserId,
+            Email = "youssef@example.com",
+            UserName = "youssef@example.com",
+            FirstName = "Youssef",
+            LastName = "Student",
+        };
+
+        student.SetPrivateProperty("User", user);
+
+        ActivateChildSetupCommandHandler handler = new(
+            new InMemoryRepository<Student>(student),
+            new InMemoryRepository<ChildSetupDraft>(draft),
+            new InMemoryRepository<ParentStudentRelationship>(),
+            new FakeCurrentUser(studentUserId),
+            new TestIdentityService(user),
+            new FakeUnitOfWork()
+        );
+
+        Result<StudentDetailsResponse> result = await handler.Handle(
+            new ActivateChildSetupCommand(),
+            CancellationToken.None
+        );
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(ChildSetupStatus.Activated, draft.Status);
+        Assert.Equal("Youssef", user.FirstName);
+        Assert.Equal("Student", user.LastName);
+    }
+
+    [Fact]
     public async Task Activate_WithClaimedDraft_CreatesActiveParentStudentRelationship()
     {
         Guid studentUserId = Guid.NewGuid();
@@ -38,7 +80,7 @@ public sealed class ActivateChildSetupCommandHandlerTests
             Email = "youssef@example.com",
             UserName = "youssef@example.com",
             FirstName = "Old",
-            LastName = "Name"
+            LastName = "Name",
         };
 
         student.SetPrivateProperty("User", user);
@@ -49,17 +91,18 @@ public sealed class ActivateChildSetupCommandHandlerTests
             relationships,
             new FakeCurrentUser(studentUserId),
             new TestIdentityService(user),
-            new FakeUnitOfWork());
+            new FakeUnitOfWork()
+        );
 
         Result<StudentDetailsResponse> result = await handler.Handle(
             new ActivateChildSetupCommand(),
-            CancellationToken.None);
+            CancellationToken.None
+        );
 
         Assert.True(result.IsSuccess);
         Assert.Equal(ChildSetupStatus.Activated, draft.Status);
 
-        ParentStudentRelationship relationship =
-            Assert.Single(await relationships.GetAllAsync());
+        ParentStudentRelationship relationship = Assert.Single(await relationships.GetAllAsync());
 
         Assert.Equal(parent.Id, relationship.ParentId);
         Assert.Equal(student.Id, relationship.StudentId);
@@ -81,12 +124,10 @@ public sealed class ActivateChildSetupCommandHandlerTests
         draft.MarkInvited();
         draft.MarkClaimed(student.Id);
 
-        ParentStudentRelationship relationship =
-            new(parent.Id, student.Id);
+        ParentStudentRelationship relationship = new(parent.Id, student.Id);
         relationship.Accept();
 
-        InMemoryRepository<ParentStudentRelationship> relationships =
-            new(relationship);
+        InMemoryRepository<ParentStudentRelationship> relationships = new(relationship);
 
         ApplicationUser user = new()
         {
@@ -94,7 +135,7 @@ public sealed class ActivateChildSetupCommandHandlerTests
             Email = "youssef@example.com",
             UserName = "youssef@example.com",
             FirstName = "Old",
-            LastName = "Name"
+            LastName = "Name",
         };
 
         student.SetPrivateProperty("User", user);
@@ -105,11 +146,13 @@ public sealed class ActivateChildSetupCommandHandlerTests
             relationships,
             new FakeCurrentUser(studentUserId),
             new TestIdentityService(user),
-            new FakeUnitOfWork());
+            new FakeUnitOfWork()
+        );
 
         Result<StudentDetailsResponse> result = await handler.Handle(
             new ActivateChildSetupCommand(),
-            CancellationToken.None);
+            CancellationToken.None
+        );
 
         Assert.True(result.IsSuccess);
         Assert.Equal(RelationshipStatus.Active, relationship.Status);
@@ -132,13 +175,11 @@ public sealed class ActivateChildSetupCommandHandlerTests
         draft.MarkInvited();
         draft.MarkClaimed(student.Id);
 
-        ParentStudentRelationship relationship =
-            new(parent.Id, student.Id);
+        ParentStudentRelationship relationship = new(parent.Id, student.Id);
         relationship.Accept();
         relationship.Revoke();
 
-        InMemoryRepository<ParentStudentRelationship> relationships =
-            new(relationship);
+        InMemoryRepository<ParentStudentRelationship> relationships = new(relationship);
 
         ApplicationUser user = new()
         {
@@ -146,7 +187,7 @@ public sealed class ActivateChildSetupCommandHandlerTests
             Email = "youssef@example.com",
             UserName = "youssef@example.com",
             FirstName = "Old",
-            LastName = "Name"
+            LastName = "Name",
         };
 
         student.SetPrivateProperty("User", user);
@@ -157,11 +198,13 @@ public sealed class ActivateChildSetupCommandHandlerTests
             relationships,
             new FakeCurrentUser(studentUserId),
             new TestIdentityService(user),
-            new FakeUnitOfWork());
+            new FakeUnitOfWork()
+        );
 
         Result<StudentDetailsResponse> result = await handler.Handle(
             new ActivateChildSetupCommand(),
-            CancellationToken.None);
+            CancellationToken.None
+        );
 
         Assert.True(result.IsSuccess);
         Assert.Equal(RelationshipStatus.Active, relationship.Status);
@@ -190,95 +233,79 @@ public sealed class ActivateChildSetupCommandHandlerTests
             new InMemoryRepository<ChildSetupDraft>(draft),
             new InMemoryRepository<ParentStudentRelationship>(),
             new FakeCurrentUser(studentUserId),
-            new TestIdentityService(new ApplicationUser
-            {
-                Id = studentUserId,
-                Email = "youssef@example.com",
-                UserName = "youssef@example.com",
-                FirstName = "Youssef",
-                LastName = "Mahmoud"
-            }),
-            new FakeUnitOfWork());
+            new TestIdentityService(
+                new ApplicationUser
+                {
+                    Id = studentUserId,
+                    Email = "youssef@example.com",
+                    UserName = "youssef@example.com",
+                    FirstName = "Youssef",
+                    LastName = "Mahmoud",
+                }
+            ),
+            new FakeUnitOfWork()
+        );
 
         Result<StudentDetailsResponse> result = await handler.Handle(
             new ActivateChildSetupCommand(),
-            CancellationToken.None);
+            CancellationToken.None
+        );
 
         Assert.False(result.IsSuccess);
-        Assert.Equal(
-            "ChildSetup.NotReadyForActivation",
-            result.TopError.Code);
+        Assert.Equal("ChildSetup.NotReadyForActivation", result.TopError.Code);
     }
 
     private sealed class TestIdentityService(ApplicationUser user) : IIdentityService
     {
         public Task<ApplicationUser?> FindByIdAsync(Guid userId) =>
-            Task.FromResult<ApplicationUser?>(
-                userId == user.Id ? user : null);
+            Task.FromResult<ApplicationUser?>(userId == user.Id ? user : null);
 
         public Task<ApplicationUser?> FindByEmailAsync(string email) =>
             Task.FromResult<ApplicationUser?>(null);
 
-        public Task<bool> CheckPasswordAsync(
-            ApplicationUser user,
-            string password) =>
+        public Task<bool> CheckPasswordAsync(ApplicationUser user, string password) =>
             Task.FromResult(true);
 
-        public Task<bool> IsEmailConfirmedAsync(ApplicationUser user) =>
-            Task.FromResult(true);
+        public Task<bool> IsEmailConfirmedAsync(ApplicationUser user) => Task.FromResult(true);
 
-        public Task<bool> IsLockedOutAsync(ApplicationUser user) =>
-            Task.FromResult(false);
+        public Task<bool> IsLockedOutAsync(ApplicationUser user) => Task.FromResult(false);
 
-        public Task<IReadOnlyCollection<string>> GetRolesAsync(
-            ApplicationUser user) =>
-            Task.FromResult<IReadOnlyCollection<string>>(
-                [ApplicationRoles.Student]);
+        public Task<IReadOnlyCollection<string>> GetRolesAsync(ApplicationUser user) =>
+            Task.FromResult<IReadOnlyCollection<string>>([ApplicationRoles.Student]);
 
-        public Task<bool> IsInRoleAsync(
-            ApplicationUser user,
-            string role) =>
-            Task.FromResult(true);
+        public Task<bool> IsInRoleAsync(ApplicationUser user, string role) => Task.FromResult(true);
 
-        public Task<IdentityResultSummary> CreateAsync(
-            ApplicationUser user,
-            string password) =>
+        public Task<IdentityResultSummary> CreateAsync(ApplicationUser user, string password) =>
             Task.FromResult(IdentityResultSummary.Success);
 
-        public Task<IdentityResultSummary> UpdateAsync(
-            ApplicationUser user) =>
+        public Task<IdentityResultSummary> UpdateAsync(ApplicationUser user) =>
             Task.FromResult(IdentityResultSummary.Success);
 
-        public Task<IdentityResultSummary> AddToRoleAsync(
-            ApplicationUser user,
-            string role) =>
+        public Task<IdentityResultSummary> AddToRoleAsync(ApplicationUser user, string role) =>
             Task.FromResult(IdentityResultSummary.Success);
 
-        public Task<IdentityResultSummary> ConfirmEmailAsync(
-            ApplicationUser user) =>
+        public Task<IdentityResultSummary> ConfirmEmailAsync(ApplicationUser user) =>
             Task.FromResult(IdentityResultSummary.Success);
 
         public Task<IdentityResultSummary> SetPasswordAsync(
             ApplicationUser user,
-            string newPassword) =>
-            Task.FromResult(IdentityResultSummary.Success);
+            string newPassword
+        ) => Task.FromResult(IdentityResultSummary.Success);
 
         public Task<IdentityResultSummary> ChangePasswordAsync(
             ApplicationUser user,
             string currentPassword,
-            string newPassword) =>
-            Task.FromResult(IdentityResultSummary.Success);
+            string newPassword
+        ) => Task.FromResult(IdentityResultSummary.Success);
 
-        public Task<ApplicationUser?> FindByLoginAsync(
-            string loginProvider,
-            string providerKey) =>
+        public Task<ApplicationUser?> FindByLoginAsync(string loginProvider, string providerKey) =>
             Task.FromResult<ApplicationUser?>(null);
 
         public Task<IdentityResultSummary> AddLoginAsync(
             ApplicationUser user,
             string loginProvider,
             string providerKey,
-            string displayName) =>
-            Task.FromResult(IdentityResultSummary.Success);
+            string displayName
+        ) => Task.FromResult(IdentityResultSummary.Success);
     }
 }

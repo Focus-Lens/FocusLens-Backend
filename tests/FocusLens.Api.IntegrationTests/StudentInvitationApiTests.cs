@@ -12,7 +12,7 @@ namespace FocusLens.Api.IntegrationTests;
 public class StudentInvitationApiTests
 {
     [Fact]
-    public async Task GetMyInvitations_AsStudent_IncludesRequestingParentEmail()
+    public async Task GetMyInvitations_AsStudent_IncludesRequestingParent()
     {
         InvitationFixture fixture = await CreateFixtureAsync();
         using HttpClient client = CreateStudentClient(fixture.Factory, fixture.StudentUserId);
@@ -23,7 +23,9 @@ public class StudentInvitationApiTests
         using JsonDocument document = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
         JsonElement invitation = document.RootElement[0];
         Assert.Equal(fixture.RelationshipId, invitation.GetProperty("id").GetGuid());
-        Assert.Equal("parent@example.com", invitation.GetProperty("parentEmail").GetString());
+        Assert.Equal("parent@example.com", invitation.GetProperty("otherPartyEmail").GetString());
+        Assert.Equal("Incoming", invitation.GetProperty("direction").GetString());
+        Assert.Equal("Relationship", invitation.GetProperty("kind").GetString());
         await fixture.Factory.DisposeAsync();
     }
 
@@ -51,13 +53,13 @@ public class StudentInvitationApiTests
     }
 
     [Fact]
-    public async Task RejectInvitation_AsInvitedStudent_RevokesInvitation()
+    public async Task DeclineInvitation_AsInvitedStudent_RevokesInvitation()
     {
         InvitationFixture fixture = await CreateFixtureAsync();
         using HttpClient client = CreateStudentClient(fixture.Factory, fixture.StudentUserId);
 
         HttpResponseMessage response = await client.PostAsync(
-            $"/api/access/invitations/{fixture.RelationshipId}/reject",
+            $"/api/access/invitations/{fixture.RelationshipId}/decline",
             null);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);

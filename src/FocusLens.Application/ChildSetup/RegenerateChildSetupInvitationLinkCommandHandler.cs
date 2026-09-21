@@ -11,22 +11,21 @@ using ICurrentUser = FocusLens.Application.Common.Interfaces.ICurrentUser;
 
 namespace FocusLens.Application.ChildSetup;
 
-public sealed class ResendChildSetupInvitationCommandHandler(
+public sealed class RegenerateChildSetupInvitationLinkCommandHandler(
     IBaseRepository<Parent> parentRepository,
     IBaseRepository<ChildSetupDraft> draftRepository,
     IBaseRepository<ChildSetupInvitation> invitationRepository,
     ICurrentUser currentUser,
     IUnitOfWork unitOfWork,
-    IEmailSender emailSender,
     IInvitationUrlBuilder invitationUrlBuilder,
     IChildSetupInvitationTokenProtector tokenProtector,
     TimeProvider timeProvider
-) : IRequestHandler<ResendChildSetupInvitationCommand, Result<ChildSetupInvitationResponse>>
+) : IRequestHandler<RegenerateChildSetupInvitationLinkCommand, Result<ChildSetupInvitationResponse>>
 {
     private static readonly TimeSpan InvitationLifetime = TimeSpan.FromDays(7);
 
     public async Task<Result<ChildSetupInvitationResponse>> Handle(
-        ResendChildSetupInvitationCommand request,
+        RegenerateChildSetupInvitationLinkCommand request,
         CancellationToken cancellationToken
     )
     {
@@ -88,32 +87,33 @@ public sealed class ResendChildSetupInvitationCommandHandler(
             );
         }
 
-        if (invitation.Type == ChildSetupInvitationType.Link)
+        if (invitation.Type != ChildSetupInvitationType.Link)
         {
             return Error.Conflict(
-                "ChildSetupInvitation.LinkCannotBeResent",
-                "Link invitations cannot be resent by email."
+                "ChildSetupInvitation.EmailLinkCannotBeRegenerated",
+                "Email invitations cannot be regenerated as links."
             );
         }
 
+        if (invitation.IsExpired(timeProvider.GetUtcNow()))
+        {
+            return Error.Conflict("ChildSetupInvitation.Expired", "This invitation has expired.");
+        }
+
         string token = Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
+
         string tokenHash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(token)));
+
         string protectedToken = tokenProtector.Protect(token);
+
         DateTimeOffset expiresAtUtc = timeProvider.GetUtcNow().Add(InvitationLifetime);
 
         invitation.Renew(tokenHash, expiresAtUtc, protectedToken);
+
         invitationRepository.Update(invitation);
         await unitOfWork.SaveChangesAsync();
 
         string invitationUrl = invitationUrlBuilder.CreateChildSetupInvitationUrl(token);
-
-        string childEmail = invitation.TargetEmailNormalized!;
-
-        await emailSender.SendChildSetupInvitationAsync(
-            childEmail,
-            invitationUrl,
-            cancellationToken
-        );
 
         return new ChildSetupInvitationResponse(
             invitation.Id,

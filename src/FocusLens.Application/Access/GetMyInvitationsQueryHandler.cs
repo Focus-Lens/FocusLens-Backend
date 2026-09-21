@@ -11,6 +11,7 @@ public sealed class GetMyInvitationsQueryHandler(
     IBaseRepository<Parent> parentRepository,
     IBaseRepository<Student> studentRepository,
     IBaseRepository<ParentStudentRelationship> relationshipRepository,
+    IBaseRepository<StudentParentInvitation> invitationRepository,
     ICurrentUser currentUser)
     : IRequestHandler<GetMyInvitationsQuery, IReadOnlyList<InvitationResponse>>
 {
@@ -53,9 +54,71 @@ public sealed class GetMyInvitationsQueryHandler(
         IReadOnlyDictionary<Guid, string?> parentEmails = invitationParents
             .ToDictionary(parent => parent.Id, parent => parent.User?.Email);
 
-        return relationshipList
-            .Select(relationship => relationship.ToResponse(
-                parentEmails.GetValueOrDefault(relationship.ParentId)))
+        Guid[] studentIds = relationshipList
+            .Select(relationship => relationship.StudentId)
+            .Distinct()
+            .ToArray();
+
+        IEnumerable<Student> invitationStudents = await studentRepository.GetAllAsync(
+            studentItem => studentIds.Contains(studentItem.Id),
+            studentItem => studentItem.User);
+
+        IReadOnlyDictionary<Guid, string?> studentEmails = invitationStudents
+            .ToDictionary(studentItem => studentItem.Id, studentItem => studentItem.User?.Email);
+
+        List<InvitationResponse> responses = relationshipList
+            .Select(relationship =>
+            {
+                bool isInitiator = relationship.InitiatedBy == InvitationInitiator.Parent
+                    ? parentId == relationship.ParentId
+                    : studentId == relationship.StudentId;
+
+                string direction = isInitiator ? "Outgoing" : "Incoming";
+
+                string? otherPartyEmail = parentId == relationship.ParentId
+                    ? studentEmails.GetValueOrDefault(relationship.StudentId)
+                    : parentEmails.GetValueOrDefault(relationship.ParentId);
+
+                return relationship.ToResponse(direction, otherPartyEmail);
+            })
             .ToList();
+
+        if (studentId is Guid currentStudentId)
+        {
+            IEnumerable<StudentParentInvitation> outgoingInvitations =
+                await invitationRepository.GetAllAsync(
+                    invitation => invitation.StudentId == currentStudentId &&
+                                   invitation.Status == ParentInvitationStatus.Pending,
+                    invitation => invitation.Student,
+                    invitation => invitation.Student.User);
+
+            responses.AddRange(
+                outgoingInvitations.Select(invitation =>
+                    invitation.ToResponse(
+                        "Outgoing",
+                        null,
+                        invitation.TargetEmailNormalized)));
+        }
+
+        if (parent is not null && !string.IsNullOrWhiteSpace(parent.User?.Email))
+        {
+            string normalizedParentEmail = parent.User.Email.Trim().ToUpperInvariant();
+
+            IEnumerable<StudentParentInvitation> incomingInvitations =
+                await invitationRepository.GetAllAsync(
+                    invitation => invitation.TargetEmailNormalized == normalizedParentEmail &&
+                                   invitation.Status == ParentInvitationStatus.Pending,
+                    invitation => invitation.Student,
+                    invitation => invitation.Student.User);
+
+            responses.AddRange(
+                incomingInvitations.Select(invitation =>
+                    invitation.ToResponse(
+                        "Incoming",
+                        parent.Id,
+                        invitation.Student.User?.Email)));
+        }
+
+        return responses;
     }
 }

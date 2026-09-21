@@ -33,7 +33,7 @@ public sealed class CreateInvitationCommandHandler(
                 "The current user could not be identified.");
         }
 
-        string? studentEmail = request.Request.StudentEmail?.Trim();
+        string? studentEmail = request.Request.Email?.Trim();
 
         if (string.IsNullOrWhiteSpace(studentEmail))
         {
@@ -99,7 +99,7 @@ public sealed class CreateInvitationCommandHandler(
                     existingRelationship.Id,
                     cancellationToken);
 
-                return existingRelationship.ToResponse();
+                return existingRelationship.ToResponse("Outgoing", student.User.Email);
             }
 
             if (existingRelationship.Status == RelationshipStatus.Pending)
@@ -117,7 +117,7 @@ public sealed class CreateInvitationCommandHandler(
                     existingRelationship.Id,
                     cancellationToken);
 
-                return existingRelationship.ToResponse();
+                return existingRelationship.ToResponse("Outgoing", student.User.Email);
             }
 
             return Error.Conflict(
@@ -137,6 +137,6 @@ public sealed class CreateInvitationCommandHandler(
             relationship.Id,
             cancellationToken);
 
-        return relationship.ToResponse();
+        return relationship.ToResponse("Outgoing", student.User.Email);
     }
 }

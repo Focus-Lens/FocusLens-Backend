@@ -7,10 +7,10 @@ using FocusLens.Domain.Identity;
 
 namespace FocusLens.Application.UnitTests.Access;
 
-public class AcceptInvitationCommandHandlerTests
+public class DeclineInvitationCommandHandlerTests
 {
     [Fact]
-    public async Task Handle_WithCorrectStudent_ActivatesInvitation()
+    public async Task Handle_WithCorrectStudent_RevokesInvitation()
     {
         Guid parentUserId = Guid.NewGuid();
         Guid studentUserId = Guid.NewGuid();
@@ -27,7 +27,7 @@ public class AcceptInvitationCommandHandlerTests
         InMemoryRepository<ParentStudentRelationship> relationshipRepository = new(relationship);
         FakeUnitOfWork unitOfWork = new();
 
-        AcceptInvitationCommandHandler handler = new(
+        DeclineInvitationCommandHandler handler = new(
             relationshipRepository,
             new InMemoryRepository<StudentParentInvitation>(),
             new InMemoryRepository<Parent>(),
@@ -35,12 +35,13 @@ public class AcceptInvitationCommandHandlerTests
             unitOfWork);
 
         Result<InvitationResponse> result = await handler.Handle(
-            new AcceptInvitationCommand(relationship.Id),
+            new DeclineInvitationCommand(relationship.Id),
             CancellationToken.None);
 
         Assert.True(result.IsSuccess);
-        Assert.Equal("Active", result.Value.Status);
-        Assert.Equal(RelationshipStatus.Active, relationship.Status);
+        Assert.Equal("Revoked", result.Value.Status);
+        Assert.Equal(RelationshipStatus.Revoked, relationship.Status);
+        Assert.NotNull(relationship.RevokedAtUtc);
         Assert.Equal(1, unitOfWork.SaveChangesCalls);
     }
 
@@ -62,7 +63,7 @@ public class AcceptInvitationCommandHandlerTests
 
         FakeUnitOfWork unitOfWork = new();
 
-        AcceptInvitationCommandHandler handler = new(
+        DeclineInvitationCommandHandler handler = new(
             new InMemoryRepository<ParentStudentRelationship>(relationship),
             new InMemoryRepository<StudentParentInvitation>(),
             new InMemoryRepository<Parent>(),
@@ -70,7 +71,7 @@ public class AcceptInvitationCommandHandlerTests
             unitOfWork);
 
         Result<InvitationResponse> result = await handler.Handle(
-            new AcceptInvitationCommand(relationship.Id),
+            new DeclineInvitationCommand(relationship.Id),
             CancellationToken.None);
 
         Assert.False(result.IsSuccess);
@@ -86,7 +87,7 @@ public class AcceptInvitationCommandHandlerTests
         Guid studentUserId = Guid.NewGuid();
         FakeUnitOfWork unitOfWork = new();
 
-        AcceptInvitationCommandHandler handler = new(
+        DeclineInvitationCommandHandler handler = new(
             new InMemoryRepository<ParentStudentRelationship>(),
             new InMemoryRepository<StudentParentInvitation>(),
             new InMemoryRepository<Parent>(),
@@ -94,7 +95,7 @@ public class AcceptInvitationCommandHandlerTests
             unitOfWork);
 
         Result<InvitationResponse> result = await handler.Handle(
-            new AcceptInvitationCommand(Guid.NewGuid()),
+            new DeclineInvitationCommand(Guid.NewGuid()),
             CancellationToken.None);
 
         Assert.False(result.IsSuccess);
@@ -121,7 +122,7 @@ public class AcceptInvitationCommandHandlerTests
 
         FakeUnitOfWork unitOfWork = new();
 
-        AcceptInvitationCommandHandler handler = new(
+        DeclineInvitationCommandHandler handler = new(
             new InMemoryRepository<ParentStudentRelationship>(relationship),
             new InMemoryRepository<StudentParentInvitation>(),
             new InMemoryRepository<Parent>(),
@@ -129,17 +130,18 @@ public class AcceptInvitationCommandHandlerTests
             unitOfWork);
 
         Result<InvitationResponse> result = await handler.Handle(
-            new AcceptInvitationCommand(relationship.Id),
+            new DeclineInvitationCommand(relationship.Id),
             CancellationToken.None);
 
         Assert.False(result.IsSuccess);
         Assert.Equal(ErrorKind.Conflict, result.TopError.Type);
         Assert.Equal("Access.InvalidInvitationState", result.TopError.Code);
+        Assert.Equal(RelationshipStatus.Active, relationship.Status);
         Assert.Equal(0, unitOfWork.SaveChangesCalls);
     }
 
     [Fact]
-    public async Task Handle_WithMatchingParentInvitation_ActivatesRelationship()
+    public async Task Handle_WithMatchingParentInvitation_DeclinesInvitation()
     {
         Guid parentUserId = Guid.NewGuid();
         Guid studentUserId = Guid.NewGuid();
@@ -147,9 +149,6 @@ public class AcceptInvitationCommandHandlerTests
         Parent parent = new(parentUserId);
         parent.SetPrivateProperty("User", new ApplicationUser { Email = "parent@example.com" });
         Student student = new(studentUserId);
-        student.SetPrivateProperty(
-            "User",
-            new ApplicationUser { Email = "student@example.com" });
 
         StudentParentInvitation invitation = new(
             student.Id,
@@ -159,37 +158,26 @@ public class AcceptInvitationCommandHandlerTests
 
         invitation.SetPrivateProperty("Student", student);
 
-        InMemoryRepository<ParentStudentRelationship> relationships = new();
         InMemoryRepository<StudentParentInvitation> invitations = new(invitation);
-        InMemoryRepository<Parent> parents = new(parent);
         FakeUnitOfWork unitOfWork = new();
 
-        AcceptInvitationCommandHandler handler = new(
-            relationships,
+        DeclineInvitationCommandHandler handler = new(
+            new InMemoryRepository<ParentStudentRelationship>(),
             invitations,
-            parents,
+            new InMemoryRepository<Parent>(parent),
             new FakeCurrentUser(parentUserId, "parent@example.com"),
             unitOfWork,
             TimeProvider.System);
 
         Result<InvitationResponse> result = await handler.Handle(
-            new AcceptInvitationCommand(invitation.Id),
+            new DeclineInvitationCommand(invitation.Id),
             CancellationToken.None);
 
         Assert.True(result.IsSuccess);
-        Assert.Equal("Active", result.Value.Status);
-        Assert.Equal("Relationship", result.Value.Kind);
-        Assert.Equal(ParentInvitationStatus.Accepted, invitation.Status);
-
-        IEnumerable<ParentStudentRelationship> savedRelationships =
-            await relationships.GetAllAsync();
-
-        Assert.Single(savedRelationships);
-        ParentStudentRelationship savedRelationship = (await relationships.GetAllAsync()).Single();
-        Assert.Equal(parent.Id, savedRelationship.ParentId);
-        Assert.Equal(student.Id, savedRelationship.StudentId);
-        Assert.Equal(InvitationInitiator.Student, savedRelationship.InitiatedBy);
-        Assert.Equal(RelationshipStatus.Active, savedRelationship.Status);
+        Assert.Equal("Declined", result.Value.Status);
+        Assert.Equal("StudentParent", result.Value.Kind);
+        Assert.Equal(ParentInvitationStatus.Declined, invitation.Status);
+        Assert.Equal(1, unitOfWork.SaveChangesCalls);
     }
 
     [Fact]
@@ -213,7 +201,7 @@ public class AcceptInvitationCommandHandlerTests
         InMemoryRepository<StudentParentInvitation> invitations = new(invitation);
         FakeUnitOfWork unitOfWork = new();
 
-        AcceptInvitationCommandHandler handler = new(
+        DeclineInvitationCommandHandler handler = new(
             new InMemoryRepository<ParentStudentRelationship>(),
             invitations,
             new InMemoryRepository<Parent>(parent),
@@ -222,14 +210,13 @@ public class AcceptInvitationCommandHandlerTests
             TimeProvider.System);
 
         Result<InvitationResponse> result = await handler.Handle(
-            new AcceptInvitationCommand(invitation.Id),
+            new DeclineInvitationCommand(invitation.Id),
             CancellationToken.None);
 
         Assert.False(result.IsSuccess);
         Assert.Equal(ErrorKind.Forbidden, result.TopError.Type);
         Assert.Equal("Access.InvitationNotOwned", result.TopError.Code);
         Assert.Equal(ParentInvitationStatus.Pending, invitation.Status);
-        Assert.Empty(await new InMemoryRepository<ParentStudentRelationship>().GetAllAsync());
         Assert.Equal(0, unitOfWork.SaveChangesCalls);
     }
 }

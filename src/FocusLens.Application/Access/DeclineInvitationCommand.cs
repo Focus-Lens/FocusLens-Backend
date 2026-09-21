@@ -4,5 +4,5 @@ using MediatR;
 
 namespace FocusLens.Application.Access;
 
-public sealed record RejectInvitationCommand(Guid InvitationId)
+public sealed record DeclineInvitationCommand(Guid InvitationId)
     : IRequest<Result<InvitationResponse>>;

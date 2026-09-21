@@ -39,8 +39,7 @@ public sealed class CreateChildSetupInvitationCommandHandler(
             );
         }
 
-        Parent? parent = await parentRepository.FirstOrDefaultAsync(
-            item => item.UserId == userId);
+        Parent? parent = await parentRepository.FirstOrDefaultAsync(item => item.UserId == userId);
 
         if (parent is null)
         {
@@ -89,13 +88,6 @@ public sealed class CreateChildSetupInvitationCommandHandler(
             );
         }
 
-        if (parent.WeekStartsOn is null)
-        {
-            return Error.Validation(
-                "ChildSetup.WeekStartsOnRequired",
-                "Choose a week start day before sending a child setup invitation.");
-        }
-
         if (!IsComplete(draft))
         {
             return Error.Validation(
@@ -110,35 +102,29 @@ public sealed class CreateChildSetupInvitationCommandHandler(
         string tokenHash = HashToken(token);
         string protectedToken = tokenProtector.Protect(token);
 
-        DateTimeOffset expiresAtUtc =
-            timeProvider.GetUtcNow().Add(InvitationLifetime);
+        DateTimeOffset expiresAtUtc = timeProvider.GetUtcNow().Add(InvitationLifetime);
 
         ChildSetupInvitation invitation = new(
             draft.Id,
+            ChildSetupInvitationType.Email,
             normalizedEmail,
             tokenHash,
             expiresAtUtc,
-            protectedToken);
+            protectedToken
+        );
 
         invitationRepository.Add(invitation);
         draft.MarkInvited();
 
         await unitOfWork.SaveChangesAsync();
 
-        string invitationUrl =
-            invitationUrlBuilder.CreateChildSetupInvitationUrl(token);
-
-        Console.WriteLine(
-            $"CHILD INVITATION: Sending invitation email to {childEmail}");
+        string invitationUrl = invitationUrlBuilder.CreateChildSetupInvitationUrl(token);
 
         await emailSender.SendChildSetupInvitationAsync(
             childEmail,
             invitationUrl,
             cancellationToken
         );
-
-        Console.WriteLine(
-            $"CHILD INVITATION: Invitation email send completed for {childEmail}");
 
         return new ChildSetupInvitationResponse(
             invitation.Id,
@@ -151,20 +137,18 @@ public sealed class CreateChildSetupInvitationCommandHandler(
     private static bool IsComplete(ChildSetupDraft draft)
     {
         return !string.IsNullOrWhiteSpace(draft.FirstName)
-               && !string.IsNullOrWhiteSpace(draft.LastName)
-               && draft.Grade is not null
-               && draft.Subjects.Count > 0
-               && draft.StudyPriorities.Count > 0
-               && draft.StudyTimeGoal is not null;
+            && !string.IsNullOrWhiteSpace(draft.LastName)
+            && draft.Grade is not null
+            && draft.Subjects.Count > 0
+            && draft.StudyPriorities.Count > 0
+            && draft.StudyTimeGoal is not null;
     }
 
     private static bool IsValidEmail(string email)
     {
         try
         {
-            return new MailAddress(email).Address.Equals(
-                email,
-                StringComparison.OrdinalIgnoreCase);
+            return new MailAddress(email).Address.Equals(email, StringComparison.OrdinalIgnoreCase);
         }
         catch (FormatException)
         {
@@ -172,12 +156,8 @@ public sealed class CreateChildSetupInvitationCommandHandler(
         }
     }
 
-    private static string CreateToken() =>
-        Convert.ToHexString(
-            RandomNumberGenerator.GetBytes(32));
+    private static string CreateToken() => Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
 
     private static string HashToken(string token) =>
-        Convert.ToHexString(
-            SHA256.HashData(
-                Encoding.UTF8.GetBytes(token)));
+        Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(token)));
 }
