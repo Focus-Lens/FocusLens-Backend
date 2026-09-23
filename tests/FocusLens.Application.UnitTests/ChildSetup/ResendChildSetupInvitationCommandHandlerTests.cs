@@ -53,6 +53,13 @@ public sealed class ResendChildSetupInvitationCommandHandlerTests
     {
         Guid parentUserId = Guid.NewGuid();
         Parent parent = new(parentUserId);
+        parent.SetPrivateProperty(
+            "User",
+            new FocusLens.Domain.Identity.ApplicationUser
+            {
+                FirstName = "Karim",
+                LastName = "Mahmoud"
+            });
         ChildSetupDraft draft = CreateInvitedDraft(parent.Id);
 
         string oldHash = Hash("old-token");

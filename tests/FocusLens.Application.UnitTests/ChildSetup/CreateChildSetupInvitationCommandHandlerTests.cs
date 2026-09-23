@@ -209,6 +209,13 @@ public sealed class CreateChildSetupInvitationCommandHandlerTests
     {
         Guid parentUserId = Guid.NewGuid();
         Parent parent = new(parentUserId);
+        parent.SetPrivateProperty(
+            "User",
+            new FocusLens.Domain.Identity.ApplicationUser
+            {
+                FirstName = "Karim",
+                LastName = "Mahmoud"
+            });
         ChildSetupDraft draft = CreateCompleteDraft(parent.Id);
 
         InMemoryRepository<ChildSetupInvitation> invitations = new();
@@ -269,6 +276,13 @@ public sealed class CreateChildSetupInvitationCommandHandlerTests
     private static Parent CreateParent(Guid userId)
     {
         Parent parent = new(userId);
+        parent.SetPrivateProperty(
+            "User",
+            new FocusLens.Domain.Identity.ApplicationUser
+            {
+                FirstName = "Karim",
+                LastName = "Mahmoud"
+            });
         parent.SetWeekStartsOn(DayOfWeek.Monday);
         return parent;
     }

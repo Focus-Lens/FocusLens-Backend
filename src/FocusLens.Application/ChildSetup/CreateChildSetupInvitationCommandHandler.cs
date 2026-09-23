@@ -39,7 +39,10 @@ public sealed class CreateChildSetupInvitationCommandHandler(
             );
         }
 
-        Parent? parent = await parentRepository.FirstOrDefaultAsync(item => item.UserId == userId);
+        Parent? parent = await parentRepository.FirstOrDefaultAsync(
+            item => item.UserId == userId,
+            item => item.User
+        );
 
         if (parent is null)
         {
@@ -48,6 +51,7 @@ public sealed class CreateChildSetupInvitationCommandHandler(
                 "The current user does not have a parent profile."
             );
         }
+
 
         if (request.DraftId == Guid.Empty)
         {
@@ -120,8 +124,11 @@ public sealed class CreateChildSetupInvitationCommandHandler(
 
         string invitationUrl = invitationUrlBuilder.CreateChildSetupInvitationUrl(token);
 
+        string parentName = $"{parent.User.FirstName} {parent.User.LastName}".Trim();
+
         await emailSender.SendChildSetupInvitationAsync(
             childEmail,
+            parentName,
             invitationUrl,
             cancellationToken
         );

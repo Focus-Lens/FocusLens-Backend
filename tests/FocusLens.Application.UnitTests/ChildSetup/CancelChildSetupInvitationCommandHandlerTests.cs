@@ -73,6 +73,13 @@ public sealed class CancelChildSetupInvitationCommandHandlerTests
     {
         Guid parentUserId = Guid.NewGuid();
         Parent parent = new(parentUserId);
+        parent.SetPrivateProperty(
+            "User",
+            new FocusLens.Domain.Identity.ApplicationUser
+            {
+                FirstName = "Karim",
+                LastName = "Mahmoud"
+            });
         parent.SetWeekStartsOn(DayOfWeek.Monday);
         ChildSetupDraft draft = CreateCompleteDraft(parent.Id);
         draft.MarkInvited();

@@ -338,6 +338,7 @@ public sealed class SmtpEmailSender : IEmailSender
 
     public async Task SendChildSetupInvitationAsync(
         string childEmail,
+        string parentName,
         string invitationUrl,
         CancellationToken cancellationToken = default)
     {
@@ -345,6 +346,7 @@ public sealed class SmtpEmailSender : IEmailSender
             ChildSetupInvitationTemplate,
             new Dictionary<string, string>
             {
+                ["{{ParentName}}"] = parentName,
                 ["{{InvitationUrl}}"] = invitationUrl
             },
             cancellationToken);
