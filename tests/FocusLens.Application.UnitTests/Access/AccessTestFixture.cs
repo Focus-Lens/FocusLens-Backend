@@ -145,10 +145,7 @@ public sealed class FakeEmailSender : IEmailSender
         return Task.CompletedTask;
     }
 
-    public Task SendChildSetupInvitationAsync(
-        string childEmail,
-        string invitationUrl,
-        CancellationToken cancellationToken = default)
+    public Task SendChildSetupInvitationAsync(string childEmail, string parentName, string invitationUrl, CancellationToken cancellationToken = default)
     {
         ChildSetupInvitations.Add((childEmail, invitationUrl));
         return Task.CompletedTask;
