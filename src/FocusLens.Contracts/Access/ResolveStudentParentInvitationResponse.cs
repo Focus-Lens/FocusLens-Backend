@@ -6,6 +6,8 @@ namespace FocusLens.Contracts.Access;
 public sealed record ResolveStudentParentInvitationResponse(
     Guid InvitationId,
     string Status,
+    string Type,
+    string? TargetEmail,
     string StudentPreferredName,
     string? AgeRange,
     DateTimeOffset ExpiresAtUtc,

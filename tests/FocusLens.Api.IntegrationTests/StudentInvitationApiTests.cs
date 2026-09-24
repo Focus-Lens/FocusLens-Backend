@@ -1,5 +1,7 @@
 using System.Net;
 using System.Net.Http.Headers;
+using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 using FocusLens.Domain;
 using FocusLens.Domain.Access;
@@ -67,6 +69,94 @@ public class StudentInvitationApiTests
         using JsonDocument document = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
         Assert.Equal("Revoked", document.RootElement.GetProperty("status").GetString());
         await fixture.Factory.DisposeAsync();
+    }
+
+    [Fact]
+    public async Task ResolveInvitation_WithEmailInvitation_ReturnsTypeAndTargetEmail()
+    {
+        Guid studentUserId = Guid.NewGuid();
+        Student student = new(studentUserId);
+        const string rawToken = "student-parent-email-token";
+        string tokenHash = Convert.ToHexString(
+            SHA256.HashData(Encoding.UTF8.GetBytes(rawToken)));
+        StudentParentInvitation invitation = new(
+            student.Id,
+            StudentParentInvitationType.Email,
+            "PARENT@EXAMPLE.COM",
+            tokenHash,
+            DateTimeOffset.UtcNow.AddDays(7));
+        CustomWebApplicationFactory factory = new();
+
+        await factory.SeedAsync(db =>
+        {
+            db.Users.Add(new ApplicationUser
+            {
+                Id = studentUserId,
+                Email = "student@example.com",
+                UserName = "student@example.com",
+                FirstName = "Youssef",
+                LastName = "Ali"
+            });
+            db.Students.Add(student);
+            db.StudentParentInvitations.Add(invitation);
+            return Task.CompletedTask;
+        });
+
+        using HttpClient client = factory.CreateClient();
+        HttpResponseMessage response = await client.GetAsync(
+            $"/api/access/invitations/resolve?token={rawToken}");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        using JsonDocument document = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        JsonElement root = document.RootElement;
+        Assert.Equal("Email", root.GetProperty("type").GetString());
+        Assert.Equal("PARENT@EXAMPLE.COM", root.GetProperty("targetEmail").GetString());
+
+        await factory.DisposeAsync();
+    }
+
+    [Fact]
+    public async Task ResolveInvitation_WithLinkInvitation_ReturnsLinkTypeWithoutTargetEmail()
+    {
+        Guid studentUserId = Guid.NewGuid();
+        Student student = new(studentUserId);
+        const string rawToken = "student-parent-link-token";
+        string tokenHash = Convert.ToHexString(
+            SHA256.HashData(Encoding.UTF8.GetBytes(rawToken)));
+        StudentParentInvitation invitation = new(
+            student.Id,
+            StudentParentInvitationType.Link,
+            null,
+            tokenHash,
+            DateTimeOffset.UtcNow.AddDays(7));
+        CustomWebApplicationFactory factory = new();
+
+        await factory.SeedAsync(db =>
+        {
+            db.Users.Add(new ApplicationUser
+            {
+                Id = studentUserId,
+                Email = "student@example.com",
+                UserName = "student@example.com",
+                FirstName = "Youssef",
+                LastName = "Ali"
+            });
+            db.Students.Add(student);
+            db.StudentParentInvitations.Add(invitation);
+            return Task.CompletedTask;
+        });
+
+        using HttpClient client = factory.CreateClient();
+        HttpResponseMessage response = await client.GetAsync(
+            $"/api/access/invitations/resolve?token={rawToken}");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        using JsonDocument document = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        JsonElement root = document.RootElement;
+        Assert.Equal("Link", root.GetProperty("type").GetString());
+        Assert.Equal(JsonValueKind.Null, root.GetProperty("targetEmail").ValueKind);
+
+        await factory.DisposeAsync();
     }
 
     [Fact]

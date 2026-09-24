@@ -34,10 +34,33 @@ public sealed class ResolveStudentParentInvitationQueryHandlerTests
         Assert.True(result.IsSuccess);
         Assert.Equal(invitation.Id, result.Value.InvitationId);
         Assert.Equal("Pending", result.Value.Status);
+        Assert.Equal("Email", result.Value.Type);
+        Assert.Equal("PARENT@EXAMPLE.COM", result.Value.TargetEmail);
         Assert.Equal("Youssef", result.Value.StudentPreferredName);
         Assert.Equal("13–15", result.Value.AgeRange);
         Assert.Equal(invitation.ExpiresAtUtc, result.Value.ExpiresAtUtc);
         Assert.True(result.Value.RequiresSignIn);
+    }
+
+    [Fact]
+    public async Task Handle_WithLinkInvitation_ReturnsLinkTypeWithoutTargetEmail()
+    {
+        Student student = CreateStudent(new DateOnly(2012, 5, 12));
+        StudentParentInvitation invitation = CreateInvitation(
+            student,
+            Now.AddDays(7),
+            StudentParentInvitationType.Link,
+            null);
+
+        ResolveStudentParentInvitationQueryHandler handler = CreateHandler(invitation);
+
+        Result<ResolveStudentParentInvitationResponse> result = await handler.Handle(
+            new ResolveStudentParentInvitationQuery(RawToken),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal("Link", result.Value.Type);
+        Assert.Null(result.Value.TargetEmail);
     }
 
     [Theory]
@@ -172,14 +195,17 @@ public sealed class ResolveStudentParentInvitationQueryHandlerTests
 
     private static StudentParentInvitation CreateInvitation(
         Student student,
-        DateTimeOffset expiresAtUtc)
+        DateTimeOffset expiresAtUtc,
+        StudentParentInvitationType type = StudentParentInvitationType.Email,
+        string? targetEmailNormalized = "PARENT@EXAMPLE.COM")
     {
         string tokenHash = Convert.ToHexString(
             SHA256.HashData(Encoding.UTF8.GetBytes(RawToken)));
 
         StudentParentInvitation invitation = new(
             student.Id,
-            "parent@example.com",
+            type,
+            targetEmailNormalized,
             tokenHash,
             expiresAtUtc);
 

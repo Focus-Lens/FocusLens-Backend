@@ -50,6 +50,8 @@ public sealed class ResolveStudentParentInvitationQueryHandler(
         return new ResolveStudentParentInvitationResponse(
             invitation.Id,
             invitation.Status.ToString(),
+            invitation.Type.ToString(),
+            invitation.TargetEmailNormalized,
             displayName,
             GetAgeRange(invitation.Student.DateOfBirth, now),
             invitation.ExpiresAtUtc,
