@@ -93,11 +93,12 @@ public sealed class DeclineInvitationCommandHandler(
                 "The invitation was not found.");
         }
 
-        if (string.IsNullOrWhiteSpace(currentUser.Email) ||
-            !string.Equals(
-                invitation.TargetEmailNormalized,
-                currentUser.Email.Trim().ToUpperInvariant(),
-                StringComparison.Ordinal))
+        if (invitation.Type == StudentParentInvitationType.Email &&
+            (string.IsNullOrWhiteSpace(currentUser.Email) ||
+             !string.Equals(
+                 invitation.TargetEmailNormalized,
+                 currentUser.Email.Trim().ToUpperInvariant(),
+                 StringComparison.Ordinal)))
         {
             return Error.Forbidden(
                 "Access.InvitationNotOwned",

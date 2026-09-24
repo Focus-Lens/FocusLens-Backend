@@ -36,6 +36,9 @@ public sealed class StudentParentInvitationCommandHandlerTests
         Assert.True(result.IsSuccess);
         Assert.Equal("Pending", result.Value.Status);
         Assert.NotNull(result.Value.InvitationUrl);
+        Assert.Equal(
+            StudentParentInvitationType.Email,
+            (await invitations.GetAllAsync()).Single().Type);
         Assert.Contains("/invitations/parent/", result.Value.InvitationUrl);
         Assert.Single(emailSender.StudentParentInvitations);
         Assert.Equal("parent@example.com", emailSender.StudentParentInvitations[0].ParentEmail);

@@ -57,7 +57,12 @@ public sealed class CreateStudentParentInvitationCommandHandler(
 
         if (invitation is null)
         {
-            invitation = new StudentParentInvitation(student.Id, normalizedEmail, tokenHash, expiresAtUtc);
+            invitation = new StudentParentInvitation(
+                student.Id,
+                StudentParentInvitationType.Email,
+                normalizedEmail,
+                tokenHash,
+                expiresAtUtc);
             invitationRepository.Add(invitation);
         }
         else

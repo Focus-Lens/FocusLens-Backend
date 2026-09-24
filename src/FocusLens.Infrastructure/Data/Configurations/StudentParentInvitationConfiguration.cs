@@ -9,16 +9,35 @@ public sealed class StudentParentInvitationConfiguration
 {
     public void Configure(EntityTypeBuilder<StudentParentInvitation> builder)
     {
-        builder.ToTable("StudentParentInvitations");
+        builder.ToTable(
+            "StudentParentInvitations",
+            table =>
+                table.HasCheckConstraint(
+                    "CK_StudentParentInvitations_Type_TargetEmail",
+                    "([Type] = 'Email' AND [TargetEmailNormalized] IS NOT NULL) "
+                        + "OR ([Type] = 'Link' AND [TargetEmailNormalized] IS NULL)"
+                )
+        );
+
         builder.HasKey(invitation => invitation.Id);
 
         builder.Property(invitation => invitation.StudentId).IsRequired();
+
+        builder
+            .Property(invitation => invitation.Type)
+            .HasConversion<string>()
+            .HasMaxLength(20)
+            .HasDefaultValue(StudentParentInvitationType.Email)
+            .IsRequired();
+
         builder.Property(invitation => invitation.TargetEmailNormalized)
             .HasMaxLength(256)
-            .IsRequired();
+            .IsRequired(false);
+
         builder.Property(invitation => invitation.TokenHash)
             .HasMaxLength(128)
             .IsRequired();
+
         builder.Property(invitation => invitation.ExpiresAtUtc).IsRequired();
         builder.Property(invitation => invitation.Status).IsRequired();
         builder.Property(invitation => invitation.RespondedAtUtc).IsRequired(false);

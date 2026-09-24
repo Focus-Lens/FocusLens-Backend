@@ -219,4 +219,43 @@ public class DeclineInvitationCommandHandlerTests
         Assert.Equal(ParentInvitationStatus.Pending, invitation.Status);
         Assert.Equal(0, unitOfWork.SaveChangesCalls);
     }
+
+    [Fact]
+    public async Task Handle_WithLinkInvitation_AllowsParentWithoutMatchingEmail()
+    {
+        Guid parentUserId = Guid.NewGuid();
+        Guid studentUserId = Guid.NewGuid();
+
+        Parent parent = new(parentUserId);
+        parent.SetPrivateProperty("User", new ApplicationUser { Email = "different@example.com" });
+        Student student = new(studentUserId);
+
+        StudentParentInvitation invitation = new(
+            student.Id,
+            StudentParentInvitationType.Link,
+            null,
+            "TEST-HASH",
+            DateTimeOffset.UtcNow.AddDays(1));
+        invitation.SetPrivateProperty("Student", student);
+
+        InMemoryRepository<StudentParentInvitation> invitations = new(invitation);
+        FakeUnitOfWork unitOfWork = new();
+
+        DeclineInvitationCommandHandler handler = new(
+            new InMemoryRepository<ParentStudentRelationship>(),
+            invitations,
+            new InMemoryRepository<Parent>(parent),
+            new FakeCurrentUser(parentUserId, "different@example.com"),
+            unitOfWork,
+            TimeProvider.System);
+
+        Result<InvitationResponse> result = await handler.Handle(
+            new DeclineInvitationCommand(invitation.Id),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(ParentInvitationStatus.Declined, invitation.Status);
+        Assert.Equal(1, unitOfWork.SaveChangesCalls);
+    }
+
 }

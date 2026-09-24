@@ -81,6 +81,23 @@ public class AuthorizationTests
     }
 
     [Fact]
+    public async Task CreateInvitationLink_WithStudentToken_AllowsAccess()
+    {
+        await using CustomWebApplicationFactory factory = new();
+        using HttpClient client = factory.CreateClient();
+        client.DefaultRequestHeaders.Authorization =
+            new AuthenticationHeaderValue(
+                "Bearer",
+                TestJwtTokenFactory.Create(Guid.NewGuid(), "Student"));
+
+        HttpResponseMessage response = await client.PostAsync(
+            "/api/access/invitations/link/create",
+            null);
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    [Fact]
     public async Task AcceptInvitation_WithParentToken_AllowsAccess()
     {
         await using CustomWebApplicationFactory factory = new();

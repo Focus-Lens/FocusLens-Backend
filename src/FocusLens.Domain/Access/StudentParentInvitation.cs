@@ -3,8 +3,8 @@ using FocusLens.Domain.Common;
 namespace FocusLens.Domain.Access;
 
 /// <summary>
-///     A student-owned invitation for a parent who may not have a FocusLens
-///     account yet. The raw link token is never persisted.
+///     A student-owned invitation for a parent. Email invitations are
+///     restricted to the target email; link invitations are bearer links.
 /// </summary>
 public sealed class StudentParentInvitation : AuditableEntity
 {
@@ -15,6 +15,21 @@ public sealed class StudentParentInvitation : AuditableEntity
         string targetEmailNormalized,
         string tokenHash,
         DateTimeOffset expiresAtUtc)
+        : this(
+            studentId,
+            StudentParentInvitationType.Email,
+            targetEmailNormalized,
+            tokenHash,
+            expiresAtUtc)
+    {
+    }
+
+    public StudentParentInvitation(
+        Guid studentId,
+        StudentParentInvitationType type,
+        string? targetEmailNormalized,
+        string tokenHash,
+        DateTimeOffset expiresAtUtc)
         : base(Guid.CreateVersion7())
     {
         if (studentId == Guid.Empty)
@@ -22,9 +37,22 @@ public sealed class StudentParentInvitation : AuditableEntity
             throw new ArgumentException("Student ID cannot be empty.", nameof(studentId));
         }
 
-        if (string.IsNullOrWhiteSpace(targetEmailNormalized))
+        if (
+            type == StudentParentInvitationType.Email
+            && string.IsNullOrWhiteSpace(targetEmailNormalized)
+        )
         {
             throw new ArgumentException("Target email is required.", nameof(targetEmailNormalized));
+        }
+
+        if (
+            type == StudentParentInvitationType.Link
+            && !string.IsNullOrWhiteSpace(targetEmailNormalized)
+        )
+        {
+            throw new ArgumentException(
+                "Link invitations cannot have a target email.",
+                nameof(targetEmailNormalized));
         }
 
         if (string.IsNullOrWhiteSpace(tokenHash))
@@ -33,6 +61,7 @@ public sealed class StudentParentInvitation : AuditableEntity
         }
 
         StudentId = studentId;
+        Type = type;
         TargetEmailNormalized = targetEmailNormalized;
         TokenHash = tokenHash;
         ExpiresAtUtc = expiresAtUtc;
@@ -41,7 +70,9 @@ public sealed class StudentParentInvitation : AuditableEntity
 
     public Guid StudentId { get; private set; }
 
-    public string TargetEmailNormalized { get; private set; } = string.Empty;
+    public StudentParentInvitationType Type { get; private set; }
+
+    public string? TargetEmailNormalized { get; private set; }
 
     public string TokenHash { get; private set; } = string.Empty;
 

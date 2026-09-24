@@ -106,7 +106,8 @@ public sealed class GetMyInvitationsQueryHandler(
 
             IEnumerable<StudentParentInvitation> incomingInvitations =
                 await invitationRepository.GetAllAsync(
-                    invitation => invitation.TargetEmailNormalized == normalizedParentEmail &&
+                    invitation => invitation.Type == StudentParentInvitationType.Email &&
+                                   invitation.TargetEmailNormalized == normalizedParentEmail &&
                                    invitation.Status == ParentInvitationStatus.Pending,
                     invitation => invitation.Student,
                     invitation => invitation.Student.User);

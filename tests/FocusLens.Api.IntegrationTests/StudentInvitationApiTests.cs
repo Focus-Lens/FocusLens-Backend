@@ -5,6 +5,7 @@ using FocusLens.Domain;
 using FocusLens.Domain.Access;
 using FocusLens.Domain.Identity;
 using FocusLens.Infrastructure.Data;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace FocusLens.Api.IntegrationTests;
@@ -66,6 +67,52 @@ public class StudentInvitationApiTests
         using JsonDocument document = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
         Assert.Equal("Revoked", document.RootElement.GetProperty("status").GetString());
         await fixture.Factory.DisposeAsync();
+    }
+
+    [Fact]
+    public async Task CreateInvitationLink_AsStudent_ReturnsLinkWithoutTargetEmail()
+    {
+        Guid studentUserId = Guid.NewGuid();
+        Student student = new(studentUserId);
+        CustomWebApplicationFactory factory = new();
+
+        await factory.SeedAsync(db =>
+        {
+            db.Users.Add(new ApplicationUser
+            {
+                Id = studentUserId,
+                Email = "student@example.com",
+                UserName = "student@example.com"
+            });
+            db.Students.Add(student);
+            return Task.CompletedTask;
+        });
+
+        using HttpClient client = CreateStudentClient(factory, studentUserId);
+
+        HttpResponseMessage response = await client.PostAsync(
+            "/api/access/invitations/link/create",
+            null);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        using JsonDocument document = JsonDocument.Parse(
+            await response.Content.ReadAsStringAsync());
+
+        JsonElement root = document.RootElement;
+        Assert.NotEqual(Guid.Empty, root.GetProperty("id").GetGuid());
+        Assert.Equal("Pending", root.GetProperty("status").GetString());
+        Assert.Contains("/invitations/parent/", root.GetProperty("invitationUrl").GetString());
+        Assert.Equal(JsonValueKind.Null, root.GetProperty("otherPartyEmail").ValueKind);
+
+        using IServiceScope scope = factory.Services.CreateScope();
+        ApplicationDbContext db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        StudentParentInvitation invitation = await db.StudentParentInvitations.SingleAsync();
+
+        Assert.Equal(StudentParentInvitationType.Link, invitation.Type);
+        Assert.Null(invitation.TargetEmailNormalized);
+
+        await factory.DisposeAsync();
     }
 
     private static async Task<InvitationFixture> CreateFixtureAsync()

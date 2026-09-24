@@ -232,4 +232,44 @@ public class AcceptInvitationCommandHandlerTests
         Assert.Empty(await new InMemoryRepository<ParentStudentRelationship>().GetAllAsync());
         Assert.Equal(0, unitOfWork.SaveChangesCalls);
     }
+
+    [Fact]
+    public async Task Handle_WithLinkInvitation_AllowsParentWithoutMatchingEmail()
+    {
+        Guid parentUserId = Guid.NewGuid();
+        Guid studentUserId = Guid.NewGuid();
+
+        Parent parent = new(parentUserId);
+        parent.SetPrivateProperty("User", new ApplicationUser { Email = "different@example.com" });
+        Student student = new(studentUserId);
+
+        StudentParentInvitation invitation = new(
+            student.Id,
+            StudentParentInvitationType.Link,
+            null,
+            "TEST-HASH",
+            DateTimeOffset.UtcNow.AddDays(1));
+        invitation.SetPrivateProperty("Student", student);
+
+        InMemoryRepository<ParentStudentRelationship> relationships = new();
+        InMemoryRepository<StudentParentInvitation> invitations = new(invitation);
+        FakeUnitOfWork unitOfWork = new();
+
+        AcceptInvitationCommandHandler handler = new(
+            relationships,
+            invitations,
+            new InMemoryRepository<Parent>(parent),
+            new FakeCurrentUser(parentUserId, "different@example.com"),
+            unitOfWork,
+            TimeProvider.System);
+
+        Result<InvitationResponse> result = await handler.Handle(
+            new AcceptInvitationCommand(invitation.Id),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(ParentInvitationStatus.Accepted, invitation.Status);
+        Assert.Single(await relationships.GetAllAsync());
+    }
+
 }

@@ -5,6 +5,7 @@ using FocusLens.Domain.Common.Results;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace FocusLens.API.Controllers;
 
@@ -40,6 +41,32 @@ public sealed class AccessController(ISender sender) : ApiController
         return result.IsSuccess
             ? StatusCode(StatusCodes.Status201Created, result.Value)
             : Problem(result.Errors);
+    }
+
+    [HttpPost("invitations/link/create")]
+    [Authorize(Roles = "Student")]
+    [EnableRateLimiting("InvitationMutation")]
+    public async Task<IActionResult> CreateStudentParentInvitationLink(
+        CancellationToken cancellationToken)
+    {
+        Result<InvitationResponse> result = await sender.Send(
+            new CreateStudentParentInvitationLinkCommand(),
+            cancellationToken);
+
+        return result.Match(Ok, Problem);
+    }
+
+    [HttpPost("invitations/link")]
+    [Authorize(Roles = "Student")]
+    [EnableRateLimiting("InvitationMutation")]
+    public async Task<IActionResult> RegenerateStudentParentInvitationLink(
+        CancellationToken cancellationToken)
+    {
+        Result<InvitationResponse> result = await sender.Send(
+            new RegenerateStudentParentInvitationLinkCommand(),
+            cancellationToken);
+
+        return result.Match(Ok, Problem);
     }
 
     [HttpGet("invitations/resolve")]
