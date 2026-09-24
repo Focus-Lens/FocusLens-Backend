@@ -65,6 +65,9 @@ public class StudentConfiguration : IEntityTypeConfiguration<Student>
             .HasConversion<string>()
             .HasMaxLength(50);
 
+        builder.Property(student => student.CustomGrade)
+            .HasMaxLength(100);
+
         builder.Property(student => student.IsOnboardingCompleted)
             .IsRequired()
             .HasDefaultValue(false);

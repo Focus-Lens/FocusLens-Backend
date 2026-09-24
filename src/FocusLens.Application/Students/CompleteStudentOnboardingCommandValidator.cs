@@ -21,6 +21,17 @@ public sealed class CompleteStudentOnboardingCommandValidator
             .IsInEnum()
             .When(command => command.Request.Grade.HasValue);
 
+        RuleFor(command => command.Request.CustomGrade)
+            .Must(customGrade => !string.IsNullOrWhiteSpace(customGrade))
+            .MaximumLength(100)
+            .When(command => command.Request.Grade == StudentGrade.Other)
+            .WithMessage("A custom grade is required and cannot exceed 100 characters.");
+
+        RuleFor(command => command.Request.CustomGrade)
+            .Empty()
+            .WithMessage("CustomGrade is only allowed for Other.")
+            .When(command => command.Request.Grade.HasValue && command.Request.Grade != StudentGrade.Other);
+
         RuleFor(command => command.Request.StudyPriorities)
             .Must(priorities =>
                 priorities is null ||

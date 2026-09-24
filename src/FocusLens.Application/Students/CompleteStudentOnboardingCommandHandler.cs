@@ -11,6 +11,7 @@ using FocusLens.Domain.Interfaces;
 using FocusLens.Domain.Students;
 using MediatR;
 using ContractStudentSubjectType = FocusLens.Contracts.Students.StudentSubjectType;
+using ContractStudentGrade = FocusLens.Contracts.Students.StudentGrade;
 using ICurrentUser = FocusLens.Application.Common.Interfaces.ICurrentUser;
 using DomainStudentGoal = FocusLens.Domain.Students.StudentGoal;
 using DomainStudyPriority = FocusLens.Domain.Students.StudyPriority;
@@ -63,6 +64,11 @@ public sealed class CompleteStudentOnboardingCommandHandler(
                 ? null
                 : StudentEnumMapper.ToDomain(request.Request.Grade.Value),
             subjects);
+
+        student.SetCustomGrade(
+            request.Request.Grade == ContractStudentGrade.Other
+                ? request.Request.CustomGrade
+                : null);
 
         student.SetDateOfBirth(request.Request.DateOfBirth);
 

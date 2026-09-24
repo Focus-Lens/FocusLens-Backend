@@ -33,6 +33,8 @@ public class Student : AuditableEntity
 
     public StudentGrade? Grade { get; private set; }
 
+    public string? CustomGrade { get; private set; }
+
     public ICollection<StudentSubject> Subjects { get; } = [];
 
     public ICollection<StudyPriority> StudyPriorities { get; } = [];
@@ -71,6 +73,18 @@ public class Student : AuditableEntity
     public void SetGrade(StudentGrade? grade)
     {
         Grade = grade;
+
+        if (grade is not StudentGrade.Other)
+        {
+            CustomGrade = null;
+        }
+
+        UpdateOnboardingCompletionStatus();
+    }
+
+    public void SetCustomGrade(string? customGrade)
+    {
+        CustomGrade = customGrade?.Trim();
         UpdateOnboardingCompletionStatus();
     }
 
@@ -143,5 +157,9 @@ public class Student : AuditableEntity
     }
 
     private void UpdateOnboardingCompletionStatus() =>
-        IsOnboardingCompleted = Goals.Count > 0 && Grade is not null && Subjects.Count > 0;
+        IsOnboardingCompleted =
+            Goals.Count > 0
+            && Grade is not null
+            && (Grade is not StudentGrade.Other || !string.IsNullOrWhiteSpace(CustomGrade))
+            && Subjects.Count > 0;
 }

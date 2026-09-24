@@ -95,6 +95,40 @@ public class StudentsApiTests
     }
 
     [Fact]
+    public async Task UpdatePreferences_WhenCustomGradeIsOther_PersistsCustomGrade()
+    {
+        Guid userId = Guid.NewGuid();
+        await using CustomWebApplicationFactory factory = new();
+        await factory.SeedAsync(db =>
+        {
+            SeedStudentIdentity(db, userId);
+            db.Students.Add(new Student(userId));
+            return Task.CompletedTask;
+        });
+
+        using HttpClient client = CreateStudentClient(factory, userId);
+        using StringContent content = new(
+            """{"grade":"Other","customGrade":"  Year 13  "}""",
+            Encoding.UTF8,
+            "application/json");
+
+        HttpResponseMessage response = await client.PatchAsync("/api/students/me/preferences", content);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        using JsonDocument document = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        JsonElement root = document.RootElement;
+        Assert.Equal("Other", root.GetProperty("grade").GetString());
+        Assert.Equal("Year 13", root.GetProperty("customGrade").GetString());
+
+        HttpResponseMessage getResponse = await client.GetAsync("/api/students/me");
+        Assert.Equal(HttpStatusCode.OK, getResponse.StatusCode);
+        using JsonDocument getDocument = JsonDocument.Parse(await getResponse.Content.ReadAsStringAsync());
+        JsonElement getRoot = getDocument.RootElement;
+        Assert.Equal("Other", getRoot.GetProperty("grade").GetString());
+        Assert.Equal("Year 13", getRoot.GetProperty("customGrade").GetString());
+    }
+
+    [Fact]
     public async Task UpdatePreferences_WhenPreferredNameIsWhitespace_ReturnsBadRequest()
     {
         Guid userId = Guid.NewGuid();

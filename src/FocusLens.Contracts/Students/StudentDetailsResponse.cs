@@ -12,6 +12,7 @@ public sealed record StudentDetailsResponse(
     DateOnly? DateOfBirth,
     IReadOnlyCollection<StudentGoal> Goals,
     StudentGrade? Grade,
+    string? CustomGrade,
     IReadOnlyCollection<StudentSubjectResponse> Subjects,
     IReadOnlyCollection<StudyPriority> StudyPriorities,
     StudyTimeGoalResponse? StudyTimeGoal,

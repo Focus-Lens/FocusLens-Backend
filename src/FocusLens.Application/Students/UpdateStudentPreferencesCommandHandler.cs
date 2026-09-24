@@ -12,6 +12,7 @@ using ContractStudentGrade = FocusLens.Contracts.Students.StudentGrade;
 using ContractStudentSubjectType = FocusLens.Contracts.Students.StudentSubjectType;
 using DomainStudyPriority = FocusLens.Domain.Students.StudyPriority;
 using DomainStudyTimeGoalPeriod = FocusLens.Domain.Students.StudyTimeGoalPeriod;
+using DomainStudentGrade = FocusLens.Domain.Students.StudentGrade;
 using ICurrentUser = FocusLens.Application.Common.Interfaces.ICurrentUser;
 
 namespace FocusLens.Application.Students;
@@ -77,6 +78,11 @@ public sealed class UpdateStudentPreferencesCommandHandler(
             return gradeError!.Value;
         }
 
+        if (!TryUpdateCustomGrade(student, request.Request, out Error? customGradeError))
+        {
+            return customGradeError!.Value;
+        }
+
         if (!TryUpdatePreferredName(student, request.Request, out Error? preferredNameError))
         {
             return preferredNameError!.Value;
@@ -133,6 +139,7 @@ public sealed class UpdateStudentPreferencesCommandHandler(
                || request.StudyPrioritiesProvided
                || request.StudyTimeGoalProvided
                || request.GradeProvided
+               || request.CustomGradeProvided
                || request.PreferredNameProvided
                || request.ShareSessionSummariesWithParentsProvided
                || request.ShareSubjectTrendsWithParentsProvided
@@ -364,6 +371,53 @@ public sealed class UpdateStudentPreferencesCommandHandler(
                              student.ShareSubjectTrendsWithParents;
 
         return summariesChanged || trendsChanged;
+    }
+
+    private static bool TryUpdateCustomGrade(
+        Student student,
+        UpdateStudentPreferencesRequest request,
+        out Error? error)
+    {
+        error = null;
+
+        if (!request.CustomGradeProvided)
+        {
+            return true;
+        }
+
+        if (request.CustomGrade is null)
+        {
+            student.SetCustomGrade(null);
+            return true;
+        }
+
+        if (student.Grade is not DomainStudentGrade.Other)
+        {
+            error = Error.Validation(
+                "Students.InvalidCustomGrade",
+                "CustomGrade is only allowed when grade is Other.");
+            return false;
+        }
+
+        string customGrade = request.CustomGrade.Trim();
+        if (customGrade.Length == 0)
+        {
+            error = Error.Validation(
+                "Students.CustomGradeRequired",
+                "A custom grade is required.");
+            return false;
+        }
+
+        if (customGrade.Length > 100)
+        {
+            error = Error.Validation(
+                "Students.CustomGradeTooLong",
+                "A custom grade cannot exceed 100 characters.");
+            return false;
+        }
+
+        student.SetCustomGrade(customGrade);
+        return true;
     }
 
     private static bool TryUpdatePreferredName(Student student, UpdateStudentPreferencesRequest request,

@@ -7,6 +7,7 @@ public sealed class UpdateStudentPreferencesRequest
     private DateOnly? _dateOfBirth;
     private IReadOnlyCollection<StudentGoal>? _goals;
     private StudentGrade? _grade;
+    private string? _customGrade;
     private string? _preferredName;
     private bool? _shareSessionSummariesWithParents;
     private bool? _shareSubjectTrendsWithParents;
@@ -64,6 +65,16 @@ public sealed class UpdateStudentPreferencesRequest
         }
     }
 
+    public string? CustomGrade
+    {
+        get => _customGrade;
+        set
+        {
+            CustomGradeProvided = true;
+            _customGrade = value;
+        }
+    }
+
     public string? PreferredName
     {
         get => _preferredName;
@@ -113,6 +124,8 @@ public sealed class UpdateStudentPreferencesRequest
     [JsonIgnore] public bool StudyTimeGoalProvided { get; private set; }
 
     [JsonIgnore] public bool GradeProvided { get; private set; }
+
+    [JsonIgnore] public bool CustomGradeProvided { get; private set; }
 
     [JsonIgnore] public bool PreferredNameProvided { get; private set; }
 

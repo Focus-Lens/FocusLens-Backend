@@ -96,6 +96,62 @@ public class UpdateStudentPreferencesCommandHandlerTests
     }
 
     [Fact]
+    public async Task Handle_WhenCustomGradeIsProvidedForOther_StoresTrimmedValue()
+    {
+        Student student = CreateStudentWithPreferences();
+        student.SetGrade(StudentGrade.Other);
+
+        Result<StudentDetailsResponse> result = await CreateHandler(student).Handle(
+            new UpdateStudentPreferencesCommand(new UpdateStudentPreferencesRequest
+            {
+                CustomGrade = "  Year 13  "
+            }),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal("Year 13", student.CustomGrade);
+        Assert.Equal("Year 13", result.Value.CustomGrade);
+        Assert.True(result.Value.OnboardingCompleted);
+    }
+
+    [Fact]
+    public async Task Handle_WhenCustomGradeIsProvidedForPredefinedGrade_ReturnsValidationError()
+    {
+        Student student = CreateStudentWithPreferences();
+
+        Result<StudentDetailsResponse> result = await CreateHandler(student).Handle(
+            new UpdateStudentPreferencesCommand(new UpdateStudentPreferencesRequest
+            {
+                CustomGrade = "Year 13"
+            }),
+            CancellationToken.None);
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal("Students.InvalidCustomGrade", result.TopError.Code);
+        Assert.Null(student.CustomGrade);
+    }
+
+    [Fact]
+    public async Task Handle_WhenGradeChangesFromOtherToPredefined_ClearsCustomGrade()
+    {
+        Student student = CreateStudentWithPreferences();
+        student.SetGrade(StudentGrade.Other);
+        student.SetCustomGrade("Year 13");
+
+        Result<StudentDetailsResponse> result = await CreateHandler(student).Handle(
+            new UpdateStudentPreferencesCommand(new UpdateStudentPreferencesRequest
+            {
+                Grade = ContractStudentGrade.Grade12
+            }),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(StudentGrade.Grade12, student.Grade);
+        Assert.Null(student.CustomGrade);
+        Assert.Null(result.Value.CustomGrade);
+    }
+
+    [Fact]
     public async Task Handle_WhenPreferredNameIsProvided_TrimsAndStoresIt()
     {
         Student student = CreateStudentWithPreferences();

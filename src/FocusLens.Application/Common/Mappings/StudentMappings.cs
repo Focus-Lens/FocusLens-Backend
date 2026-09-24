@@ -46,6 +46,7 @@ internal static class StudentMappings
             student.Grade is null
                 ? null
                 : StudentEnumMapper.ToContract(student.Grade.Value),
+            student.CustomGrade,
             student.Subjects
                 .Select(subject => new StudentSubjectResponse(
                     subject.Id,
