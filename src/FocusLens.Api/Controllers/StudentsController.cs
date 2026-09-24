@@ -70,6 +70,18 @@ public sealed class StudentsController(ISender sender) : ApiController
         return Problem(result.Errors);
     }
 
+    [HttpGet("me/profile-image")]
+    public async Task<IActionResult> GetProfileImage(CancellationToken cancellationToken)
+    {
+        Result<StudentProfileImageFile> result = await sender.Send(
+            new GetStudentProfileImageQuery(),
+            cancellationToken);
+
+        return result.Match(
+            image => File(image.Content, image.ContentType),
+            Problem);
+    }
+
     [HttpPut("me/profile-image")]
     [Consumes("multipart/form-data")]
     [RequestSizeLimit(10 * 1024 * 1024)]

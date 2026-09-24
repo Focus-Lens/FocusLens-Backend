@@ -10,7 +10,7 @@ namespace FocusLens.Application.Students;
 
 public sealed class StudentProfileImageCommandHandler(
     IBaseRepository<Student> studentRepository,
-    IStudySessionImageFileStore fileStore,
+    IProfileImageFileStore fileStore,
     ICurrentUser currentUser,
     IUnitOfWork unitOfWork)
     : IRequestHandler<UpdateStudentProfileImageCommand, Result<StudentDetailsResponse>>,

@@ -37,6 +37,9 @@ public sealed class ChildSetupDraftConfiguration
         builder.Property(draft => draft.LastName)
             .HasMaxLength(100);
 
+        builder.Property(draft => draft.ProfileImageStorageReference)
+            .HasMaxLength(500);
+
         builder.Property(draft => draft.DateOfBirth);
 
         builder.Property(draft => draft.Grade)

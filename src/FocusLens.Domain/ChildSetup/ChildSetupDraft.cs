@@ -38,6 +38,7 @@ public sealed class ChildSetupDraft : AuditableEntity
         = new List<StudyPriority>();
 
     public StudyTimeGoal? StudyTimeGoal { get; private set; }
+    public string? ProfileImageStorageReference { get; private set; }
     public ChildSetupStatus Status { get; private set; }
 
     public void SetName(string firstName, string lastName)
@@ -98,6 +99,11 @@ public sealed class ChildSetupDraft : AuditableEntity
     }
 
     public void SetStudyTimeGoal(StudyTimeGoal? studyTimeGoal) => StudyTimeGoal = studyTimeGoal;
+
+    public void SetProfileImageStorageReference(string? storageReference) =>
+        ProfileImageStorageReference = string.IsNullOrWhiteSpace(storageReference)
+            ? null
+            : storageReference.Trim();
 
     public void MarkInvited()
     {

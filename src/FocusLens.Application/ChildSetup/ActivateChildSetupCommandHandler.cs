@@ -167,6 +167,13 @@ public sealed class ActivateChildSetupCommandHandler(
             relationshipRepository.Update(relationship);
         }
 
+        if (!string.IsNullOrWhiteSpace(draft.ProfileImageStorageReference))
+        {
+            student.SetProfileImageStorageReference(
+                draft.ProfileImageStorageReference
+            );
+        }
+
         draft.MarkActivated();
 
         await unitOfWork.SaveChangesAsync();

@@ -77,6 +77,7 @@ public sealed class GetMyClaimedChildSetupQueryHandler(
                     parent?.WeekStartsOn is DayOfWeek weekStartsOn
                         ? ParentWeekdayOrder.OrderDays(draft.StudyTimeGoal.Days, weekStartsOn)
                         : draft.StudyTimeGoal.Days,
-                    draft.StudyTimeGoal.StartDate));
+                    draft.StudyTimeGoal.StartDate),
+            draft.ProfileImageStorageReference);
     }
 }

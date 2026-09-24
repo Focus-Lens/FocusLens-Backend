@@ -58,6 +58,53 @@ public sealed class ActivateChildSetupCommandHandlerTests
     }
 
     [Fact]
+    public async Task Activate_WithClaimedDraftWithProfileImage_TransfersImageToStudent()
+    {
+        Guid studentUserId = Guid.NewGuid();
+        Guid parentUserId = Guid.NewGuid();
+
+        Student student = new(studentUserId);
+        Parent parent = new(parentUserId);
+
+        ChildSetupDraft draft = new(parent.Id);
+        draft.MarkInvited();
+        draft.MarkClaimed(student.Id);
+        draft.SetProfileImageStorageReference("images/draft-profile.jpg");
+
+        ApplicationUser user = new()
+        {
+            Id = studentUserId,
+            Email = "youssef@example.com",
+            UserName = "youssef@example.com",
+            FirstName = "Youssef",
+            LastName = "Student",
+        };
+
+        student.SetPrivateProperty("User", user);
+
+        ActivateChildSetupCommandHandler handler = new(
+            new InMemoryRepository<Student>(student),
+            new InMemoryRepository<ChildSetupDraft>(draft),
+            new InMemoryRepository<ParentStudentRelationship>(),
+            new FakeCurrentUser(studentUserId),
+            new TestIdentityService(user),
+            new FakeUnitOfWork()
+        );
+
+        Result<StudentDetailsResponse> result = await handler.Handle(
+            new ActivateChildSetupCommand(),
+            CancellationToken.None
+        );
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(ChildSetupStatus.Activated, draft.Status);
+        Assert.Equal(
+            "images/draft-profile.jpg",
+            student.ProfileImageStorageReference
+        );
+    }
+
+    [Fact]
     public async Task Activate_WithClaimedDraft_CreatesActiveParentStudentRelationship()
     {
         Guid studentUserId = Guid.NewGuid();

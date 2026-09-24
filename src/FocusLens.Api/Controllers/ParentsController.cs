@@ -254,6 +254,49 @@ public sealed class ParentsController(ISender sender) : ApiController
         return result.Match(Ok, Problem);
     }
 
+    [HttpGet("child-setups/{draftId:guid}/profile-image")]
+    public async Task<IActionResult> GetChildSetupProfileImage(
+        Guid draftId,
+        CancellationToken cancellationToken)
+    {
+        Result<ChildSetupProfileImageFile> result = await sender.Send(
+            new GetChildSetupProfileImageQuery(draftId),
+            cancellationToken);
+
+        return result.Match(
+            image => File(image.Content, image.ContentType),
+            Problem);
+    }
+
+    [HttpPut("child-setups/{draftId:guid}/profile-image")]
+    [Consumes("multipart/form-data")]
+    [RequestSizeLimit(10 * 1024 * 1024)]
+    public async Task<IActionResult> UpdateChildSetupProfileImage(
+        Guid draftId,
+        [FromForm] IFormFile file,
+        CancellationToken cancellationToken)
+    {
+        if (file.Length == 0)
+        {
+            return Problem([
+                Error.Validation(
+                    "ChildSetup.EmptyProfileImage",
+                    "The profile image is empty.")
+            ]);
+        }
+
+        Result<string> result = await sender.Send(
+            new UpdateChildSetupDraftProfileImageCommand(
+                draftId,
+                file.FileName,
+                file.Length,
+                cancellation => Task.FromResult<Stream>(
+                    file.OpenReadStream())),
+            cancellationToken);
+
+        return result.Match(Ok, Problem);
+    }
+
     [HttpPost("child-setups/{draftId:guid}/invite")]
     [EnableRateLimiting("InvitationMutation")]
     public async Task<IActionResult> InviteChild(

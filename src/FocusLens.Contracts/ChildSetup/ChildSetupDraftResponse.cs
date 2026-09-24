@@ -11,7 +11,8 @@ public sealed record ChildSetupDraftResponse(
     StudentGrade? Grade,
     IReadOnlyCollection<ChildSetupSubjectResponse> Subjects,
     IReadOnlyCollection<StudyPriority> StudyPriorities,
-    StudyTimeGoalResponse? StudyTimeGoal
+    StudyTimeGoalResponse? StudyTimeGoal,
+    string? ProfileImageStorageReference
 );
 
 public sealed record ChildSetupSubjectResponse(

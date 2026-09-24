@@ -12,6 +12,7 @@ using FocusLens.Infrastructure.Data.Interceptors;
 using FocusLens.Infrastructure.Identity;
 using FocusLens.Infrastructure.Identity.Seed;
 using FocusLens.Infrastructure.Notifications;
+using FocusLens.Infrastructure.ProfileImages;
 using FocusLens.Infrastructure.StudySessions;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Http;
@@ -53,6 +54,8 @@ public static class DependencyInjection
             configuration.GetRequiredSection(StudyMaterialStorageOptions.SectionName));
         services.Configure<StudySessionImageStorageOptions>(
             configuration.GetSection(StudySessionImageStorageOptions.SectionName));
+        services.Configure<ProfileImageStorageOptions>(
+            configuration.GetSection(ProfileImageStorageOptions.SectionName));
         services.Configure<StudySessionImageUploadOptions>(
             configuration.GetSection(StudySessionImageUploadOptions.SectionName));
           services.AddOptions<FocusLensAiOptions>()
@@ -89,6 +92,7 @@ public static class DependencyInjection
 
         services.AddScoped<IStudyMaterialFileStore, LocalStudyMaterialFileStore>();
         services.AddScoped<IStudySessionImageFileStore, LocalStudySessionImageFileStore>();
+        services.AddScoped<IProfileImageFileStore, LocalProfileImageFileStore>();
         services.AddScoped<IStudyMaterialPdfProcessor, PdfSharpStudyMaterialPdfProcessor>();
         services.AddSingleton<IPushNotificationProvider, NoopPushNotificationProvider>();
         services.AddHostedService<ScheduledNotificationWorker>();
