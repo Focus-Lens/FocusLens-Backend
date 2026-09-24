@@ -80,6 +80,8 @@ public sealed class GetChildSetupInvitationQueryHandler(
 
         return new ChildSetupInvitationDetailsResponse(
             invitation.Status.ToString(),
+            invitation.Type.ToString(),
+            invitation.TargetEmailNormalized,
             draft.FirstName,
             draft.LastName,
             draft.Grade is null ? null : StudentEnumMapper.ToContract(draft.Grade.Value),

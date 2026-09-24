@@ -114,6 +114,125 @@ public sealed class ChildSetupApiTests
     }
 
     [Fact]
+    public async Task GetInvitation_WithEmailInvitation_ReturnsInvitationTypeAndTargetEmail()
+    {
+        const string token = "email-child-setup-token";
+        Guid parentUserId = Guid.NewGuid();
+        Parent parent = new(parentUserId);
+
+        ChildSetupDraft draft = new(parent.Id);
+        draft.SetName("Youssef", "Mahmoud");
+        draft.SetGrade(StudentGrade.Grade10);
+        draft.MarkInvited();
+
+        ChildSetupInvitation invitation = new(
+            draft.Id,
+            "YOUSSEF@EXAMPLE.COM",
+            Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(token))),
+            DateTimeOffset.UtcNow.AddDays(1)
+        );
+
+        await using CustomWebApplicationFactory factory = new();
+
+        await factory.SeedAsync(db =>
+        {
+            db.Users.Add(
+                new ApplicationUser
+                {
+                    Id = parentUserId,
+                    Email = "parent@example.com",
+                    UserName = "parent@example.com",
+                    FirstName = "Mariam",
+                    LastName = "Parent",
+                }
+            );
+
+            db.Parents.Add(parent);
+            db.ChildSetupDrafts.Add(draft);
+            db.ChildSetupInvitations.Add(invitation);
+
+            return Task.CompletedTask;
+        });
+
+        using HttpClient client = factory.CreateClient();
+
+        HttpResponseMessage response = await client.GetAsync(
+            $"/api/child-setup-invitations/{token}"
+        );
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        using JsonDocument document = JsonDocument.Parse(
+            await response.Content.ReadAsStringAsync()
+        );
+
+        JsonElement result = document.RootElement;
+
+        Assert.Equal("Email", result.GetProperty("type").GetString());
+        Assert.Equal("YOUSSEF@EXAMPLE.COM", result.GetProperty("targetEmail").GetString());
+    }
+
+    [Fact]
+    public async Task GetInvitation_WithLinkInvitation_ReturnsLinkTypeWithoutTargetEmail()
+    {
+        const string token = "link-child-setup-token";
+        Guid parentUserId = Guid.NewGuid();
+        Parent parent = new(parentUserId);
+
+        ChildSetupDraft draft = new(parent.Id);
+        draft.SetName("Youssef", "Mahmoud");
+        draft.SetGrade(StudentGrade.Grade10);
+        draft.MarkInvited();
+
+        ChildSetupInvitation invitation = new(
+            draft.Id,
+            ChildSetupInvitationType.Link,
+            null,
+            Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(token))),
+            DateTimeOffset.UtcNow.AddDays(1)
+        );
+
+        await using CustomWebApplicationFactory factory = new();
+
+        await factory.SeedAsync(db =>
+        {
+            db.Users.Add(
+                new ApplicationUser
+                {
+                    Id = parentUserId,
+                    Email = "parent@example.com",
+                    UserName = "parent@example.com",
+                    FirstName = "Mariam",
+                    LastName = "Parent",
+                }
+            );
+
+            db.Parents.Add(parent);
+            db.ChildSetupDrafts.Add(draft);
+            db.ChildSetupInvitations.Add(invitation);
+
+            return Task.CompletedTask;
+        });
+
+        using HttpClient client = factory.CreateClient();
+
+        HttpResponseMessage response = await client.GetAsync(
+            $"/api/child-setup-invitations/{token}"
+        );
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        using JsonDocument document = JsonDocument.Parse(
+            await response.Content.ReadAsStringAsync()
+        );
+
+        JsonElement result = document.RootElement;
+
+        Assert.Equal("Link", result.GetProperty("type").GetString());
+        Assert.Equal(JsonValueKind.Null, result.GetProperty("targetEmail").ValueKind);
+    }
+
+    [Fact]
     public async Task GetPendingInvitations_AsParent_ReturnsPendingChildInvitation()
     {
         Guid parentUserId = Guid.NewGuid();

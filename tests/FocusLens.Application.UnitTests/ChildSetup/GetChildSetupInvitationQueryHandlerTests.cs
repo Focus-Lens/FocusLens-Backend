@@ -40,6 +40,8 @@ public sealed class GetChildSetupInvitationQueryHandlerTests
 
         Assert.True(result.IsSuccess);
         Assert.Equal("Pending", result.Value.Status);
+        Assert.Equal("Email", result.Value.Type);
+        Assert.Equal("CHILD@EXAMPLE.COM", result.Value.TargetEmail);
         Assert.Equal("Karim", result.Value.FirstName);
         Assert.Equal("Mahmoud", result.Value.LastName);
         Assert.Equal(StudentGrade.Grade10, result.Value.Grade);
@@ -49,6 +51,34 @@ public sealed class GetChildSetupInvitationQueryHandlerTests
         Assert.Equal("Daily", result.Value.StudyTimeGoal!.Period);
         Assert.Equal(60, result.Value.StudyTimeGoal.TargetMinutes);
         Assert.Equal([DayOfWeek.Saturday, DayOfWeek.Monday], result.Value.StudyTimeGoal.Days);
+    }
+
+    [Fact]
+    public async Task Get_WithLinkInvitation_ReturnsLinkTypeWithoutTargetEmail()
+    {
+        const string token = "link-child-setup-token";
+        Parent parent = new(Guid.NewGuid());
+        ChildSetupDraft draft = CreateCompleteDraft(parent.Id);
+        ChildSetupInvitation invitation = new(
+            draft.Id,
+            ChildSetupInvitationType.Link,
+            null,
+            Hash(token),
+            DateTimeOffset.UtcNow.AddDays(1));
+
+        GetChildSetupInvitationQueryHandler handler = new(
+            new InMemoryRepository<ChildSetupInvitation>(invitation),
+            new InMemoryRepository<ChildSetupDraft>(draft),
+            new InMemoryRepository<Parent>(parent),
+            TimeProvider.System);
+
+        Result<ChildSetupInvitationDetailsResponse> result = await handler.Handle(
+            new GetChildSetupInvitationQuery(token),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal("Link", result.Value.Type);
+        Assert.Null(result.Value.TargetEmail);
     }
 
     [Fact]
