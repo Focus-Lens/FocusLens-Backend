@@ -28,6 +28,7 @@ public sealed class StudentParentInvitationConfiguration
             .HasConversion<string>()
             .HasMaxLength(20)
             .HasDefaultValue(StudentParentInvitationType.Email)
+            .ValueGeneratedNever()
             .IsRequired();
 
         builder.Property(invitation => invitation.TargetEmailNormalized)
