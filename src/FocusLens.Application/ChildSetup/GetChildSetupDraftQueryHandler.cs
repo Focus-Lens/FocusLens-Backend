@@ -90,6 +90,7 @@ public sealed class GetChildSetupDraftQueryHandler(
                         : draft.StudyTimeGoal.Days,
                     draft.StudyTimeGoal.StartDate
                 ),
+            draft.ProfileSetupMode?.ToString(),
             draft.ProfileImageStorageReference
         );
     }

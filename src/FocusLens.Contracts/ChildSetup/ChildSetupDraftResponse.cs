@@ -12,6 +12,7 @@ public sealed record ChildSetupDraftResponse(
     IReadOnlyCollection<ChildSetupSubjectResponse> Subjects,
     IReadOnlyCollection<StudyPriority> StudyPriorities,
     StudyTimeGoalResponse? StudyTimeGoal,
+    string? ProfileSetupMode,
     string? ProfileImageStorageReference
 );
 

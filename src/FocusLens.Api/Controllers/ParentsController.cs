@@ -254,6 +254,21 @@ public sealed class ParentsController(ISender sender) : ApiController
         return result.Match(Ok, Problem);
     }
 
+    [HttpPut("child-setups/{draftId:guid}/profile-setup-mode")]
+    public async Task<IActionResult> SetChildSetupProfileMode(
+        Guid draftId,
+        SetChildSetupProfileModeRequest request,
+        CancellationToken cancellationToken
+    )
+    {
+        Result<bool> result = await sender.Send(
+            new SetChildSetupProfileModeCommand(draftId, request.ProfileSetupMode),
+            cancellationToken
+        );
+
+        return result.Match(_ => NoContent(), Problem);
+    }
+
     [HttpGet("child-setups/{draftId:guid}/profile-image")]
     public async Task<IActionResult> GetChildSetupProfileImage(
         Guid draftId,

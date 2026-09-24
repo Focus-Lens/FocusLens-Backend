@@ -92,7 +92,16 @@ public sealed class CreateChildSetupInvitationCommandHandler(
             );
         }
 
-        if (!IsComplete(draft))
+        if (draft.ProfileSetupMode is null)
+        {
+            return Error.Validation(
+                "ChildSetup.ProfileSetupModeRequired",
+                "Choose how the child profile will be set up before sending an invitation."
+            );
+        }
+
+        if (draft.ProfileSetupMode == ChildSetupProfileMode.ParentManaged
+            && !draft.IsProfileComplete())
         {
             return Error.Validation(
                 "ChildSetup.Incomplete",
@@ -141,15 +150,6 @@ public sealed class CreateChildSetupInvitationCommandHandler(
         );
     }
 
-    private static bool IsComplete(ChildSetupDraft draft)
-    {
-        return !string.IsNullOrWhiteSpace(draft.FirstName)
-            && !string.IsNullOrWhiteSpace(draft.LastName)
-            && draft.Grade is not null
-            && draft.Subjects.Count > 0
-            && draft.StudyPriorities.Count > 0
-            && draft.StudyTimeGoal is not null;
-    }
 
     private static bool IsValidEmail(string email)
     {

@@ -38,6 +38,7 @@ public sealed class ChildSetupDraft : AuditableEntity
         = new List<StudyPriority>();
 
     public StudyTimeGoal? StudyTimeGoal { get; private set; }
+    public ChildSetupProfileMode? ProfileSetupMode { get; private set; }
     public string? ProfileImageStorageReference { get; private set; }
     public ChildSetupStatus Status { get; private set; }
 
@@ -99,6 +100,21 @@ public sealed class ChildSetupDraft : AuditableEntity
     }
 
     public void SetStudyTimeGoal(StudyTimeGoal? studyTimeGoal) => StudyTimeGoal = studyTimeGoal;
+
+    public void SetProfileSetupMode(ChildSetupProfileMode mode)
+    {
+        ProfileSetupMode = mode;
+    }
+
+    public bool IsProfileComplete()
+    {
+        return !string.IsNullOrWhiteSpace(FirstName)
+            && !string.IsNullOrWhiteSpace(LastName)
+            && Grade is not null
+            && Subjects.Count > 0
+            && StudyPriorities.Count > 0
+            && StudyTimeGoal is not null;
+    }
 
     public void SetProfileImageStorageReference(string? storageReference) =>
         ProfileImageStorageReference = string.IsNullOrWhiteSpace(storageReference)

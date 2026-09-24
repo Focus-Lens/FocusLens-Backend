@@ -18,6 +18,7 @@ public sealed class CreateChildSetupLinkInvitationCommandHandlerTests
         Guid parentUserId = Guid.NewGuid();
         Parent parent = new(parentUserId);
         ChildSetupDraft draft = new(parent.Id);
+        draft.SetProfileSetupMode(ChildSetupProfileMode.ChildManaged);
         InMemoryRepository<ChildSetupInvitation> invitations = new();
 
         CreateChildSetupLinkInvitationCommandHandler handler = new(
@@ -99,6 +100,7 @@ public sealed class CreateChildSetupLinkInvitationCommandHandlerTests
                 )
                 .Value
         );
+        draft.SetProfileSetupMode(ChildSetupProfileMode.ParentManaged);
         return draft;
     }
 }

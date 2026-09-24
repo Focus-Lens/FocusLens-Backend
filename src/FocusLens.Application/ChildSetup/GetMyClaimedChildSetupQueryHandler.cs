@@ -78,6 +78,7 @@ public sealed class GetMyClaimedChildSetupQueryHandler(
                         ? ParentWeekdayOrder.OrderDays(draft.StudyTimeGoal.Days, weekStartsOn)
                         : draft.StudyTimeGoal.Days,
                     draft.StudyTimeGoal.StartDate),
+            draft.ProfileSetupMode?.ToString(),
             draft.ProfileImageStorageReference);
     }
 }

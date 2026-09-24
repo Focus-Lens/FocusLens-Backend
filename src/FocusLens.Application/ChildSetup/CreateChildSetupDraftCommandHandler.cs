@@ -52,6 +52,7 @@ public sealed class CreateChildSetupDraftCommandHandler(
             Array.Empty<ChildSetupSubjectResponse>(),
             Array.Empty<StudyPriority>(),
             null,
+            draft.ProfileSetupMode?.ToString(),
             draft.ProfileImageStorageReference);
     }
 }

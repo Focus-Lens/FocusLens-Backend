@@ -76,6 +76,23 @@ public sealed class CreateChildSetupLinkInvitationCommandHandler(
             );
         }
 
+        if (draft.ProfileSetupMode is null)
+        {
+            return Error.Validation(
+                "ChildSetup.ProfileSetupModeRequired",
+                "Choose how the child profile will be set up before sending an invitation."
+            );
+        }
+
+        if (draft.ProfileSetupMode == ChildSetupProfileMode.ParentManaged
+            && !draft.IsProfileComplete())
+        {
+            return Error.Validation(
+                "ChildSetup.Incomplete",
+                "Complete the child setup before sending an invitation."
+            );
+        }
+
         string token = Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
         string tokenHash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(token)));
         string protectedToken = tokenProtector.Protect(token);

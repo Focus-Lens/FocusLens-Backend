@@ -124,6 +124,7 @@ public sealed class CreateChildSetupInvitationCommandHandlerTests
         Guid parentUserId = Guid.NewGuid();
         Parent parent = CreateParent(parentUserId);
         ChildSetupDraft draft = new(parent.Id);
+        draft.SetProfileSetupMode(ChildSetupProfileMode.ParentManaged);
 
         CreateChildSetupInvitationCommandHandler handler = new(
             new InMemoryRepository<Parent>(parent),
@@ -248,6 +249,7 @@ public sealed class CreateChildSetupInvitationCommandHandlerTests
     private static ChildSetupDraft CreateCompleteDraft(Guid parentId)
     {
         ChildSetupDraft draft = new(parentId);
+        draft.SetProfileSetupMode(ChildSetupProfileMode.ParentManaged);
         draft.SetName("Karim", "Mahmoud");
         draft.SetGrade(StudentGrade.Grade10);
         draft.ReplaceSubjects([

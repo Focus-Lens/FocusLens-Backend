@@ -106,6 +106,8 @@ public sealed class CancelChildSetupInvitationCommandHandlerTests
         Assert.Equal(ChildSetupInvitationStatus.Cancelled, cancelledInvitation.Status);
 
 
+        draft.SetProfileSetupMode(ChildSetupProfileMode.ChildManaged);
+
         CreateChildSetupInvitationCommandHandler createHandler = new(
             new InMemoryRepository<Parent>(parent),
             new InMemoryRepository<ChildSetupDraft>(draft),

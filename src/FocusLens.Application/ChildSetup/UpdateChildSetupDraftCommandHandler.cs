@@ -372,6 +372,7 @@ public sealed class UpdateChildSetupDraftCommandHandler(
                         ? ParentWeekdayOrder.OrderDays(draft.StudyTimeGoal.Days, value)
                         : draft.StudyTimeGoal.Days,
                     draft.StudyTimeGoal.StartDate),
+            draft.ProfileSetupMode?.ToString(),
             draft.ProfileImageStorageReference);
     }
 }
