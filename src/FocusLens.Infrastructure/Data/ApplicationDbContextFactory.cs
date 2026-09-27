@@ -1,4 +1,4 @@
-using System.Text.Json;
+using Microsoft.Extensions.Configuration;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Design;
 
@@ -9,27 +9,17 @@ public sealed class ApplicationDbContextFactory
 {
     public ApplicationDbContext CreateDbContext(string[] args)
     {
+        string appSettingsPath = FindAppSettings();
+
+        IConfiguration configuration = new ConfigurationBuilder()
+            .SetBasePath(Path.GetDirectoryName(appSettingsPath)!)
+            .AddJsonFile("appsettings.json", optional: false)
+            .AddUserSecrets("e0087eb7-5390-4b2a-bd51-8b66652060d2")
+            .Build();
+
         string? connectionString =
-            Environment.GetEnvironmentVariable("ConnectionStrings__DefaultConnection");
-
-        if (string.IsNullOrWhiteSpace(connectionString))
-        {
-            string appSettingsPath = FindAppSettings();
-
-            using FileStream stream = File.OpenRead(appSettingsPath);
-            using JsonDocument document = JsonDocument.Parse(stream);
-
-            if (document.RootElement.TryGetProperty(
-                    "ConnectionStrings",
-                    out JsonElement connectionStrings)
-                && connectionStrings.TryGetProperty(
-                    "DefaultConnection",
-                    out JsonElement defaultConnection)
-                && defaultConnection.GetString() is { Length: > 0 } value)
-            {
-                connectionString = value;
-            }
-        }
+            Environment.GetEnvironmentVariable("ConnectionStrings__DefaultConnection")
+            ?? configuration.GetConnectionString("DefaultConnection");
 
         if (string.IsNullOrWhiteSpace(connectionString))
         {
