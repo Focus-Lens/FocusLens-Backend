@@ -24,7 +24,7 @@ public class CompleteStudentOnboardingCommandHandlerTests
 
         AuthResponse result = (await CreateHandler(student).Handle(
             new CompleteStudentOnboardingCommand(
-                new CompleteStudentOnboardingRequest(null, null, null, null, null, null)),
+                new CompleteStudentOnboardingRequest("  كريم  ", null, null, null, null, null, null)),
             CancellationToken.None)).Value;
 
         Assert.False(student.IsOnboardingCompleted);
@@ -41,11 +41,11 @@ public class CompleteStudentOnboardingCommandHandlerTests
         AuthResponse result = (await CreateHandler(student).Handle(
             new CompleteStudentOnboardingCommand(
                 new CompleteStudentOnboardingRequest(
+                    "  كريم  ",
                     new DateOnly(2010, 5, 12),
-                    new[] { ContractStudentGoal.FocusBetter },
+                    ContractStudentGoal.FocusBetter,
                     ContractStudentGrade.Grade10,
                     [new StudentSubjectRequest(ContractStudentSubjectType.Math, null)],
-                    new[] { StudyPriority.StayFocused, StudyPriority.ExamPreparation },
                     new StudyTimeGoalRequest(
                         StudyTimeGoalPeriod.Daily,
                         60,
@@ -54,14 +54,11 @@ public class CompleteStudentOnboardingCommandHandlerTests
             CancellationToken.None)).Value;
 
         Assert.True(student.IsOnboardingCompleted);
+        Assert.Equal("كريم", student.PreferredName);
         Assert.Equal(new DateOnly(2010, 5, 12), student.DateOfBirth);
-        Assert.Equal([StudentGoal.FocusBetter], student.Goals);
         Assert.Equal(
-            [
-                Domain.Students.StudyPriority.StayFocused,
-                Domain.Students.StudyPriority.ExamPreparation
-            ],
-            student.StudyPriorities);
+            Domain.Students.StudentGoal.FocusBetter,
+            student.Goal);
         Assert.Equal(Domain.Students.StudyTimeGoalPeriod.Daily, student.StudyTimeGoal!.Period);
         Assert.Equal(60, student.StudyTimeGoal.TargetMinutes);
         Assert.False(result.RequiresOnboarding);

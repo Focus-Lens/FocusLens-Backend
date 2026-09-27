@@ -5,7 +5,7 @@ using FocusLens.Domain;
 using FocusLens.Domain.ChildSetup;
 using FocusLens.Domain.Common.Results;
 using FocusLens.Domain.Students;
-using DomainStudyPriority = FocusLens.Domain.Students.StudyPriority;
+
 using DomainStudyTimeGoalPeriod = FocusLens.Domain.Students.StudyTimeGoalPeriod;
 
 namespace FocusLens.Application.UnitTests.ChildSetup;
@@ -273,11 +273,7 @@ public sealed class CancelChildSetupInvitationCommandHandlerTests
         draft.SetName("Karim", "Mahmoud");
         draft.SetGrade(StudentGrade.Grade10);
         draft.ReplaceSubjects([ChildSetupSubject.Predefined(StudentSubjectType.Math)]);
-        draft.ReplaceStudyPriorities([
-            DomainStudyPriority.BuildStudyRoutine,
-            DomainStudyPriority.StayFocused,
-            DomainStudyPriority.ExamPreparation,
-        ]);
+        draft.SetGoal(StudentGoal.BuildARoutine);
         draft.SetStudyTimeGoal(
             StudyTimeGoal
                 .Create(

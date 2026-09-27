@@ -14,7 +14,7 @@ namespace FocusLens.Api.IntegrationTests;
 public class StudentsApiTests
 {
     [Fact]
-    public async Task CompleteOnboarding_WhenAllFieldsAreSkipped_LeavesOnboardingIncomplete()
+    public async Task CompleteOnboarding_WhenOptionalFieldsAreSkipped_LeavesOnboardingIncomplete()
     {
         Guid userId = Guid.NewGuid();
         await using CustomWebApplicationFactory factory = new();
@@ -26,7 +26,7 @@ public class StudentsApiTests
         });
 
         using HttpClient client = CreateStudentClient(factory, userId);
-        using StringContent content = new("{}", Encoding.UTF8, "application/json");
+        using StringContent content = new("{\"preferredName\":\"Dina\"}", Encoding.UTF8, "application/json");
 
         HttpResponseMessage response = await client.PostAsync("/api/students/onboarding", content);
 
@@ -48,7 +48,7 @@ public class StudentsApiTests
 
         using HttpClient client = CreateStudentClient(factory, userId);
         using StringContent content = new(
-            """{"goals":["FocusBetter"],"grade":"Grade10","subjects":[{"type":"Math","customName":null}],"studyPriorities":["StayFocused","ExamPreparation"],"studyTimeGoal":{"period":"Daily","targetMinutes":60,"days":["Monday","Tuesday","Wednesday","Thursday","Friday"],"startDate":"2026-09-14"},"dateOfBirth":"2010-05-12"}""",
+            """{"preferredName":"  Dina  ","goal":"FocusBetter","grade":"Grade10","subjects":[{"type":"Math","customName":null}],"studyTimeGoal":{"period":"Daily","targetMinutes":60,"days":["Monday","Tuesday","Wednesday","Thursday","Friday"],"startDate":"2026-09-14"},"dateOfBirth":"2010-05-12"}""",
             Encoding.UTF8,
             "application/json");
 
@@ -56,6 +56,34 @@ public class StudentsApiTests
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.True(await GetOnboardingCompletedAsync(client));
+
+        HttpResponseMessage getResponse = await client.GetAsync("/api/students/me");
+        Assert.Equal(HttpStatusCode.OK, getResponse.StatusCode);
+        using JsonDocument getDocument = JsonDocument.Parse(await getResponse.Content.ReadAsStringAsync());
+        Assert.Equal("Dina", getDocument.RootElement.GetProperty("preferredName").GetString());
+    }
+
+    [Fact]
+    public async Task CompleteOnboarding_WhenPreferredNameIsWhitespace_ReturnsBadRequest()
+    {
+        Guid userId = Guid.NewGuid();
+        await using CustomWebApplicationFactory factory = new();
+        await factory.SeedAsync(db =>
+        {
+            SeedStudentIdentity(db, userId);
+            db.Students.Add(new Student(userId));
+            return Task.CompletedTask;
+        });
+
+        using HttpClient client = CreateStudentClient(factory, userId);
+        using StringContent content = new(
+            """{"preferredName":"   "}""",
+            Encoding.UTF8,
+            "application/json");
+
+        HttpResponseMessage response = await client.PostAsync("/api/students/onboarding", content);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
 
     [Fact]
@@ -64,7 +92,7 @@ public class StudentsApiTests
         Guid userId = Guid.NewGuid();
         Student student = new(userId);
         student.CompleteOnboarding(
-            new[] { StudentGoal.FocusBetter },
+            StudentGoal.FocusBetter,
             StudentGrade.Grade10,
             [StudentSubject.Predefined(StudentSubjectType.Math)]);
 
@@ -78,7 +106,7 @@ public class StudentsApiTests
 
         using HttpClient client = CreateStudentClient(factory, userId);
         using StringContent content = new(
-            """{"preferredName":"  كريم  ","goals":null,"subjects":[]}""",
+            """{"preferredName":"  كريم  ","goal":null,"subjects":[]}""",
             Encoding.UTF8,
             "application/json");
 
@@ -88,10 +116,71 @@ public class StudentsApiTests
         using JsonDocument document = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
         JsonElement root = document.RootElement;
         Assert.Equal("كريم", root.GetProperty("preferredName").GetString());
-        Assert.Equal(0, root.GetProperty("goals").GetArrayLength());
+        Assert.Equal(JsonValueKind.Null, root.GetProperty("goal").ValueKind);
         Assert.Equal("Grade10", root.GetProperty("grade").GetString());
         Assert.Equal(0, root.GetProperty("subjects").GetArrayLength());
         Assert.False(root.GetProperty("onboardingCompleted").GetBoolean());
+    }
+
+    [Fact]
+    public async Task UpdatePreferences_WhenDateOfBirthIsProvided_UpdatesAndReturnsDateOfBirth()
+    {
+        Guid userId = Guid.NewGuid();
+        Student student = new(userId);
+        student.SetDateOfBirth(new DateOnly(2010, 5, 12));
+
+        await using CustomWebApplicationFactory factory = new();
+        await factory.SeedAsync(db =>
+        {
+            SeedStudentIdentity(db, userId);
+            db.Students.Add(student);
+            return Task.CompletedTask;
+        });
+
+        using HttpClient client = CreateStudentClient(factory, userId);
+        using StringContent content = new(
+            """{"dateOfBirth":"2011-06-15"}""",
+            Encoding.UTF8,
+            "application/json");
+
+        HttpResponseMessage response = await client.PatchAsync("/api/students/me/preferences", content);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        using JsonDocument document = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        Assert.Equal("2011-06-15", document.RootElement.GetProperty("dateOfBirth").GetString());
+
+        HttpResponseMessage getResponse = await client.GetAsync("/api/students/me");
+        Assert.Equal(HttpStatusCode.OK, getResponse.StatusCode);
+        using JsonDocument getDocument = JsonDocument.Parse(await getResponse.Content.ReadAsStringAsync());
+        Assert.Equal("2011-06-15", getDocument.RootElement.GetProperty("dateOfBirth").GetString());
+    }
+
+    [Fact]
+    public async Task UpdatePreferences_WhenDateOfBirthIsNull_ClearsExistingDateOfBirth()
+    {
+        Guid userId = Guid.NewGuid();
+        Student student = new(userId);
+        student.SetDateOfBirth(new DateOnly(2010, 5, 12));
+
+        await using CustomWebApplicationFactory factory = new();
+        await factory.SeedAsync(db =>
+        {
+            SeedStudentIdentity(db, userId);
+            db.Students.Add(student);
+            return Task.CompletedTask;
+        });
+
+        using HttpClient client = CreateStudentClient(factory, userId);
+        using StringContent content = new(
+            """{"dateOfBirth":null}""",
+            Encoding.UTF8,
+            "application/json");
+
+        HttpResponseMessage response = await client.PatchAsync("/api/students/me/preferences", content);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        using JsonDocument document = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        Assert.Equal(JsonValueKind.Null, document.RootElement.GetProperty("dateOfBirth").ValueKind);
     }
 
     [Fact]

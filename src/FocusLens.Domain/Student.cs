@@ -29,7 +29,7 @@ public class Student : AuditableEntity
 
     public DateOnly? DateOfBirth { get; private set; }
 
-    public ICollection<StudentGoal> Goals { get; } = [];
+    public StudentGoal? Goal { get; private set; }
 
     public StudentGrade? Grade { get; private set; }
 
@@ -37,7 +37,6 @@ public class Student : AuditableEntity
 
     public ICollection<StudentSubject> Subjects { get; } = [];
 
-    public ICollection<StudyPriority> StudyPriorities { get; } = [];
 
     public StudyTimeGoal? StudyTimeGoal { get; private set; }
 
@@ -49,23 +48,9 @@ public class Student : AuditableEntity
 
     public void SetDateOfBirth(DateOnly? dateOfBirth) => DateOfBirth = dateOfBirth;
 
-    public void ReplaceGoals(IEnumerable<StudentGoal> goals)
+    public void SetGoal(StudentGoal? goal)
     {
-        ArgumentNullException.ThrowIfNull(goals);
-
-        StudentGoal[] values = goals.ToArray();
-
-        if (values.Distinct().Count() != values.Length)
-        {
-            throw new ArgumentException("Student goals cannot contain duplicates.", nameof(goals));
-        }
-
-        Goals.Clear();
-
-        foreach (StudentGoal goal in values)
-        {
-            Goals.Add(goal);
-        }
+        Goal = goal;
 
         UpdateOnboardingCompletionStatus();
     }
@@ -102,28 +87,6 @@ public class Student : AuditableEntity
         UpdateOnboardingCompletionStatus();
     }
 
-    public void ReplaceStudyPriorities(IEnumerable<StudyPriority> priorities)
-    {
-        ArgumentNullException.ThrowIfNull(priorities);
-
-        StudyPriority[] values = priorities.ToArray();
-
-        if (values.Distinct().Count() != values.Length)
-        {
-            throw new ArgumentException(
-                "Study priorities cannot contain duplicates.",
-                nameof(priorities)
-            );
-        }
-
-        StudyPriorities.Clear();
-
-        foreach (StudyPriority priority in values)
-        {
-            StudyPriorities.Add(priority);
-        }
-    }
-
     public void SetStudyTimeGoal(StudyTimeGoal? studyTimeGoal) => StudyTimeGoal = studyTimeGoal;
 
     public void SetPreferredName(string? preferredName) => PreferredName = preferredName?.Trim();
@@ -142,15 +105,14 @@ public class Student : AuditableEntity
     }
 
     public void CompleteOnboarding(
-        IEnumerable<StudentGoal> goals,
+        StudentGoal? goal,
         StudentGrade? grade,
         IEnumerable<StudentSubject> subjects
     )
     {
-        ArgumentNullException.ThrowIfNull(goals);
         ArgumentNullException.ThrowIfNull(subjects);
 
-        ReplaceGoals(goals);
+        SetGoal(goal);
 
         Grade = grade;
         ReplaceSubjects(subjects);
@@ -158,7 +120,7 @@ public class Student : AuditableEntity
 
     private void UpdateOnboardingCompletionStatus() =>
         IsOnboardingCompleted =
-            Goals.Count > 0
+            Goal is not null
             && Grade is not null
             && (Grade is not StudentGrade.Other || !string.IsNullOrWhiteSpace(CustomGrade))
             && Subjects.Count > 0;

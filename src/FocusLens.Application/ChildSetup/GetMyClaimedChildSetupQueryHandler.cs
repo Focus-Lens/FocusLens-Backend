@@ -60,15 +60,16 @@ public sealed class GetMyClaimedChildSetupQueryHandler(
             draft.Grade is null
                 ? null
                 : StudentEnumMapper.ToContract(draft.Grade.Value),
+            draft.CustomGrade,
             draft.Subjects
                 .Select(subject => new ChildSetupSubjectResponse(
                     subject.Id,
                     subject.Type.ToString(),
                     subject.CustomName))
                 .ToList(),
-            draft.StudyPriorities
-                .Select(priority => Enum.Parse<StudyPriority>(priority.ToString()))
-                .ToList(),
+            draft.Goal is null
+                  ? null
+                  : StudentEnumMapper.ToContract(draft.Goal.Value),
             draft.StudyTimeGoal is null
                 ? null
                 : new StudyTimeGoalResponse(

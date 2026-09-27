@@ -31,15 +31,9 @@ public class StudentConfiguration : IEntityTypeConfiguration<Student>
 
         builder.Property(student => student.DateOfBirth);
 
-        builder.PrimitiveCollection(student => student.Goals)
-            .HasColumnName("Goals")
-            .ElementType()
-            .HasConversion<string>();
-
-        builder.PrimitiveCollection(student => student.StudyPriorities)
-            .HasColumnName("StudyPriorities")
-            .ElementType()
-            .HasConversion<string>();
+        builder.Property(student => student.Goal)
+            .HasConversion<string>()
+            .HasMaxLength(50);
 
         builder.OwnsOne(student => student.StudyTimeGoal, goalBuilder =>
         {

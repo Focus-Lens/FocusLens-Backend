@@ -7,7 +7,8 @@ public sealed record UpdateChildSetupDraftRequest(
     string LastName,
     DateOnly? DateOfBirth,
     StudentGrade? Grade,
+    string? CustomGrade,
     IReadOnlyCollection<StudentSubjectRequest>? Subjects,
-    IReadOnlyCollection<StudyPriority>? StudyPriorities,
+    StudentGoal? Goal,
     StudyTimeGoalRequest? StudyTimeGoal
 );

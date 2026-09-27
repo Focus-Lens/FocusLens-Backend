@@ -36,7 +36,7 @@ public class GetStudentForParentQueryHandlerTests
             });
 
         student.CompleteOnboarding(
-            new[] { StudentGoal.FocusBetter },
+            StudentGoal.FocusBetter,
             StudentGrade.Grade10,
             [
                 StudentSubject.Predefined(StudentSubjectType.Math),
@@ -61,8 +61,7 @@ public class GetStudentForParentQueryHandlerTests
         Assert.NotNull(result);
         Assert.Equal(student.Id, result.Id);
         Assert.Equal(student.UserId, result.UserId);
-        Assert.Single(result.Goals);
-        Assert.Equal(ContractStudentGoal.FocusBetter, result.Goals.Single());
+        Assert.Equal(ContractStudentGoal.FocusBetter, result.Goal);
         Assert.Equal(ContractStudentGrade.Grade10, result.Grade);
         Assert.True(result.OnboardingCompleted);
         Assert.Equal(2, result.Subjects.Count);

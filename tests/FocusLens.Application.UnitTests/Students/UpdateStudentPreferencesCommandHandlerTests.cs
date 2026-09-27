@@ -27,8 +27,7 @@ public class UpdateStudentPreferencesCommandHandlerTests
             CancellationToken.None);
 
         Assert.True(result.IsSuccess);
-        Assert.Single(student.Goals);
-        Assert.Equal(StudentGoal.FocusBetter, student.Goals.Single());
+        Assert.Equal(StudentGoal.FocusBetter, student.Goal);
         Assert.Equal(StudentGrade.Grade11, student.Grade);
         Assert.Equal(1, unitOfWork.SaveChangesCalls);
     }
@@ -39,11 +38,11 @@ public class UpdateStudentPreferencesCommandHandlerTests
         Student student = CreateStudentWithPreferences();
 
         Result<StudentDetailsResponse> result = await CreateHandler(student).Handle(
-            new UpdateStudentPreferencesCommand(new UpdateStudentPreferencesRequest { Goals = null }),
+            new UpdateStudentPreferencesCommand(new UpdateStudentPreferencesRequest { Goal = null }),
             CancellationToken.None);
 
         Assert.True(result.IsSuccess);
-        Assert.Empty(student.Goals);
+        Assert.Null(student.Goal);
         Assert.Equal(StudentGrade.Grade10, student.Grade);
         Assert.Single(student.Subjects);
     }
@@ -59,8 +58,7 @@ public class UpdateStudentPreferencesCommandHandlerTests
 
         Assert.True(result.IsSuccess);
         Assert.Empty(student.Subjects);
-        Assert.Single(student.Goals);
-        Assert.Equal(StudentGoal.FocusBetter, student.Goals.Single());
+        Assert.Equal(StudentGoal.FocusBetter, student.Goal);
         Assert.Equal(StudentGrade.Grade10, student.Grade);
     }
 
@@ -93,6 +91,42 @@ public class UpdateStudentPreferencesCommandHandlerTests
         Assert.False(result.IsSuccess);
         Assert.Equal("Students.InvalidSubjects", result.TopError.Code);
         Assert.Single(student.Subjects);
+    }
+
+    [Fact]
+    public async Task Handle_WhenDateOfBirthIsProvided_UpdatesAndReturnsDateOfBirth()
+    {
+        Student student = CreateStudentWithPreferences();
+        student.SetDateOfBirth(new DateOnly(2010, 5, 12));
+
+        Result<StudentDetailsResponse> result = await CreateHandler(student).Handle(
+            new UpdateStudentPreferencesCommand(new UpdateStudentPreferencesRequest
+            {
+                DateOfBirth = new DateOnly(2011, 6, 15)
+            }),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(new DateOnly(2011, 6, 15), student.DateOfBirth);
+        Assert.Equal(new DateOnly(2011, 6, 15), result.Value.DateOfBirth);
+    }
+
+    [Fact]
+    public async Task Handle_WhenDateOfBirthIsNull_ClearsExistingDateOfBirth()
+    {
+        Student student = CreateStudentWithPreferences();
+        student.SetDateOfBirth(new DateOnly(2010, 5, 12));
+
+        Result<StudentDetailsResponse> result = await CreateHandler(student).Handle(
+            new UpdateStudentPreferencesCommand(new UpdateStudentPreferencesRequest
+            {
+                DateOfBirth = null
+            }),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Null(student.DateOfBirth);
+        Assert.Null(result.Value.DateOfBirth);
     }
 
     [Fact]
@@ -216,7 +250,7 @@ public class UpdateStudentPreferencesCommandHandlerTests
             Email = "test@example.com"
         });
         student.CompleteOnboarding(
-            new[] { StudentGoal.FocusBetter },
+            StudentGoal.FocusBetter,
             StudentGrade.Grade10,
             [StudentSubject.Predefined(StudentSubjectType.Math)]);
         return student;

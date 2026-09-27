@@ -9,7 +9,7 @@ using FocusLens.Domain.Common.Results;
 using FocusLens.Domain.Students;
 using StudentGrade = FocusLens.Contracts.Students.StudentGrade;
 using StudentSubjectType = FocusLens.Domain.Students.StudentSubjectType;
-using StudyPriority = FocusLens.Contracts.Students.StudyPriority;
+
 
 namespace FocusLens.Application.UnitTests.ChildSetup;
 
@@ -47,7 +47,7 @@ public sealed class GetChildSetupInvitationQueryHandlerTests
         Assert.Equal(StudentGrade.Grade10, result.Value.Grade);
         Assert.Single(result.Value.Subjects);
         Assert.Equal("Math", result.Value.Subjects.Single().Type);
-        Assert.Equal(StudyPriority.BuildStudyRoutine, result.Value.StudyPriorities.Single());
+        Assert.Equal(FocusLens.Contracts.Students.StudentGoal.BuildARoutine, result.Value.Goal);
         Assert.Equal("Daily", result.Value.StudyTimeGoal!.Period);
         Assert.Equal(60, result.Value.StudyTimeGoal.TargetMinutes);
         Assert.Equal([DayOfWeek.Saturday, DayOfWeek.Monday], result.Value.StudyTimeGoal.Days);
@@ -189,9 +189,7 @@ public sealed class GetChildSetupInvitationQueryHandlerTests
         draft.ReplaceSubjects([
             ChildSetupSubject.Predefined(StudentSubjectType.Math)
         ]);
-        draft.ReplaceStudyPriorities([
-            Domain.Students.StudyPriority.BuildStudyRoutine
-        ]);
+        draft.SetGoal(StudentGoal.BuildARoutine);
         draft.SetStudyTimeGoal(
             StudyTimeGoal.Create(
                 StudyTimeGoalPeriod.Daily,

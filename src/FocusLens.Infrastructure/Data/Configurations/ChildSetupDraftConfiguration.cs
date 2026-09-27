@@ -51,6 +51,9 @@ public sealed class ChildSetupDraftConfiguration
             .HasConversion<string>()
             .HasMaxLength(50);
 
+        builder.Property(draft => draft.CustomGrade)
+            .HasMaxLength(100);
+
         builder.Property(draft => draft.Status)
             .HasConversion<string>()
             .HasMaxLength(20)
@@ -75,10 +78,9 @@ public sealed class ChildSetupDraftConfiguration
         });
 
 
-        builder.PrimitiveCollection(draft => draft.StudyPriorities)
-            .HasColumnName("StudyPriorities")
-            .ElementType(elementBuilder =>
-                elementBuilder.HasConversion<string>());
+        builder.Property(draft => draft.Goal)
+            .HasConversion<string>()
+            .HasMaxLength(50);
 
         builder.OwnsOne(draft => draft.StudyTimeGoal, goalBuilder =>
         {

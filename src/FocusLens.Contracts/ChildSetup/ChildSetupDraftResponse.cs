@@ -9,8 +9,9 @@ public sealed record ChildSetupDraftResponse(
     string? LastName,
     DateOnly? DateOfBirth,
     StudentGrade? Grade,
+    string? CustomGrade,
     IReadOnlyCollection<ChildSetupSubjectResponse> Subjects,
-    IReadOnlyCollection<StudyPriority> StudyPriorities,
+    StudentGoal? Goal,
     StudyTimeGoalResponse? StudyTimeGoal,
     string? ProfileSetupMode,
     string? ProfileImageStorageReference

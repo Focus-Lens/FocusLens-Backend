@@ -85,6 +85,7 @@ public sealed class GetChildSetupInvitationQueryHandler(
             draft.FirstName,
             draft.LastName,
             draft.Grade is null ? null : StudentEnumMapper.ToContract(draft.Grade.Value),
+            draft.CustomGrade,
             draft
                 .Subjects.Select(subject => new ChildSetupInvitationSubjectResponse(
                     subject.Type.ToString(),
@@ -92,8 +93,9 @@ public sealed class GetChildSetupInvitationQueryHandler(
                 ))
                 .ToList(),
             draft
-                .StudyPriorities.Select(priority => Enum.Parse<StudyPriority>(priority.ToString()))
-                .ToList(),
+                .Goal is null
+                  ? null
+                  : StudentEnumMapper.ToContract(draft.Goal.Value),
             draft.StudyTimeGoal is null
                 ? null
                 : new StudyTimeGoalResponse(

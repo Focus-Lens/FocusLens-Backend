@@ -40,9 +40,7 @@ internal static class StudentMappings
             student.PreferredName,
             student.ProfileImageStorageReference,
             student.DateOfBirth,
-            student.Goals
-                .Select(StudentEnumMapper.ToContract)
-                .ToList(),
+            student.Goal is null ? null : StudentEnumMapper.ToContract(student.Goal.Value),
             student.Grade is null
                 ? null
                 : StudentEnumMapper.ToContract(student.Grade.Value),
@@ -52,9 +50,6 @@ internal static class StudentMappings
                     subject.Id,
                     StudentEnumMapper.ToContract(subject.Type),
                     subject.CustomName))
-                .ToList(),
-            student.StudyPriorities
-                .Select(priority => Enum.Parse<StudyPriority>(priority.ToString()))
                 .ToList(),
             student.StudyTimeGoal is null
                 ? null

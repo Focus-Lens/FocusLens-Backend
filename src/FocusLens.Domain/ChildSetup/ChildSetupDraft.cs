@@ -5,18 +5,14 @@ namespace FocusLens.Domain.ChildSetup;
 
 public sealed class ChildSetupDraft : AuditableEntity
 {
-    private ChildSetupDraft()
-    {
-    }
+    private ChildSetupDraft() { }
 
     public ChildSetupDraft(Guid parentId)
         : base(Guid.CreateVersion7())
     {
         if (parentId == Guid.Empty)
         {
-            throw new ArgumentException(
-                "Parent ID cannot be empty.",
-                nameof(parentId));
+            throw new ArgumentException("Parent ID cannot be empty.", nameof(parentId));
         }
 
         ParentId = parentId;
@@ -30,12 +26,11 @@ public sealed class ChildSetupDraft : AuditableEntity
     public string? LastName { get; private set; }
     public DateOnly? DateOfBirth { get; private set; }
     public StudentGrade? Grade { get; private set; }
+    public string? CustomGrade { get; private set; }
 
-    public ICollection<ChildSetupSubject> Subjects { get; }
-        = new List<ChildSetupSubject>();
+    public ICollection<ChildSetupSubject> Subjects { get; } = new List<ChildSetupSubject>();
 
-    public ICollection<StudyPriority> StudyPriorities { get; }
-        = new List<StudyPriority>();
+    public StudentGoal? Goal { get; private set; }
 
     public StudyTimeGoal? StudyTimeGoal { get; private set; }
     public ChildSetupProfileMode? ProfileSetupMode { get; private set; }
@@ -46,16 +41,12 @@ public sealed class ChildSetupDraft : AuditableEntity
     {
         if (string.IsNullOrWhiteSpace(firstName))
         {
-            throw new ArgumentException(
-                "First name is required.",
-                nameof(firstName));
+            throw new ArgumentException("First name is required.", nameof(firstName));
         }
 
         if (string.IsNullOrWhiteSpace(lastName))
         {
-            throw new ArgumentException(
-                "Last name is required.",
-                nameof(lastName));
+            throw new ArgumentException("Last name is required.", nameof(lastName));
         }
 
         FirstName = firstName.Trim();
@@ -64,7 +55,18 @@ public sealed class ChildSetupDraft : AuditableEntity
 
     public void SetDateOfBirth(DateOnly? dateOfBirth) => DateOfBirth = dateOfBirth;
 
-    public void SetGrade(StudentGrade? grade) => Grade = grade;
+    public void SetGrade(StudentGrade? grade)
+    {
+        Grade = grade;
+
+        if (grade != StudentGrade.Other)
+        {
+            CustomGrade = null;
+        }
+    }
+
+    public void SetCustomGrade(string? customGrade) =>
+        CustomGrade = string.IsNullOrWhiteSpace(customGrade) ? null : customGrade.Trim();
 
     public void ReplaceSubjects(IEnumerable<ChildSetupSubject> subjects)
     {
@@ -78,26 +80,8 @@ public sealed class ChildSetupDraft : AuditableEntity
         }
     }
 
-    public void ReplaceStudyPriorities(IEnumerable<StudyPriority> priorities)
-    {
-        ArgumentNullException.ThrowIfNull(priorities);
-
-        StudyPriority[] values = priorities.ToArray();
-
-        if (values.Distinct().Count() != values.Length)
-        {
-            throw new ArgumentException(
-                "Study priorities cannot contain duplicates.",
-                nameof(priorities));
-        }
-
-        StudyPriorities.Clear();
-
-        foreach (StudyPriority priority in values)
-        {
-            StudyPriorities.Add(priority);
-        }
-    }
+    public void SetGoal(StudentGoal? goal) =>
+        Goal = goal;
 
     public void SetStudyTimeGoal(StudyTimeGoal? studyTimeGoal) => StudyTimeGoal = studyTimeGoal;
 
@@ -111,8 +95,8 @@ public sealed class ChildSetupDraft : AuditableEntity
         return !string.IsNullOrWhiteSpace(FirstName)
             && !string.IsNullOrWhiteSpace(LastName)
             && Grade is not null
+            && (Grade != StudentGrade.Other || !string.IsNullOrWhiteSpace(CustomGrade))
             && Subjects.Count > 0
-            && StudyPriorities.Count > 0
             && StudyTimeGoal is not null;
     }
 
@@ -125,19 +109,17 @@ public sealed class ChildSetupDraft : AuditableEntity
     {
         if (Status != ChildSetupStatus.Draft)
         {
-            throw new InvalidOperationException(
-                "Only a draft can be marked as invited.");
+            throw new InvalidOperationException("Only a draft can be marked as invited.");
         }
 
         Status = ChildSetupStatus.Invited;
     }
 
-       public void ResetToDraft()
+    public void ResetToDraft()
     {
         if (Status != ChildSetupStatus.Invited)
         {
-            throw new InvalidOperationException(
-                "Only an invited setup can be reset to draft.");
+            throw new InvalidOperationException("Only an invited setup can be reset to draft.");
         }
 
         Status = ChildSetupStatus.Draft;
@@ -149,15 +131,12 @@ public sealed class ChildSetupDraft : AuditableEntity
     {
         if (studentId == Guid.Empty)
         {
-            throw new ArgumentException(
-                "Student ID cannot be empty.",
-                nameof(studentId));
+            throw new ArgumentException("Student ID cannot be empty.", nameof(studentId));
         }
 
         if (Status != ChildSetupStatus.Invited)
         {
-            throw new InvalidOperationException(
-                "Only an invited setup can be claimed.");
+            throw new InvalidOperationException("Only an invited setup can be claimed.");
         }
 
         ClaimedByStudentId = studentId;
@@ -168,8 +147,7 @@ public sealed class ChildSetupDraft : AuditableEntity
     {
         if (Status != ChildSetupStatus.Claimed)
         {
-            throw new InvalidOperationException(
-                "Only a claimed setup can be activated.");
+            throw new InvalidOperationException("Only a claimed setup can be activated.");
         }
 
         Status = ChildSetupStatus.Activated;

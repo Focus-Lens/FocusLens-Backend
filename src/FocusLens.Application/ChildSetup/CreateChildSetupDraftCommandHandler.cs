@@ -49,8 +49,9 @@ public sealed class CreateChildSetupDraftCommandHandler(
             draft.LastName,
             draft.DateOfBirth,
             null,
+            null,
             Array.Empty<ChildSetupSubjectResponse>(),
-            Array.Empty<StudyPriority>(),
+            null,
             null,
             draft.ProfileSetupMode?.ToString(),
             draft.ProfileImageStorageReference);

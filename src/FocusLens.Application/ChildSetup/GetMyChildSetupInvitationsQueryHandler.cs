@@ -57,7 +57,8 @@ public sealed class GetMyChildSetupInvitationsQueryHandler(
                 invitation.ExpiresAtUtc,
                 invitation.ChildSetupDraft.Grade is null
                     ? null
-                    : StudentEnumMapper.ToContract(invitation.ChildSetupDraft.Grade.Value)
+                    : StudentEnumMapper.ToContract(invitation.ChildSetupDraft.Grade.Value),
+                invitation.ChildSetupDraft.CustomGrade
             ))
             .ToList();
     }

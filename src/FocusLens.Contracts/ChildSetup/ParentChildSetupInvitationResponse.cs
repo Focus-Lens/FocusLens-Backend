@@ -11,5 +11,6 @@ public sealed record ParentChildSetupInvitationResponse(
     string Type,
     string Status,
     DateTimeOffset ExpiresAtUtc,
-    StudentGrade? Grade
+    StudentGrade? Grade,
+    string? CustomGrade
 );

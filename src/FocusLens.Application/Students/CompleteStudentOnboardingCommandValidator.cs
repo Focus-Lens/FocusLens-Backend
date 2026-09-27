@@ -9,13 +9,18 @@ public sealed class CompleteStudentOnboardingCommandValidator
 {
     public CompleteStudentOnboardingCommandValidator()
     {
-        RuleFor(command => command.Request.Goals)
-            .Must(goals => goals is null || goals.Distinct().Count() == goals.Count)
-            .WithMessage("Goals must be unique.");
+        RuleFor(command => command.Request.PreferredName)
+            .Cascade(CascadeMode.Stop)
+            .Must(preferredName => !string.IsNullOrWhiteSpace(preferredName))
+            .WithErrorCode("Students.PreferredNameRequired")
+            .WithMessage("Preferred name cannot be empty.")
+            .Must(preferredName => preferredName!.Trim().Length <= 100)
+            .WithErrorCode("Students.PreferredNameTooLong")
+            .WithMessage("Preferred name cannot exceed 100 characters.");
 
-        RuleForEach(command => command.Request.Goals!)
+        RuleFor(command => command.Request.Goal)
             .IsInEnum()
-            .When(command => command.Request.Goals is not null);
+            .When(command => command.Request.Goal.HasValue);
 
         RuleFor(command => command.Request.Grade)
             .IsInEnum()
@@ -31,16 +36,6 @@ public sealed class CompleteStudentOnboardingCommandValidator
             .Empty()
             .WithMessage("CustomGrade is only allowed for Other.")
             .When(command => command.Request.Grade.HasValue && command.Request.Grade != StudentGrade.Other);
-
-        RuleFor(command => command.Request.StudyPriorities)
-            .Must(priorities =>
-                priorities is null ||
-                priorities.Distinct().Count() == priorities.Count)
-            .WithMessage("Study priorities must be unique.");
-
-        RuleForEach(command => command.Request.StudyPriorities!)
-            .IsInEnum()
-            .When(command => command.Request.StudyPriorities is not null);
 
         RuleFor(command => command.Request.StudyTimeGoal!.Period)
             .IsInEnum()

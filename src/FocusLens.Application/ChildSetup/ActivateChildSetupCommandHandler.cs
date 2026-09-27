@@ -11,6 +11,7 @@ using FocusLens.Domain.Interfaces;
 using FocusLens.Domain.Students;
 using MediatR;
 using ICurrentUser = FocusLens.Application.Common.Interfaces.ICurrentUser;
+using StudentGrade = FocusLens.Domain.Students.StudentGrade;
 using StudentSubjectType = FocusLens.Domain.Students.StudentSubjectType;
 
 namespace FocusLens.Application.ChildSetup;
@@ -84,8 +85,9 @@ public sealed class ActivateChildSetupCommandHandler(
             || !string.IsNullOrWhiteSpace(draft.LastName)
             || draft.DateOfBirth is not null
             || draft.Grade is not null
+            || draft.CustomGrade is not null
             || draft.Subjects.Count > 0
-            || draft.StudyPriorities.Count > 0
+            || draft.Goal is not null
             || draft.StudyTimeGoal is not null;
 
         if (hasParentSetupData)
@@ -103,8 +105,12 @@ public sealed class ActivateChildSetupCommandHandler(
 
             student.SetDateOfBirth(draft.DateOfBirth);
             student.SetGrade(draft.Grade);
+            student.SetCustomGrade(
+                draft.Grade == StudentGrade.Other
+                    ? draft.CustomGrade
+                    : null);
             student.ReplaceSubjects(draft.Subjects.Select(MapSubject));
-            student.ReplaceStudyPriorities(draft.StudyPriorities);
+            student.SetGoal(draft.Goal);
 
             if (draft.StudyTimeGoal is not null)
             {

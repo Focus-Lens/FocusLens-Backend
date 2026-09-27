@@ -9,8 +9,9 @@ public sealed record ChildSetupInvitationDetailsResponse(
     string? FirstName,
     string? LastName,
     StudentGrade? Grade,
+    string? CustomGrade,
     IReadOnlyCollection<ChildSetupInvitationSubjectResponse> Subjects,
-    IReadOnlyCollection<StudyPriority> StudyPriorities,
+    StudentGoal? Goal,
     StudyTimeGoalResponse? StudyTimeGoal,
     DateTimeOffset ExpiresAtUtc
 );

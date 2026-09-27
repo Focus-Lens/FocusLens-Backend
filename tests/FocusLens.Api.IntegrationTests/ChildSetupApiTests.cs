@@ -27,7 +27,8 @@ public sealed class ChildSetupApiTests
 
         ChildSetupDraft draft = new(parent.Id);
         draft.SetName("Youssef", "Mahmoud");
-        draft.SetGrade(StudentGrade.Grade10);
+        draft.SetGrade(StudentGrade.Other);
+        draft.SetCustomGrade("  Year 13  ");
         draft.MarkInvited();
         draft.MarkClaimed(student.Id);
 
@@ -95,7 +96,7 @@ public sealed class ChildSetupApiTests
 
         Assert.Equal("Mahmoud", child.GetProperty("lastName").GetString());
 
-        Assert.Equal("Grade10", child.GetProperty("grade").GetString());
+        Assert.Equal("Other", child.GetProperty("grade").GetString());
 
         using IServiceScope scope = factory.Services.CreateScope();
         ApplicationDbContext db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
@@ -109,6 +110,10 @@ public sealed class ChildSetupApiTests
         );
 
         Assert.Equal(ChildSetupStatus.Activated, persistedDraft.Status);
+        Student persistedStudent = await db.Students.SingleAsync(item => item.Id == student.Id);
+        Assert.Equal(StudentGrade.Other, persistedStudent.Grade);
+        Assert.Equal("Year 13", persistedStudent.CustomGrade);
+        Assert.Equal("Year 13", persistedDraft.CustomGrade);
 
         Assert.Equal(RelationshipStatus.Active, relationship.Status);
     }
@@ -122,7 +127,8 @@ public sealed class ChildSetupApiTests
 
         ChildSetupDraft draft = new(parent.Id);
         draft.SetName("Youssef", "Mahmoud");
-        draft.SetGrade(StudentGrade.Grade10);
+        draft.SetGrade(StudentGrade.Other);
+        draft.SetCustomGrade("Year 13");
         draft.MarkInvited();
 
         ChildSetupInvitation invitation = new(
@@ -170,6 +176,8 @@ public sealed class ChildSetupApiTests
 
         Assert.Equal("Email", result.GetProperty("type").GetString());
         Assert.Equal("YOUSSEF@EXAMPLE.COM", result.GetProperty("targetEmail").GetString());
+        Assert.Equal("Other", result.GetProperty("grade").GetString());
+        Assert.Equal("Year 13", result.GetProperty("customGrade").GetString());
     }
 
     [Fact]
@@ -241,7 +249,8 @@ public sealed class ChildSetupApiTests
 
         ChildSetupDraft draft = new(parent.Id);
         draft.SetName("Youssef", "Mahmoud");
-        draft.SetGrade(StudentGrade.Grade10);
+        draft.SetGrade(StudentGrade.Other);
+        draft.SetCustomGrade("Year 13");
         draft.MarkInvited();
 
         ChildSetupInvitation invitation = new(
@@ -300,8 +309,238 @@ public sealed class ChildSetupApiTests
         Assert.Equal("Mahmoud", result.GetProperty("lastName").GetString());
 
         Assert.Equal("YOUSSEF@EXAMPLE.COM", result.GetProperty("targetEmail").GetString());
+        Assert.Equal("Other", result.GetProperty("grade").GetString());
+        Assert.Equal("Year 13", result.GetProperty("customGrade").GetString());
 
         Assert.Equal("Pending", result.GetProperty("status").GetString());
+    }
+
+    [Fact]
+    public async Task UpdateChildSetup_WithOtherGrade_PersistsAndReturnsTrimmedCustomGrade()
+    {
+        Guid parentUserId = Guid.NewGuid();
+        Parent parent = new(parentUserId);
+        ChildSetupDraft draft = new(parent.Id);
+
+        await using CustomWebApplicationFactory factory = new();
+
+        await factory.SeedAsync(db =>
+        {
+            db.Users.Add(
+                new ApplicationUser
+                {
+                    Id = parentUserId,
+                    Email = "parent@example.com",
+                    UserName = "parent@example.com",
+                    FirstName = "Mariam",
+                    LastName = "Parent",
+                }
+            );
+
+            db.Parents.Add(parent);
+            db.ChildSetupDrafts.Add(draft);
+
+            return Task.CompletedTask;
+        });
+
+        using HttpClient client = CreateClient(factory, parentUserId, "Parent");
+
+        using StringContent content = new(
+            """{"firstName":"Youssef","lastName":"Mahmoud","dateOfBirth":null,"grade":"Other","customGrade":"  Year 13  ","subjects":[],"studyPriorities":[],"studyTimeGoal":null}""",
+            Encoding.UTF8,
+            "application/json");
+
+        HttpResponseMessage response = await client.PutAsync(
+            $"/api/parents/child-setups/{draft.Id}",
+            content);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        using JsonDocument document = JsonDocument.Parse(
+            await response.Content.ReadAsStringAsync());
+
+        JsonElement result = document.RootElement;
+
+        Assert.Equal("Other", result.GetProperty("grade").GetString());
+        Assert.Equal("Year 13", result.GetProperty("customGrade").GetString());
+
+        using IServiceScope scope = factory.Services.CreateScope();
+        ApplicationDbContext db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        ChildSetupDraft persistedDraft = await db.ChildSetupDrafts.SingleAsync(item => item.Id == draft.Id);
+
+        Assert.Equal(StudentGrade.Other, persistedDraft.Grade);
+        Assert.Equal("Year 13", persistedDraft.CustomGrade);
+    }
+
+    [Fact]
+    public async Task UpdateChildSetup_WithOtherGradeWithoutCustomGrade_ReturnsBadRequest()
+    {
+        Guid parentUserId = Guid.NewGuid();
+        Parent parent = new(parentUserId);
+        ChildSetupDraft draft = new(parent.Id);
+
+        await using CustomWebApplicationFactory factory = new();
+
+        await factory.SeedAsync(db =>
+        {
+            db.Users.Add(
+                new ApplicationUser
+                {
+                    Id = parentUserId,
+                    Email = "parent@example.com",
+                    UserName = "parent@example.com",
+                    FirstName = "Mariam",
+                    LastName = "Parent",
+                }
+            );
+            db.Parents.Add(parent);
+            db.ChildSetupDrafts.Add(draft);
+            return Task.CompletedTask;
+        });
+
+        using HttpClient client = CreateClient(factory, parentUserId, "Parent");
+        using StringContent content = new(
+            """{"firstName":"Youssef","lastName":"Mahmoud","dateOfBirth":null,"grade":"Other","customGrade":null,"subjects":[],"studyPriorities":[],"studyTimeGoal":null}""",
+            Encoding.UTF8,
+            "application/json");
+
+        HttpResponseMessage response = await client.PutAsync(
+            $"/api/parents/child-setups/{draft.Id}",
+            content);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task UpdateChildSetup_WithPredefinedGradeAndCustomGrade_ReturnsBadRequest()
+    {
+        Guid parentUserId = Guid.NewGuid();
+        Parent parent = new(parentUserId);
+        ChildSetupDraft draft = new(parent.Id);
+
+        await using CustomWebApplicationFactory factory = new();
+
+        await factory.SeedAsync(db =>
+        {
+            db.Users.Add(
+                new ApplicationUser
+                {
+                    Id = parentUserId,
+                    Email = "parent@example.com",
+                    UserName = "parent@example.com",
+                    FirstName = "Mariam",
+                    LastName = "Parent",
+                }
+            );
+            db.Parents.Add(parent);
+            db.ChildSetupDrafts.Add(draft);
+            return Task.CompletedTask;
+        });
+
+        using HttpClient client = CreateClient(factory, parentUserId, "Parent");
+        using StringContent content = new(
+            """{"firstName":"Youssef","lastName":"Mahmoud","dateOfBirth":null,"grade":"Grade12","customGrade":"Year 13","subjects":[],"studyPriorities":[],"studyTimeGoal":null}""",
+            Encoding.UTF8,
+            "application/json");
+
+        HttpResponseMessage response = await client.PutAsync(
+            $"/api/parents/child-setups/{draft.Id}",
+            content);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task UpdateChildSetup_SwitchingToPredefinedGrade_ClearsCustomGrade()
+    {
+        Guid parentUserId = Guid.NewGuid();
+        Parent parent = new(parentUserId);
+        ChildSetupDraft draft = new(parent.Id);
+        draft.SetName("Youssef", "Mahmoud");
+        draft.SetGrade(StudentGrade.Other);
+        draft.SetCustomGrade("Year 13");
+
+        await using CustomWebApplicationFactory factory = new();
+
+        await factory.SeedAsync(db =>
+        {
+            db.Users.Add(
+                new ApplicationUser
+                {
+                    Id = parentUserId,
+                    Email = "parent@example.com",
+                    UserName = "parent@example.com",
+                    FirstName = "Mariam",
+                    LastName = "Parent",
+                }
+            );
+            db.Parents.Add(parent);
+            db.ChildSetupDrafts.Add(draft);
+            return Task.CompletedTask;
+        });
+
+        using HttpClient client = CreateClient(factory, parentUserId, "Parent");
+        using StringContent content = new(
+            """{"firstName":"Youssef","lastName":"Mahmoud","dateOfBirth":null,"grade":"Grade12","customGrade":null,"subjects":[],"studyPriorities":[],"studyTimeGoal":null}""",
+            Encoding.UTF8,
+            "application/json");
+
+        HttpResponseMessage response = await client.PutAsync(
+            $"/api/parents/child-setups/{draft.Id}",
+            content);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        using JsonDocument document = JsonDocument.Parse(
+            await response.Content.ReadAsStringAsync());
+
+        Assert.Equal("Grade12", document.RootElement.GetProperty("grade").GetString());
+        Assert.Equal(JsonValueKind.Null, document.RootElement.GetProperty("customGrade").ValueKind);
+
+        using IServiceScope scope = factory.Services.CreateScope();
+        ApplicationDbContext db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        ChildSetupDraft persistedDraft = await db.ChildSetupDrafts.SingleAsync(item => item.Id == draft.Id);
+
+        Assert.Equal(StudentGrade.Grade12, persistedDraft.Grade);
+        Assert.Null(persistedDraft.CustomGrade);
+    }
+
+    [Fact]
+    public async Task UpdateChildSetup_WithCustomGradeLongerThan100Characters_ReturnsBadRequest()
+    {
+        Guid parentUserId = Guid.NewGuid();
+        Parent parent = new(parentUserId);
+        ChildSetupDraft draft = new(parent.Id);
+
+        await using CustomWebApplicationFactory factory = new();
+
+        await factory.SeedAsync(db =>
+        {
+            db.Users.Add(
+                new ApplicationUser
+                {
+                    Id = parentUserId,
+                    Email = "parent@example.com",
+                    UserName = "parent@example.com",
+                    FirstName = "Mariam",
+                    LastName = "Parent",
+                }
+            );
+            db.Parents.Add(parent);
+            db.ChildSetupDrafts.Add(draft);
+            return Task.CompletedTask;
+        });
+
+        using HttpClient client = CreateClient(factory, parentUserId, "Parent");
+        string customGrade = new('X', 101);
+        string json = $"{{\"firstName\":\"Youssef\",\"lastName\":\"Mahmoud\",\"dateOfBirth\":null,\"grade\":\"Other\",\"customGrade\":\"{customGrade}\",\"subjects\":[],\"studyPriorities\":[],\"studyTimeGoal\":null}}";
+        using StringContent content = new(json, Encoding.UTF8, "application/json");
+
+        HttpResponseMessage response = await client.PutAsync(
+            $"/api/parents/child-setups/{draft.Id}",
+            content);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
 
     [Fact]

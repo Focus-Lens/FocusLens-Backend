@@ -9,8 +9,7 @@ using FocusLens.Domain.Common.Results;
 using FocusLens.Domain.Students;
 using MediatR;
 using ContractStudentSubjectType = FocusLens.Contracts.Students.StudentSubjectType;
-using ContractStudyPriority = FocusLens.Contracts.Students.StudyPriority;
-using DomainStudyPriority = FocusLens.Domain.Students.StudyPriority;
+using ContractStudentGrade = FocusLens.Contracts.Students.StudentGrade;
 using ICurrentUser = FocusLens.Application.Common.Interfaces.ICurrentUser;
 using StudyTimeGoalPeriod = FocusLens.Domain.Students.StudyTimeGoalPeriod;
 
@@ -114,33 +113,35 @@ public sealed class UpdateChildSetupDraftCommandHandler(
                 "Grade is invalid.");
         }
 
+        if (request.Request.Grade == ContractStudentGrade.Other)
+        {
+            if (string.IsNullOrWhiteSpace(request.Request.CustomGrade))
+            {
+                return Error.Validation(
+                    "ChildSetup.CustomGradeRequired",
+                    "A custom grade is required.");
+            }
+
+            if (request.Request.CustomGrade.Trim().Length > 100)
+            {
+                return Error.Validation(
+                    "ChildSetup.CustomGradeTooLong",
+                    "A custom grade cannot exceed 100 characters.");
+            }
+        }
+        else if (request.Request.CustomGrade is not null)
+        {
+            return Error.Validation(
+                "ChildSetup.InvalidCustomGrade",
+                "CustomGrade is only allowed when grade is Other.");
+        }
+
         IReadOnlyCollection<StudentSubjectRequest> subjects =
             request.Request.Subjects ?? [];
 
         if (!AreValidSubjects(subjects, out Error? subjectsError))
         {
             return subjectsError!.Value;
-        }
-
-        IReadOnlyCollection<ContractStudyPriority> priorities =
-            request.Request.StudyPriorities ?? [];
-
-        if (!AreValidPriorities(priorities, out Error? prioritiesError))
-        {
-            return prioritiesError!.Value;
-        }
-
-        DateOnly today =
-            DateOnly.FromDateTime(timeProvider.GetUtcNow().UtcDateTime);
-
-        if (!TryCreateStudyTimeGoal(
-                request.Request.StudyTimeGoal,
-                parent.WeekStartsOn,
-                today,
-                out StudyTimeGoal? studyTimeGoal,
-                out Error? studyTimeGoalError))
-        {
-            return studyTimeGoalError!.Value;
         }
 
         draft.SetName(
@@ -152,10 +153,36 @@ public sealed class UpdateChildSetupDraftCommandHandler(
         draft.SetGrade(request.Request.Grade is null
             ? null
             : StudentEnumMapper.ToDomain(request.Request.Grade.Value));
+        draft.SetCustomGrade(
+            request.Request.Grade == ContractStudentGrade.Other
+                ? request.Request.CustomGrade
+                : null);
         draft.ReplaceSubjects(subjects.Select(MapSubject));
 
-        draft.ReplaceStudyPriorities(
-            priorities.Select(MapPriority));
+        draft.SetGoal(
+            request.Request.Goal is null
+                ? null
+                : StudentEnumMapper.ToDomain(request.Request.Goal.Value));
+
+        StudyTimeGoal? studyTimeGoal = null;
+
+        if (request.Request.StudyTimeGoal is not null)
+        {
+            Result<StudyTimeGoal> studyTimeGoalResult =
+                StudyTimeGoal.Create(
+                    Enum.Parse<StudyTimeGoalPeriod>(
+                        request.Request.StudyTimeGoal.Period.ToString()),
+                    request.Request.StudyTimeGoal.TargetMinutes,
+                    request.Request.StudyTimeGoal.Days ?? [],
+                    request.Request.StudyTimeGoal.StartDate);
+
+            if (studyTimeGoalResult.IsError)
+            {
+                return studyTimeGoalResult.TopError;
+            }
+
+            studyTimeGoal = studyTimeGoalResult.Value;
+        }
 
         draft.SetStudyTimeGoal(studyTimeGoal);
 
@@ -222,31 +249,6 @@ public sealed class UpdateChildSetupDraftCommandHandler(
             error = Error.Validation(
                 "ChildSetup.DuplicateSubjects",
                 "Subjects must be unique.");
-            return false;
-        }
-
-        return true;
-    }
-
-    private static bool AreValidPriorities(
-        IReadOnlyCollection<ContractStudyPriority> priorities,
-        out Error? error)
-    {
-        error = null;
-
-        if (priorities.Any(priority => !Enum.IsDefined(priority)))
-        {
-            error = Error.Validation(
-                "ChildSetup.InvalidPriority",
-                "A study priority is invalid.");
-            return false;
-        }
-
-        if (priorities.Distinct().Count() != priorities.Count)
-        {
-            error = Error.Validation(
-                "ChildSetup.DuplicatePriorities",
-                "Study priorities must be unique.");
             return false;
         }
 
@@ -328,10 +330,6 @@ public sealed class UpdateChildSetupDraftCommandHandler(
         return true;
     }
 
-    private static DomainStudyPriority MapPriority(
-        ContractStudyPriority priority) =>
-        Enum.Parse<DomainStudyPriority>(priority.ToString());
-
     private static ChildSetupSubject MapSubject(
         StudentSubjectRequest subject)
     {
@@ -354,15 +352,16 @@ public sealed class UpdateChildSetupDraftCommandHandler(
             draft.Grade is null
                 ? null
                 : StudentEnumMapper.ToContract(draft.Grade.Value),
+            draft.CustomGrade,
             draft.Subjects
                 .Select(subject => new ChildSetupSubjectResponse(
                     subject.Id,
                     subject.Type.ToString(),
                     subject.CustomName))
                 .ToList(),
-            draft.StudyPriorities
-                .Select(priority => Enum.Parse<ContractStudyPriority>(priority.ToString()))
-                .ToList(),
+            draft.Goal is null
+                  ? null
+                  : StudentEnumMapper.ToContract(draft.Goal.Value),
             draft.StudyTimeGoal is null
                 ? null
                 : new StudyTimeGoalResponse(

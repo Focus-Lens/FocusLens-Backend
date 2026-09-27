@@ -68,6 +68,83 @@ public class ChildSetupDraftTests
     }
 
     [Fact]
+    public void SetCustomGrade_TrimsAndStoresValue()
+    {
+        ChildSetupDraft draft = new(Guid.NewGuid());
+
+        draft.SetGrade(StudentGrade.Other);
+        draft.SetCustomGrade("  Year 13  ");
+
+        Assert.Equal("Year 13", draft.CustomGrade);
+    }
+
+    [Fact]
+    public void SetGrade_WhenChangedFromOtherToPredefined_ClearsCustomGrade()
+    {
+        ChildSetupDraft draft = new(Guid.NewGuid());
+
+        draft.SetGrade(StudentGrade.Other);
+        draft.SetCustomGrade("Year 13");
+        draft.SetGrade(StudentGrade.Grade12);
+
+        Assert.Null(draft.CustomGrade);
+    }
+
+    [Fact]
+    public void IsProfileComplete_WhenGradeIsOtherWithoutCustomGrade_ReturnsFalse()
+    {
+        ChildSetupDraft draft = new(Guid.NewGuid());
+        draft.SetName("Karim", "Mahmoud");
+        draft.SetGrade(StudentGrade.Other);
+        draft.ReplaceSubjects([ChildSetupSubject.Predefined(StudentSubjectType.Math)]);
+        draft.SetGoal(StudentGoal.FocusBetter);
+        draft.SetStudyTimeGoal(
+            StudyTimeGoal.Create(
+                StudyTimeGoalPeriod.Daily,
+                60,
+                [DayOfWeek.Monday],
+                new DateOnly(2026, 9, 14)).Value);
+
+        Assert.False(draft.IsProfileComplete());
+    }
+
+    [Fact]
+    public void IsProfileComplete_WithoutGoal_ReturnsTrue()
+    {
+        ChildSetupDraft draft = new(Guid.NewGuid());
+        draft.SetName("Karim", "Mahmoud");
+        draft.SetGrade(StudentGrade.Grade12);
+        draft.ReplaceSubjects([ChildSetupSubject.Predefined(StudentSubjectType.Math)]);
+        draft.SetStudyTimeGoal(
+            StudyTimeGoal.Create(
+                StudyTimeGoalPeriod.Daily,
+                60,
+                [DayOfWeek.Monday],
+                new DateOnly(2026, 9, 14)).Value);
+
+        Assert.True(draft.IsProfileComplete());
+    }
+
+    [Fact]
+    public void IsProfileComplete_WhenGradeIsOtherWithCustomGrade_ReturnsTrue()
+    {
+        ChildSetupDraft draft = new(Guid.NewGuid());
+        draft.SetName("Karim", "Mahmoud");
+        draft.SetGrade(StudentGrade.Other);
+        draft.SetCustomGrade("Year 13");
+        draft.ReplaceSubjects([ChildSetupSubject.Predefined(StudentSubjectType.Math)]);
+        draft.SetGoal(StudentGoal.FocusBetter);
+        draft.SetStudyTimeGoal(
+            StudyTimeGoal.Create(
+                StudyTimeGoalPeriod.Daily,
+                60,
+                [DayOfWeek.Monday],
+                new DateOnly(2026, 9, 14)).Value);
+
+        Assert.True(draft.IsProfileComplete());
+    }
+
+    [Fact]
     public void SetStudyTimeGoal_StoresGoal()
     {
         ChildSetupDraft draft = new(Guid.NewGuid());

@@ -10,7 +10,6 @@ using FocusLens.Domain.Students;
 using MediatR;
 using ContractStudentGrade = FocusLens.Contracts.Students.StudentGrade;
 using ContractStudentSubjectType = FocusLens.Contracts.Students.StudentSubjectType;
-using DomainStudyPriority = FocusLens.Domain.Students.StudyPriority;
 using DomainStudyTimeGoalPeriod = FocusLens.Domain.Students.StudyTimeGoalPeriod;
 using DomainStudentGrade = FocusLens.Domain.Students.StudentGrade;
 using ICurrentUser = FocusLens.Application.Common.Interfaces.ICurrentUser;
@@ -53,7 +52,7 @@ public sealed class UpdateStudentPreferencesCommandHandler(
             return Error.NotFound("Students.NotFound", "The student profile was not found.");
         }
 
-        if (!TryUpdateGoals(student, request.Request, out Error? goalError))
+        if (!TryUpdateGoal(student, request.Request, out Error? goalError))
         {
             return goalError!.Value;
         }
@@ -61,11 +60,6 @@ public sealed class UpdateStudentPreferencesCommandHandler(
         if (!TryUpdateDateOfBirth(student, request.Request, out Error? dateOfBirthError))
         {
             return dateOfBirthError!.Value;
-        }
-
-        if (!TryUpdateStudyPriorities(student, request.Request, out Error? studyPrioritiesError))
-        {
-            return studyPrioritiesError!.Value;
         }
 
         if (!TryUpdateStudyTimeGoal(student, request.Request, out Error? studyTimeGoalError))
@@ -135,8 +129,8 @@ public sealed class UpdateStudentPreferencesCommandHandler(
     private static bool HasChanges(UpdateStudentPreferencesRequest request)
     {
         return request.DateOfBirthProvided
-               || request.GoalsProvided
-               || request.StudyPrioritiesProvided
+               || request.GoalProvided
+               
                || request.StudyTimeGoalProvided
                || request.GradeProvided
                || request.CustomGradeProvided
@@ -146,34 +140,34 @@ public sealed class UpdateStudentPreferencesCommandHandler(
                || request.SubjectsProvided;
     }
 
-    private static bool TryUpdateGoals(
+    private static bool TryUpdateGoal(
         Student student,
         UpdateStudentPreferencesRequest request,
         out Error? error)
     {
         error = null;
 
-        if (!request.GoalsProvided)
+        if (!request.GoalProvided)
         {
             return true;
         }
 
-        if (request.Goals is null)
+        if (request.Goal is null)
         {
-            student.ReplaceGoals([]);
+            student.SetGoal(null);
             return true;
         }
 
-        if (request.Goals.Any(goal => !Enum.IsDefined(goal)))
+        if (!Enum.IsDefined(request.Goal.Value))
         {
             error = Error.Validation(
                 "Students.InvalidGoal",
                 "A goal is invalid.");
+
             return false;
         }
 
-        student.ReplaceGoals(
-            request.Goals.Select(StudentEnumMapper.ToDomain));
+        student.SetGoal(StudentEnumMapper.ToDomain(request.Goal.Value));
 
         return true;
     }
@@ -191,47 +185,6 @@ public sealed class UpdateStudentPreferencesCommandHandler(
         }
 
         student.SetDateOfBirth(request.DateOfBirth);
-        return true;
-    }
-
-    private static bool TryUpdateStudyPriorities(
-        Student student,
-        UpdateStudentPreferencesRequest request,
-        out Error? error)
-    {
-        error = null;
-
-        if (!request.StudyPrioritiesProvided)
-        {
-            return true;
-        }
-
-        if (request.StudyPriorities is null)
-        {
-            student.ReplaceStudyPriorities([]);
-            return true;
-        }
-
-        if (request.StudyPriorities.Any(priority => !Enum.IsDefined(priority)))
-        {
-            error = Error.Validation(
-                "Students.InvalidStudyPriority",
-                "A study priority is invalid.");
-            return false;
-        }
-
-        if (request.StudyPriorities.Distinct().Count()
-            != request.StudyPriorities.Count)
-        {
-            error = Error.Validation(
-                "Students.DuplicateStudyPriorities",
-                "Study priorities must be unique.");
-            return false;
-        }
-
-        student.ReplaceStudyPriorities(
-            request.StudyPriorities.Select(priority => Enum.Parse<DomainStudyPriority>(priority.ToString())));
-
         return true;
     }
 

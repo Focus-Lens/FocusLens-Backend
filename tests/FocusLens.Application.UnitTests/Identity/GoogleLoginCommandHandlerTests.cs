@@ -67,7 +67,7 @@ public class GoogleLoginCommandHandlerTests
             "student@example.com");
         Student student = new(user.Id);
         student.CompleteOnboarding(
-            [StudentGoal.FocusBetter],
+            StudentGoal.FocusBetter,
             StudentGrade.Grade10,
             [StudentSubject.Predefined(StudentSubjectType.Math)]);
         fixture.Students.Add(student);

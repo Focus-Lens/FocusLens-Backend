@@ -70,6 +70,7 @@ public sealed class GetChildSetupDraftQueryHandler(
             draft.LastName,
             draft.DateOfBirth,
             draft.Grade is null ? null : StudentEnumMapper.ToContract(draft.Grade.Value),
+            draft.CustomGrade,
             draft
                 .Subjects.Select(subject => new ChildSetupSubjectResponse(
                     subject.Id,
@@ -78,8 +79,9 @@ public sealed class GetChildSetupDraftQueryHandler(
                 ))
                 .ToList(),
             draft
-                .StudyPriorities.Select(priority => Enum.Parse<StudyPriority>(priority.ToString()))
-                .ToList(),
+                .Goal is null
+                  ? null
+                  : StudentEnumMapper.ToContract(draft.Goal.Value),
             draft.StudyTimeGoal is null
                 ? null
                 : new StudyTimeGoalResponse(

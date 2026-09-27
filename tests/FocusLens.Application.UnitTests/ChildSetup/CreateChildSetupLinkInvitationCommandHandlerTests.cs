@@ -5,7 +5,7 @@ using FocusLens.Domain;
 using FocusLens.Domain.ChildSetup;
 using FocusLens.Domain.Common.Results;
 using FocusLens.Domain.Students;
-using DomainStudyPriority = FocusLens.Domain.Students.StudyPriority;
+
 using DomainStudyTimeGoalPeriod = FocusLens.Domain.Students.StudyTimeGoalPeriod;
 
 namespace FocusLens.Application.UnitTests.ChildSetup;
@@ -40,6 +40,36 @@ public sealed class CreateChildSetupLinkInvitationCommandHandlerTests
         Assert.True(result.IsSuccess);
         Assert.Equal(ChildSetupStatus.Invited, draft.Status);
         Assert.Null((await invitations.GetAllAsync()).Single().TargetEmailNormalized);
+    }
+
+    [Fact]
+    public async Task CreateLink_WithCompleteDraftWithoutGoal_CreatesLinkWithoutEmail()
+    {
+        Guid parentUserId = Guid.NewGuid();
+        Parent parent = CreateParent(parentUserId);
+        ChildSetupDraft draft = CreateCompleteDraft(parent.Id);
+        draft.SetGoal(StudentGoal.BuildARoutine);
+        InMemoryRepository<ChildSetupInvitation> invitations = new();
+
+        CreateChildSetupLinkInvitationCommandHandler handler = new(
+            new InMemoryRepository<Parent>(parent),
+            new InMemoryRepository<ChildSetupDraft>(draft),
+            invitations,
+            new FakeCurrentUser(parentUserId),
+            new FakeUnitOfWork(),
+            new FakeInvitationUrlBuilder(),
+            new FakeChildSetupInvitationTokenProtector(),
+            TimeProvider.System
+        );
+
+        Result<ChildSetupInvitationResponse> result = await handler.Handle(
+            new CreateChildSetupLinkInvitationCommand(draft.Id),
+            CancellationToken.None
+        );
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(ChildSetupStatus.Invited, draft.Status);
+        Assert.Single(await invitations.GetAllAsync());
     }
 
     [Fact]
@@ -89,7 +119,7 @@ public sealed class CreateChildSetupLinkInvitationCommandHandlerTests
         draft.SetName("Karim", "Mahmoud");
         draft.SetGrade(StudentGrade.Grade10);
         draft.ReplaceSubjects([ChildSetupSubject.Predefined(StudentSubjectType.Math)]);
-        draft.ReplaceStudyPriorities([DomainStudyPriority.BuildStudyRoutine]);
+        draft.SetGoal(StudentGoal.BuildARoutine);
         draft.SetStudyTimeGoal(
             StudyTimeGoal
                 .Create(
