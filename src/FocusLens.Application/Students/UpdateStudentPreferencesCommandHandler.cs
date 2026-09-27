@@ -62,7 +62,16 @@ public sealed class UpdateStudentPreferencesCommandHandler(
             return dateOfBirthError!.Value;
         }
 
-        if (!TryUpdateStudyTimeGoal(student, request.Request, out Error? studyTimeGoalError))
+        IEnumerable<ParentStudentRelationship> activeRelationships =
+            await relationshipRepository.GetAllAsync(
+                relationship => relationship.StudentId == student.Id &&
+                                relationship.Status == RelationshipStatus.Active);
+
+        if (!TryUpdateStudyTimeGoal(
+                student,
+                request.Request,
+                activeRelationships.Any(),
+                out Error? studyTimeGoalError))
         {
             return studyTimeGoalError!.Value;
         }
@@ -191,6 +200,7 @@ public sealed class UpdateStudentPreferencesCommandHandler(
     private static bool TryUpdateStudyTimeGoal(
         Student student,
         UpdateStudentPreferencesRequest request,
+        bool hasActiveParentRelationship,
         out Error? error)
     {
         error = null;
@@ -198,6 +208,15 @@ public sealed class UpdateStudentPreferencesCommandHandler(
         if (!request.StudyTimeGoalProvided)
         {
             return true;
+        }
+
+        if (hasActiveParentRelationship)
+        {
+            error = Error.Forbidden(
+                "Students.StudyTimeGoalControlledByParent",
+                "Study time goal is controlled by the parent.");
+
+            return false;
         }
 
         if (request.StudyTimeGoal is null)

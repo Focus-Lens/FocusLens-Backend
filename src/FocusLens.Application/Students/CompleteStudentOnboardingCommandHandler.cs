@@ -14,8 +14,6 @@ using ContractStudentSubjectType = FocusLens.Contracts.Students.StudentSubjectTy
 using ContractStudentGrade = FocusLens.Contracts.Students.StudentGrade;
 using ICurrentUser = FocusLens.Application.Common.Interfaces.ICurrentUser;
 using DomainStudentGoal = FocusLens.Domain.Students.StudentGoal;
-using DomainStudyTimeGoal = FocusLens.Domain.Students.StudyTimeGoal;
-using DomainStudyTimeGoalPeriod = FocusLens.Domain.Students.StudyTimeGoalPeriod;
 
 namespace FocusLens.Application.Students;
 
@@ -69,28 +67,6 @@ public sealed class CompleteStudentOnboardingCommandHandler(
 
         student.SetPreferredName(request.Request.PreferredName);
         student.SetDateOfBirth(request.Request.DateOfBirth);
-
-        DomainStudyTimeGoal? studyTimeGoal = null;
-
-        if (request.Request.StudyTimeGoal is not null)
-        {
-            Result<DomainStudyTimeGoal> studyTimeGoalResult =
-                DomainStudyTimeGoal.Create(
-                    Enum.Parse<DomainStudyTimeGoalPeriod>(
-                        request.Request.StudyTimeGoal.Period.ToString()),
-                    request.Request.StudyTimeGoal.TargetMinutes,
-                    request.Request.StudyTimeGoal.Days ?? [],
-                    request.Request.StudyTimeGoal.StartDate);
-
-            if (studyTimeGoalResult.IsError)
-            {
-                return studyTimeGoalResult.TopError;
-            }
-
-            studyTimeGoal = studyTimeGoalResult.Value;
-        }
-
-        student.SetStudyTimeGoal(studyTimeGoal);
 
         await unitOfWork.SaveChangesAsync();
 

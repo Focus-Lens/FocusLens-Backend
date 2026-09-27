@@ -24,7 +24,7 @@ public class CompleteStudentOnboardingCommandHandlerTests
 
         AuthResponse result = (await CreateHandler(student).Handle(
             new CompleteStudentOnboardingCommand(
-                new CompleteStudentOnboardingRequest("  كريم  ", null, null, null, null, null, null)),
+                new CompleteStudentOnboardingRequest("  كريم  ", null, null, null, null, null)),
             CancellationToken.None)).Value;
 
         Assert.False(student.IsOnboardingCompleted);
@@ -46,11 +46,7 @@ public class CompleteStudentOnboardingCommandHandlerTests
                     ContractStudentGoal.FocusBetter,
                     ContractStudentGrade.Grade10,
                     [new StudentSubjectRequest(ContractStudentSubjectType.Math, null)],
-                    new StudyTimeGoalRequest(
-                        StudyTimeGoalPeriod.Daily,
-                        60,
-                        [DayOfWeek.Monday],
-                        new DateOnly(2026, 9, 14)))),
+                    null)),
             CancellationToken.None)).Value;
 
         Assert.True(student.IsOnboardingCompleted);
@@ -59,8 +55,7 @@ public class CompleteStudentOnboardingCommandHandlerTests
         Assert.Equal(
             Domain.Students.StudentGoal.FocusBetter,
             student.Goal);
-        Assert.Equal(Domain.Students.StudyTimeGoalPeriod.Daily, student.StudyTimeGoal!.Period);
-        Assert.Equal(60, student.StudyTimeGoal.TargetMinutes);
+        Assert.Null(student.StudyTimeGoal);
         Assert.False(result.RequiresOnboarding);
         Assert.Equal("completed", result.OnboardingStatus);
         Assert.NotNull(result.Tokens);

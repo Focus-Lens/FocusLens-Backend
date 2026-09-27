@@ -6,6 +6,5 @@ public sealed record CompleteStudentOnboardingRequest(
     StudentGoal? Goal,
     StudentGrade? Grade,
     IReadOnlyCollection<StudentSubjectRequest>? Subjects,
-        StudyTimeGoalRequest? StudyTimeGoal,
     string? CustomGrade = null
 );

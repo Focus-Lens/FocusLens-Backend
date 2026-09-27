@@ -186,6 +186,51 @@ public class UpdateStudentPreferencesCommandHandlerTests
     }
 
     [Fact]
+    public async Task Handle_WhenStudyTimeGoalChangesAndStudentHasActiveParent_ReturnsForbidden()
+    {
+        Student student = CreateStudentWithPreferences();
+        ParentStudentRelationship relationship = new(Guid.NewGuid(), student.Id);
+        relationship.Accept();
+
+        UpdateStudentPreferencesRequest request = new()
+        {
+            StudyTimeGoal = new(
+                FocusLens.Contracts.Students.StudyTimeGoalPeriod.Daily,
+                60,
+                null)
+        };
+
+        Result<StudentDetailsResponse> result = await CreateHandler(student, relationships: [relationship]).Handle(
+            new UpdateStudentPreferencesCommand(request),
+            CancellationToken.None);
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal("Students.StudyTimeGoalControlledByParent", result.TopError.Code);
+        Assert.Null(student.StudyTimeGoal);
+    }
+
+    [Fact]
+    public async Task Handle_WhenStudyTimeGoalChangesAndStudentHasNoParent_UpdatesGoal()
+    {
+        Student student = CreateStudentWithPreferences();
+
+        Result<StudentDetailsResponse> result = await CreateHandler(student).Handle(
+            new UpdateStudentPreferencesCommand(new UpdateStudentPreferencesRequest
+            {
+                StudyTimeGoal = new(
+                    FocusLens.Contracts.Students.StudyTimeGoalPeriod.Daily,
+                    60,
+                    [DayOfWeek.Monday],
+                    new DateOnly(2026, 9, 14))
+            }),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.NotNull(student.StudyTimeGoal);
+        Assert.Equal(60, student.StudyTimeGoal.TargetMinutes);
+    }
+
+    [Fact]
     public async Task Handle_WhenPreferredNameIsProvided_TrimsAndStoresIt()
     {
         Student student = CreateStudentWithPreferences();
@@ -230,11 +275,14 @@ public class UpdateStudentPreferencesCommandHandlerTests
 
     private static UpdateStudentPreferencesCommandHandler CreateHandler(
         Student student,
-        FakeUnitOfWork? unitOfWork = null)
+        FakeUnitOfWork? unitOfWork = null,
+        IEnumerable<ParentStudentRelationship>? relationships = null)
     {
         return new UpdateStudentPreferencesCommandHandler(
             new InMemoryRepository<Student>(student),
-            new InMemoryRepository<ParentStudentRelationship>(),
+            relationships is null || !relationships.Any()
+                ? new InMemoryRepository<ParentStudentRelationship>()
+                : new InMemoryRepository<ParentStudentRelationship>(relationships.First()),
             new FakeNotificationWriter(),
             new FakeCurrentUser(student.UserId),
             unitOfWork ?? new FakeUnitOfWork());

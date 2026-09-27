@@ -37,14 +37,6 @@ public sealed class CompleteStudentOnboardingCommandValidator
             .WithMessage("CustomGrade is only allowed for Other.")
             .When(command => command.Request.Grade.HasValue && command.Request.Grade != StudentGrade.Other);
 
-        RuleFor(command => command.Request.StudyTimeGoal!.Period)
-            .IsInEnum()
-            .When(command => command.Request.StudyTimeGoal is not null);
-
-        RuleFor(command => command.Request.StudyTimeGoal!.TargetMinutes)
-            .GreaterThan(0)
-            .When(command => command.Request.StudyTimeGoal is not null);
-
         RuleFor(command => command.Request.Subjects)
             .Must(HaveUniqueSubjects)
             .WithMessage("Subjects must be unique.")
