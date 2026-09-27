@@ -19,8 +19,7 @@ public sealed class UpdateChildSetupDraftCommandHandler(
     IBaseRepository<Parent> parentRepository,
     IBaseRepository<ChildSetupDraft> childSetupDraftRepository,
     ICurrentUser currentUser,
-    IUnitOfWork unitOfWork,
-    TimeProvider timeProvider)
+    IUnitOfWork unitOfWork)
     : IRequestHandler<UpdateChildSetupDraftCommand, Result<ChildSetupDraftResponse>>
 {
     public async Task<Result<ChildSetupDraftResponse>> Handle(
