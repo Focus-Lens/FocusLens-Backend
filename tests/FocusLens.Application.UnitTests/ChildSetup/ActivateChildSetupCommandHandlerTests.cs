@@ -10,6 +10,8 @@ using FocusLens.Domain.Common.Results;
 using FocusLens.Domain.Identity;
 using FocusLens.Domain.Interfaces;
 using DomainStudentGrade = FocusLens.Domain.Students.StudentGrade;
+using StudyTimeGoal = FocusLens.Domain.Students.StudyTimeGoal;
+using DomainStudyTimeGoalPeriod = FocusLens.Domain.Students.StudyTimeGoalPeriod;
 
 namespace FocusLens.Application.UnitTests.ChildSetup;
 
@@ -355,4 +357,58 @@ public sealed class ActivateChildSetupCommandHandlerTests
             string displayName
         ) => Task.FromResult(IdentityResultSummary.Success);
     }
+    
+    [Fact]
+    public async Task Activate_WithClaimedDraftWithStudyTimeGoal_TransfersGoalToStudent()
+    {
+        Guid studentUserId = Guid.NewGuid();
+        Guid parentUserId = Guid.NewGuid();
+
+        Student student = new(studentUserId);
+        Parent parent = new(parentUserId);
+
+        ChildSetupDraft draft = new(parent.Id);
+        draft.SetName("Youssef", "Mahmoud");
+        draft.MarkInvited();
+        draft.MarkClaimed(student.Id);
+        draft.SetStudyTimeGoal(
+            StudyTimeGoal
+                .Create(
+                    DomainStudyTimeGoalPeriod.Daily,
+                    60,
+                    [DayOfWeek.Monday],
+                    new DateOnly(2026, 9, 21))
+                .Value);
+
+        ApplicationUser user = new()
+        {
+            Id = studentUserId,
+            Email = "youssef@example.com",
+            UserName = "youssef@example.com",
+            FirstName = "Old",
+            LastName = "Name",
+        };
+
+        student.SetPrivateProperty("User", user);
+
+        ActivateChildSetupCommandHandler handler = new(
+            new InMemoryRepository<Student>(student),
+            new InMemoryRepository<ChildSetupDraft>(draft),
+            new InMemoryRepository<ParentStudentRelationship>(),
+            new FakeCurrentUser(studentUserId),
+            new TestIdentityService(user),
+            new FakeUnitOfWork());
+
+        Result<StudentDetailsResponse> result = await handler.Handle(
+            new ActivateChildSetupCommand(),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.NotNull(student.StudyTimeGoal);
+        Assert.Equal(60, student.StudyTimeGoal.TargetMinutes);
+        Assert.Equal(
+            Domain.Students.StudyTimeGoalPeriod.Daily,
+            student.StudyTimeGoal.Period);
+    }
+
 }
