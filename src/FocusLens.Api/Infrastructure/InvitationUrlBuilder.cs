@@ -7,6 +7,9 @@ namespace FocusLens.API.Infrastructure;
 public sealed class InvitationUrlBuilder(IOptions<InvitationSettings> settings)
     : IInvitationUrlBuilder
 {
+    public string CreateParentStudentInvitationUrl(string token) =>
+        $"{settings.Value.BaseUrl.TrimEnd('/')}/{Uri.EscapeDataString(token)}";
+
     public string CreateStudentParentInvitationUrl(string token) =>
         $"{settings.Value.StudentParentInvitationBaseUrl.TrimEnd('/')}/{Uri.EscapeDataString(token)}";
 

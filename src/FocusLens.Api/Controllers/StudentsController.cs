@@ -1,5 +1,4 @@
 using FocusLens.Application.ChildSetup;
-using FocusLens.Application.Features.Identity.Dtos;
 using FocusLens.Application.Students;
 using FocusLens.Contracts.ChildSetup;
 using FocusLens.Contracts.Students;
@@ -43,7 +42,7 @@ public sealed class StudentsController(ISender sender) : ApiController
         CancellationToken cancellationToken
     )
     {
-        Result<AuthResponse> result = await sender.Send(
+        Result<CompleteStudentOnboardingResponse> result = await sender.Send(
             new CompleteStudentOnboardingCommand(request),
             cancellationToken
         );

@@ -127,6 +127,7 @@ public class UpdateStudentPreferencesCommandHandlerTests
         Assert.True(result.IsSuccess);
         Assert.Null(student.DateOfBirth);
         Assert.Null(result.Value.DateOfBirth);
+        Assert.False(result.Value.OnboardingCompleted);
     }
 
     [Fact]
@@ -257,6 +258,7 @@ public class UpdateStudentPreferencesCommandHandlerTests
         Assert.True(result.IsSuccess);
         Assert.Null(student.PreferredName);
         Assert.Null(result.Value.PreferredName);
+        Assert.False(result.Value.OnboardingCompleted);
     }
 
     [Fact]
@@ -270,7 +272,7 @@ public class UpdateStudentPreferencesCommandHandlerTests
 
         Assert.False(result.IsSuccess);
         Assert.Equal("Students.PreferredNameRequired", result.TopError.Code);
-        Assert.Null(student.PreferredName);
+        Assert.Equal("Test Student", student.PreferredName);
     }
 
     private static UpdateStudentPreferencesCommandHandler CreateHandler(
@@ -301,6 +303,8 @@ public class UpdateStudentPreferencesCommandHandlerTests
             StudentGoal.FocusBetter,
             StudentGrade.Grade10,
             [StudentSubject.Predefined(StudentSubjectType.Math)]);
+        student.SetPreferredName("Test Student");
+        student.SetDateOfBirth(new DateOnly(2010, 5, 12));
         return student;
     }
 }

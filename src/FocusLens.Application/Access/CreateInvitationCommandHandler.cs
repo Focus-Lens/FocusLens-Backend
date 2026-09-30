@@ -1,3 +1,5 @@
+using System.Security.Cryptography;
+using System.Text;
 using FocusLens.Application.Common.Interfaces;
 using FocusLens.Contracts.Access;
 using FocusLens.Domain;
@@ -16,6 +18,7 @@ public sealed class CreateInvitationCommandHandler(
     ICurrentUser currentUser,
     IUnitOfWork unitOfWork,
     IEmailSender emailSender,
+    IInvitationUrlBuilder invitationUrlBuilder,
     TimeProvider? timeProvider = null)
     : IRequestHandler<CreateInvitationCommand, Result<InvitationResponse>>
 {
@@ -87,46 +90,48 @@ public sealed class CreateInvitationCommandHandler(
 
         if (existingRelationship is not null)
         {
+            string token = CreateToken();
+            string tokenHash = HashToken(token);
+
             if (existingRelationship.Status == RelationshipStatus.Revoked)
             {
                 existingRelationship.Reinvite(expiresAtUtc);
-                relationshipRepository.Update(existingRelationship);
-                await unitOfWork.SaveChangesAsync();
-
-                await emailSender.SendParentStudentInvitationAsync(
-                    student.User.Email!,
-                    parentEmail,
-                    existingRelationship.Id,
-                    cancellationToken);
-
-                return existingRelationship.ToResponse("Outgoing", student.User.Email);
+                existingRelationship.SetInvitationTokenHash(tokenHash);
             }
-
-            if (existingRelationship.Status == RelationshipStatus.Pending)
+            else if (existingRelationship.Status == RelationshipStatus.Pending)
             {
                 if (existingRelationship.IsExpired(now))
                 {
-                    existingRelationship.Reinvite(expiresAtUtc);
-                    relationshipRepository.Update(existingRelationship);
-                    await unitOfWork.SaveChangesAsync();
+                    existingRelationship.RenewInvitation(tokenHash, expiresAtUtc);
                 }
-
-                await emailSender.SendParentStudentInvitationAsync(
-                    student.User.Email!,
-                    parentEmail,
-                    existingRelationship.Id,
-                    cancellationToken);
-
-                return existingRelationship.ToResponse("Outgoing", student.User.Email);
+                else
+                {
+                    existingRelationship.SetInvitationTokenHash(tokenHash);
+                }
+            }
+            else
+            {
+                return Error.Conflict(
+                    "Access.RelationshipExists",
+                    "A relationship already exists between this parent and student.");
             }
 
-            return Error.Conflict(
-                "Access.RelationshipExists",
-                "A relationship already exists between this parent and student.");
+            relationshipRepository.Update(existingRelationship);
+            await unitOfWork.SaveChangesAsync();
+
+            await emailSender.SendParentStudentInvitationAsync(
+                student.User.Email!,
+                parentEmail,
+                invitationUrlBuilder.CreateParentStudentInvitationUrl(token),
+                cancellationToken);
+
+            return existingRelationship.ToResponse("Outgoing", student.User.Email);
         }
 
+        string newToken = CreateToken();
         ParentStudentRelationship relationship =
             new(parent.Id, student.Id, InvitationInitiator.Parent, expiresAtUtc);
+        relationship.SetInvitationTokenHash(HashToken(newToken));
 
         relationshipRepository.Add(relationship);
         await unitOfWork.SaveChangesAsync();
@@ -134,9 +139,15 @@ public sealed class CreateInvitationCommandHandler(
         await emailSender.SendParentStudentInvitationAsync(
             student.User.Email!,
             parentEmail,
-            relationship.Id,
+            invitationUrlBuilder.CreateParentStudentInvitationUrl(newToken),
             cancellationToken);
 
         return relationship.ToResponse("Outgoing", student.User.Email);
     }
+
+    private static string CreateToken() =>
+        Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
+
+    private static string HashToken(string token) =>
+        Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(token)));
 }

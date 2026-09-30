@@ -46,13 +46,12 @@ public sealed class LoggingEmailSender : IEmailSender
     public Task SendParentStudentInvitationAsync(
         string studentEmail,
         string parentEmail,
-        Guid invitationId,
+        string invitationUrl,
         CancellationToken cancellationToken = default
     )
     {
         _logger.LogInformation(
-            "Parent-student invitation {InvitationId} sent to {StudentEmail} from {ParentEmail}",
-            invitationId,
+            "Parent-student invitation sent to {StudentEmail} from {ParentEmail}",
             studentEmail,
             parentEmail
         );

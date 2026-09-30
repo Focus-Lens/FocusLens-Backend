@@ -1,5 +1,3 @@
-using System.Security.Claims;
-using FocusLens.Application.Features.Identity.Dtos;
 using FocusLens.Application.Students;
 using FocusLens.Application.UnitTests.Access;
 using FocusLens.Contracts.Students;
@@ -18,27 +16,51 @@ namespace FocusLens.Application.UnitTests.Students;
 public class CompleteStudentOnboardingCommandHandlerTests
 {
     [Fact]
-    public async Task Handle_WhenAllPreferencesAreSkipped_ReturnsIncompleteAuthResponse()
+    public async Task Handle_WhenAllPreferencesAreSkipped_ReturnsIncompleteOnboardingResponse()
     {
         Student student = new(Guid.NewGuid());
 
-        AuthResponse result = (await CreateHandler(student).Handle(
+        CompleteStudentOnboardingResponse result = (await CreateHandler(student).Handle(
             new CompleteStudentOnboardingCommand(
                 new CompleteStudentOnboardingRequest("  كريم  ", null, null, null, null, null)),
             CancellationToken.None)).Value;
 
         Assert.False(student.IsOnboardingCompleted);
-        Assert.True(result.RequiresOnboarding);
+        Assert.Equal(student.UserId, result.UserId);
+        Assert.Equal("Focus", result.FirstName);
+        Assert.Equal("Student", result.LastName);
         Assert.Equal("incomplete", result.OnboardingStatus);
-        Assert.NotNull(result.Tokens);
     }
 
     [Fact]
-    public async Task Handle_WhenAllPreferencesAreProvided_ReturnsCompletedAuthResponse()
+    public async Task Handle_WhenDateOfBirthIsMissing_ReturnsIncompleteOnboardingResponse()
     {
         Student student = new(Guid.NewGuid());
 
-        AuthResponse result = (await CreateHandler(student).Handle(
+        CompleteStudentOnboardingResponse result = (await CreateHandler(student).Handle(
+            new CompleteStudentOnboardingCommand(
+                new CompleteStudentOnboardingRequest(
+                    "  كريم  ",
+                    null,
+                    ContractStudentGoal.FocusBetter,
+                    ContractStudentGrade.Grade10,
+                    [new StudentSubjectRequest(ContractStudentSubjectType.Math, null)],
+                    null)),
+            CancellationToken.None)).Value;
+
+        Assert.False(student.IsOnboardingCompleted);
+        Assert.Equal(student.UserId, result.UserId);
+        Assert.Equal("Focus", result.FirstName);
+        Assert.Equal("Student", result.LastName);
+        Assert.Equal("incomplete", result.OnboardingStatus);
+    }
+
+    [Fact]
+    public async Task Handle_WhenAllPreferencesAreProvided_ReturnsCompletedOnboardingResponse()
+    {
+        Student student = new(Guid.NewGuid());
+
+        CompleteStudentOnboardingResponse result = (await CreateHandler(student).Handle(
             new CompleteStudentOnboardingCommand(
                 new CompleteStudentOnboardingRequest(
                     "  كريم  ",
@@ -56,9 +78,10 @@ public class CompleteStudentOnboardingCommandHandlerTests
             Domain.Students.StudentGoal.FocusBetter,
             student.Goal);
         Assert.Null(student.StudyTimeGoal);
-        Assert.False(result.RequiresOnboarding);
+        Assert.Equal(student.UserId, result.UserId);
+        Assert.Equal("Focus", result.FirstName);
+        Assert.Equal("Student", result.LastName);
         Assert.Equal("completed", result.OnboardingStatus);
-        Assert.NotNull(result.Tokens);
     }
 
     private static CompleteStudentOnboardingCommandHandler CreateHandler(Student student)
@@ -67,8 +90,7 @@ public class CompleteStudentOnboardingCommandHandlerTests
             new InMemoryRepository<Student>(student),
             new FakeCurrentUser(student.UserId),
             new FakeUnitOfWork(),
-            new TestIdentityService(student.UserId),
-            new TestTokenProvider());
+            new TestIdentityService(student.UserId));
     }
 
     private sealed class TestIdentityService(Guid userId) : IIdentityService
@@ -126,39 +148,4 @@ public class CompleteStudentOnboardingCommandHandlerTests
             Task.FromResult(IdentityResultSummary.Success);
     }
 
-    private sealed class TestTokenProvider : ITokenProvider
-    {
-        public Task<TokenPair> CreateTokenPairAsync(ApplicationUser user,
-            CancellationToken cancellationToken = default)
-        {
-            return Task.FromResult(new TokenPair("access-token", DateTimeOffset.UtcNow.AddMinutes(15),
-                "refresh-token", DateTimeOffset.UtcNow.AddDays(30)));
-        }
-
-        public Task<(string Token, DateTimeOffset ExpiresOnUtc)> CreateOnboardingTokenAsync(ApplicationUser user) =>
-            Task.FromResult(("registration-token", DateTimeOffset.UtcNow.AddMinutes(15)));
-
-        public ClaimsPrincipal GetPrincipalFromExpiredToken(string accessToken) => new();
-
-        public string GenerateRefreshToken() => "refresh-token";
-
-        public Task<RefreshToken> PersistRefreshTokenAsync(Guid userId, string refreshToken,
-            CancellationToken cancellationToken = default) =>
-            throw new NotSupportedException();
-
-        public Task<RefreshToken?> GetRefreshTokenAsync(string refreshToken,
-            CancellationToken cancellationToken = default) =>
-            Task.FromResult<RefreshToken?>(null);
-
-        public Task<TokenPair?> RotateRefreshTokenAsync(ApplicationUser user, string refreshToken,
-            CancellationToken cancellationToken = default) =>
-            Task.FromResult<TokenPair?>(null);
-
-        public Task<bool> RevokeRefreshTokenAsync(string refreshToken,
-            CancellationToken cancellationToken = default) =>
-            Task.FromResult(false);
-
-        public Task RevokeAllRefreshTokensAsync(Guid userId, CancellationToken cancellationToken = default) =>
-            Task.CompletedTask;
-    }
 }

@@ -1,6 +1,5 @@
 using FocusLens.Application.Common.Errors;
 using FocusLens.Application.Common.Mappings;
-using FocusLens.Application.Features.Identity.Dtos;
 using FocusLens.Contracts.Students;
 using FocusLens.Domain;
 using FocusLens.Domain.Common.Constants;
@@ -21,11 +20,10 @@ public sealed class CompleteStudentOnboardingCommandHandler(
     IBaseRepository<Student> studentRepository,
     ICurrentUser currentUser,
     IUnitOfWork unitOfWork,
-    IIdentityService identityService,
-    ITokenProvider tokenProvider)
-    : IRequestHandler<CompleteStudentOnboardingCommand, Result<AuthResponse>>
+    IIdentityService identityService)
+    : IRequestHandler<CompleteStudentOnboardingCommand, Result<CompleteStudentOnboardingResponse>>
 {
-    public async Task<Result<AuthResponse>> Handle(
+    public async Task<Result<CompleteStudentOnboardingResponse>> Handle(
         CompleteStudentOnboardingCommand request,
         CancellationToken cancellationToken)
     {
@@ -98,11 +96,11 @@ public sealed class CompleteStudentOnboardingCommandHandler(
                 "The current user is not a student.");
         }
 
-        TokenPair tokenPair = await tokenProvider.CreateTokenPairAsync(
-            user,
-            cancellationToken);
-
-        return user.ToAuthResponse(roles, tokenPair, student.IsOnboardingCompleted);
+        return new CompleteStudentOnboardingResponse(
+    user.Id,
+    user.FirstName,
+    user.LastName,
+    student.IsOnboardingCompleted ? "completed" : "incomplete");
     }
 
     private static StudentSubject MapSubject(StudentSubjectRequest subject)

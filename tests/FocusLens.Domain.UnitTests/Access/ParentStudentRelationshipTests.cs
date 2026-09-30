@@ -144,6 +144,44 @@ public class ParentStudentRelationshipTests
 
 
     [Fact]
+    public void SetInvitationTokenHash_WithValidHash_StoresHash()
+    {
+        ParentStudentRelationship relationship =
+            new(Guid.NewGuid(), Guid.NewGuid());
+
+        relationship.SetInvitationTokenHash("HASH");
+
+        Assert.Equal("HASH", relationship.InvitationTokenHash);
+    }
+
+    [Fact]
+    public void SetInvitationTokenHash_WithEmptyHash_ThrowsArgumentException()
+    {
+        ParentStudentRelationship relationship =
+            new(Guid.NewGuid(), Guid.NewGuid());
+
+        Assert.Throws<ArgumentException>(() =>
+            relationship.SetInvitationTokenHash("  "));
+    }
+
+    [Fact]
+    public void RenewInvitation_WhenPending_UpdatesTokenAndExpiry()
+    {
+        ParentStudentRelationship relationship = new(
+            Guid.NewGuid(),
+            Guid.NewGuid(),
+            InvitationInitiator.Parent,
+            DateTimeOffset.UtcNow.AddDays(1));
+        DateTimeOffset newExpiry = DateTimeOffset.UtcNow.AddDays(7);
+
+        relationship.RenewInvitation("NEW_HASH", newExpiry);
+
+        Assert.Equal("NEW_HASH", relationship.InvitationTokenHash);
+        Assert.Equal(newExpiry, relationship.ExpiresAtUtc);
+        Assert.Equal(RelationshipStatus.Pending, relationship.Status);
+    }
+
+    [Fact]
     public void Reinvite_WhenRevoked_MakesRelationshipPending()
     {
         ParentStudentRelationship relationship =

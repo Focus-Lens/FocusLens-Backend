@@ -70,6 +70,8 @@ public class GoogleLoginCommandHandlerTests
             StudentGoal.FocusBetter,
             StudentGrade.Grade10,
             [StudentSubject.Predefined(StudentSubjectType.Math)]);
+        student.SetPreferredName("Focus Student");
+        student.SetDateOfBirth(new DateOnly(2010, 5, 12));
         fixture.Students.Add(student);
 
         Result<AuthResponse> result = await fixture.Handler.Handle(

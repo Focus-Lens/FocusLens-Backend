@@ -118,7 +118,7 @@ public sealed class FakeNotificationWriter : INotificationWriter
 
 public sealed class FakeEmailSender : IEmailSender
 {
-    public List<(string StudentEmail, string ParentEmail, Guid InvitationId)> Invitations { get; } = [];
+    public List<(string StudentEmail, string ParentEmail, string InvitationUrl)> Invitations { get; } = [];
 
     public List<(string ParentEmail, string StudentDisplayName, string InvitationUrl)> StudentParentInvitations
     {
@@ -138,10 +138,10 @@ public sealed class FakeEmailSender : IEmailSender
     public Task SendParentStudentInvitationAsync(
         string studentEmail,
         string parentEmail,
-        Guid invitationId,
+        string invitationUrl,
         CancellationToken cancellationToken = default)
     {
-        Invitations.Add((studentEmail, parentEmail, invitationId));
+        Invitations.Add((studentEmail, parentEmail, invitationUrl));
         return Task.CompletedTask;
     }
 
@@ -164,6 +164,9 @@ public sealed class FakeEmailSender : IEmailSender
 
 public sealed class FakeInvitationUrlBuilder : IInvitationUrlBuilder
 {
+    public string CreateParentStudentInvitationUrl(string token) =>
+        $"https://student.focuslens.test/invitations/{token}";
+
     public string CreateStudentParentInvitationUrl(string token) =>
         $"https://parent.focuslens.test/invitations/parent/{token}";
 

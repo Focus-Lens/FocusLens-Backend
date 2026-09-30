@@ -64,6 +64,30 @@ public class StudentsApiTests
     }
 
     [Fact]
+    public async Task CompleteOnboarding_WhenDateOfBirthIsMissing_LeavesOnboardingIncomplete()
+    {
+        Guid userId = Guid.NewGuid();
+        await using CustomWebApplicationFactory factory = new();
+        await factory.SeedAsync(db =>
+        {
+            SeedStudentIdentity(db, userId);
+            db.Students.Add(new Student(userId));
+            return Task.CompletedTask;
+        });
+
+        using HttpClient client = CreateStudentClient(factory, userId);
+        using StringContent content = new(
+            """{"preferredName":"Dina","goal":"FocusBetter","grade":"Grade10","subjects":[{"type":"Math","customName":null}]}""",
+            Encoding.UTF8,
+            "application/json");
+
+        HttpResponseMessage response = await client.PostAsync("/api/students/onboarding", content);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.False(await GetOnboardingCompletedAsync(client));
+    }
+
+    [Fact]
     public async Task CompleteOnboarding_WhenPreferredNameIsWhitespace_ReturnsBadRequest()
     {
         Guid userId = Guid.NewGuid();

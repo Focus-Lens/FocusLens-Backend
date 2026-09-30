@@ -10,6 +10,7 @@ namespace FocusLens.Application.Access;
 
 public sealed class ResolveStudentParentInvitationQueryHandler(
     IBaseRepository<StudentParentInvitation> invitationRepository,
+    IBaseRepository<ParentStudentRelationship> relationshipRepository,
     TimeProvider timeProvider)
     : IRequestHandler<ResolveStudentParentInvitationQuery, Result<ResolveStudentParentInvitationResponse>>
 {
@@ -25,36 +26,69 @@ public sealed class ResolveStudentParentInvitationQueryHandler(
         string hash = Convert.ToHexString(
             SHA256.HashData(Encoding.UTF8.GetBytes(request.Token)));
 
+        DateTimeOffset now = timeProvider.GetUtcNow();
+
         StudentParentInvitation? invitation = await invitationRepository.FirstOrDefaultAsync(
             item => item.TokenHash == hash,
             item => item.Student,
             item => item.Student.User);
 
-        DateTimeOffset now = timeProvider.GetUtcNow();
+        if (invitation is not null)
+        {
+            if (invitation.IsExpired(now))
+            {
+                return InvalidInvitation();
+            }
 
-        if (invitation is null || invitation.IsExpired(now))
+            if (invitation.Status != ParentInvitationStatus.Pending)
+            {
+                return Error.Conflict(
+                    "Access.InvitationNoLongerPending",
+                    "This invitation is no longer pending.");
+            }
+
+            string displayName = invitation.Student.PreferredName
+                                 ?? invitation.Student.User.FirstName.Trim();
+
+            return new ResolveStudentParentInvitationResponse(
+                invitation.Id,
+                invitation.Status.ToString(),
+                invitation.Type.ToString(),
+                invitation.TargetEmailNormalized,
+                displayName,
+                GetAgeRange(invitation.Student.DateOfBirth, now),
+                invitation.ExpiresAtUtc,
+                true);
+        }
+
+        ParentStudentRelationship? relationship = await relationshipRepository.FirstOrDefaultAsync(
+            item => item.InvitationTokenHash == hash,
+            item => item.Student,
+            item => item.Student.User);
+
+        if (relationship is null || relationship.IsExpired(now) || !relationship.ExpiresAtUtc.HasValue)
         {
             return InvalidInvitation();
         }
 
-        if (invitation.Status != ParentInvitationStatus.Pending)
+        if (relationship.Status != RelationshipStatus.Pending)
         {
             return Error.Conflict(
                 "Access.InvitationNoLongerPending",
                 "This invitation is no longer pending.");
         }
 
-        string displayName = invitation.Student.PreferredName
-                             ?? invitation.Student.User.FirstName.Trim();
+        string relationshipDisplayName = relationship.Student.PreferredName
+                                         ?? relationship.Student.User.FirstName.Trim();
 
         return new ResolveStudentParentInvitationResponse(
-            invitation.Id,
-            invitation.Status.ToString(),
-            invitation.Type.ToString(),
-            invitation.TargetEmailNormalized,
-            displayName,
-            GetAgeRange(invitation.Student.DateOfBirth, now),
-            invitation.ExpiresAtUtc,
+            relationship.Id,
+            relationship.Status.ToString(),
+            "Relationship",
+            relationship.Student.User.Email,
+            relationshipDisplayName,
+            GetAgeRange(relationship.Student.DateOfBirth, now),
+            relationship.ExpiresAtUtc.Value,
             true);
     }
 

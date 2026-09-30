@@ -199,7 +199,6 @@
 //     }
 // }
 
-using System.Net;
 using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
@@ -216,9 +215,9 @@ public sealed class SmtpEmailSender : IEmailSender
     private const string EmailVerificationTemplate = "EmailVerification.html";
     private const string PasswordResetTemplate = "PasswordReset.html";
     private const string ParentStudentInvitationTemplate = "ParentStudentInvitation.html";
+    private const string StudentParentInvitationTemplate = "StudentParentInvitation.html";
     private const string ChildSetupInvitationTemplate = "ChildSetupInvitation.html";
 
-    private readonly InvitationSettings _invitationSettings;
     private readonly EmailTemplateRenderer _templateRenderer;
     private readonly ILogger<SmtpEmailSender> _logger;
     private readonly IHttpClientFactory _httpClientFactory;
@@ -226,13 +225,11 @@ public sealed class SmtpEmailSender : IEmailSender
 
     public SmtpEmailSender(
         EmailTemplateRenderer templateRenderer,
-        IOptions<InvitationSettings> invitationSettings,
         ILogger<SmtpEmailSender> logger,
         IHttpClientFactory httpClientFactory,
         IConfiguration configuration)
     {
         _templateRenderer = templateRenderer;
-        _invitationSettings = invitationSettings.Value;
         _logger = logger;
         _httpClientFactory = httpClientFactory;
         _configuration = configuration;
@@ -289,12 +286,9 @@ public sealed class SmtpEmailSender : IEmailSender
     public async Task SendParentStudentInvitationAsync(
         string studentEmail,
         string parentEmail,
-        Guid invitationId,
+        string invitationUrl,
         CancellationToken cancellationToken = default)
     {
-        string invitationUrl =
-            $"{_invitationSettings.BaseUrl.TrimEnd('/')}/{invitationId}";
-
         string htmlBody = await _templateRenderer.RenderAsync(
             ParentStudentInvitationTemplate,
             new Dictionary<string, string>
@@ -311,25 +305,22 @@ public sealed class SmtpEmailSender : IEmailSender
             cancellationToken);
     }
 
-    public Task SendStudentParentInvitationAsync(
+    public async Task SendStudentParentInvitationAsync(
         string parentEmail,
         string studentDisplayName,
         string invitationUrl,
         CancellationToken cancellationToken = default)
     {
-        string encodedName =
-            WebUtility.HtmlEncode(studentDisplayName);
+        string htmlBody = await _templateRenderer.RenderAsync(
+            StudentParentInvitationTemplate,
+            new Dictionary<string, string>
+            {
+                ["{{StudentDisplayName}}"] = studentDisplayName,
+                ["{{InvitationUrl}}"] = invitationUrl
+            },
+            cancellationToken);
 
-        string encodedUrl =
-            WebUtility.HtmlEncode(invitationUrl);
-
-        string htmlBody = $"""
-                           <p>{encodedName} invited you to connect on FocusLens.</p>
-                           <p><a href="{encodedUrl}">Review invitation</a></p>
-                           <p>This invitation expires in 7 days.</p>
-                           """;
-
-        return SendAsync(
+        await SendAsync(
             parentEmail,
             "You have a FocusLens invitation",
             htmlBody,

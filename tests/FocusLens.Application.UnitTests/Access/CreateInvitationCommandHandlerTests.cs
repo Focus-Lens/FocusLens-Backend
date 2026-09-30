@@ -34,7 +34,8 @@ public class CreateInvitationCommandHandlerTests
             relationshipRepository,
             currentUser,
             unitOfWork,
-            emailSender);
+            emailSender,
+            new FakeInvitationUrlBuilder());
 
         Result<InvitationResponse> result = await handler.Handle(
             new CreateInvitationCommand(
@@ -49,7 +50,16 @@ public class CreateInvitationCommandHandlerTests
         Assert.Single(emailSender.Invitations);
         Assert.Equal("student@example.com", emailSender.Invitations[0].StudentEmail);
         Assert.Equal(parentEmail, emailSender.Invitations[0].ParentEmail);
-        Assert.Equal(result.Value.Id, emailSender.Invitations[0].InvitationId);
+        string invitationUrl = emailSender.Invitations[0].InvitationUrl;
+        string token = invitationUrl[(invitationUrl.LastIndexOf('/') + 1)..];
+        Assert.Equal(64, token.Length);
+        ParentStudentRelationship savedRelationship =
+            (await relationshipRepository.GetAllAsync()).Single();
+        Assert.Equal(
+            Convert.ToHexString(
+                System.Security.Cryptography.SHA256.HashData(
+                    System.Text.Encoding.UTF8.GetBytes(token))),
+            savedRelationship.InvitationTokenHash);
     }
 
     [Fact]
@@ -64,7 +74,8 @@ public class CreateInvitationCommandHandlerTests
             new InMemoryRepository<ParentStudentRelationship>(),
             new FakeCurrentUser(parentUserId, "parent@example.com"),
             new FakeUnitOfWork(),
-            new FakeEmailSender());
+            new FakeEmailSender(),
+            new FakeInvitationUrlBuilder());
 
         Result<InvitationResponse> result = await handler.Handle(
             new CreateInvitationCommand(
@@ -87,8 +98,11 @@ public class CreateInvitationCommandHandlerTests
         ApplicationUser studentUser = new() { Email = "student@example.com" };
         student.SetPrivateProperty("User", studentUser);
 
-        ParentStudentRelationship existingRelationship =
-            new(parent.Id, student.Id);
+        ParentStudentRelationship existingRelationship = new(
+            parent.Id,
+            student.Id,
+            InvitationInitiator.Parent,
+            DateTimeOffset.UtcNow.AddDays(7));
 
         FakeUnitOfWork unitOfWork = new();
         FakeEmailSender emailSender = new();
@@ -99,7 +113,8 @@ public class CreateInvitationCommandHandlerTests
             new InMemoryRepository<ParentStudentRelationship>(existingRelationship),
             new FakeCurrentUser(parentUserId, "parent@example.com"),
             unitOfWork,
-            emailSender);
+            emailSender,
+            new FakeInvitationUrlBuilder());
 
         Result<InvitationResponse> result = await handler.Handle(
             new CreateInvitationCommand(
@@ -108,11 +123,58 @@ public class CreateInvitationCommandHandlerTests
 
         Assert.True(result.IsSuccess);
         Assert.Equal("Pending", result.Value.Status);
-        Assert.Equal(0, unitOfWork.SaveChangesCalls);
+        Assert.Equal(1, unitOfWork.SaveChangesCalls);
         Assert.Single(emailSender.Invitations);
         Assert.Equal("student@example.com", emailSender.Invitations[0].StudentEmail);
         Assert.Equal("parent@example.com", emailSender.Invitations[0].ParentEmail);
-        Assert.Equal(existingRelationship.Id, emailSender.Invitations[0].InvitationId);
+        Assert.StartsWith("https://student.focuslens.test/invitations/", emailSender.Invitations[0].InvitationUrl);
+        Assert.False(string.IsNullOrWhiteSpace(existingRelationship.InvitationTokenHash));
+    }
+
+    [Fact]
+    public async Task Handle_WithExpiredPendingRelationship_RenewsInvitation()
+    {
+        Guid parentUserId = Guid.NewGuid();
+        Guid studentUserId = Guid.NewGuid();
+        DateTimeOffset now = DateTimeOffset.UtcNow;
+
+        Parent parent = new(parentUserId);
+        Student student = new(studentUserId);
+        student.SetPrivateProperty(
+            "User",
+            new ApplicationUser { Email = "student@example.com" });
+
+        ParentStudentRelationship existingRelationship = new(
+            parent.Id,
+            student.Id,
+            InvitationInitiator.Parent,
+            now.AddMinutes(-1));
+
+        FakeUnitOfWork unitOfWork = new();
+        FakeEmailSender emailSender = new();
+        CreateInvitationCommandHandler handler = new(
+            new InMemoryRepository<Parent>(parent),
+            new InMemoryRepository<Student>(student),
+            new InMemoryRepository<ParentStudentRelationship>(existingRelationship),
+            new FakeCurrentUser(parentUserId, "parent@example.com"),
+            unitOfWork,
+            emailSender,
+            new FakeInvitationUrlBuilder(),
+            new FixedTimeProvider(now));
+
+        Result<InvitationResponse> result = await handler.Handle(
+            new CreateInvitationCommand(
+                new CreateInvitationRequest("student@example.com")),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(RelationshipStatus.Pending, existingRelationship.Status);
+        Assert.Equal(now.AddDays(7), existingRelationship.ExpiresAtUtc);
+        Assert.Equal(1, unitOfWork.SaveChangesCalls);
+        Assert.Single(emailSender.Invitations);
+        Assert.StartsWith(
+            "https://student.focuslens.test/invitations/",
+            emailSender.Invitations[0].InvitationUrl);
     }
 
     [Fact]
@@ -124,7 +186,8 @@ public class CreateInvitationCommandHandlerTests
             new InMemoryRepository<ParentStudentRelationship>(),
             new FakeCurrentUser(Guid.NewGuid()),
             new FakeUnitOfWork(),
-            new FakeEmailSender());
+            new FakeEmailSender(),
+            new FakeInvitationUrlBuilder());
 
         Result<InvitationResponse> result = await handler.Handle(
             new CreateInvitationCommand(
@@ -167,7 +230,8 @@ public class CreateInvitationCommandHandlerTests
             relationshipRepository,
             new FakeCurrentUser(parentUserId, "parent@example.com"),
             unitOfWork,
-            new FakeEmailSender());
+            new FakeEmailSender(),
+            new FakeInvitationUrlBuilder());
 
         Result<InvitationResponse> result = await handler.Handle(
             new CreateInvitationCommand(
@@ -180,5 +244,10 @@ public class CreateInvitationCommandHandlerTests
         Assert.Null(result.Value.RevokedAtUtc);
         Assert.Equal(RelationshipStatus.Pending, existingRelationship.Status);
         Assert.Equal(1, unitOfWork.SaveChangesCalls);
+    }
+
+    private sealed class FixedTimeProvider(DateTimeOffset utcNow) : TimeProvider
+    {
+        public override DateTimeOffset GetUtcNow() => utcNow;
     }
 }

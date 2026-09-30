@@ -23,11 +23,20 @@ public class ParentStudentRelationshipConfiguration
 
         builder.Property(relationship => relationship.ExpiresAtUtc).IsRequired(false);
 
+        builder.Property(relationship => relationship.InvitationTokenHash)
+            .HasMaxLength(128)
+            .IsRequired(false);
+
         builder.Property(relationship => relationship.RevokedAtUtc).IsRequired(false);
 
         builder
             .HasIndex(relationship => new { relationship.ParentId, relationship.StudentId })
             .IsUnique();
+
+        builder
+            .HasIndex(relationship => relationship.InvitationTokenHash)
+            .IsUnique()
+            .HasFilter("[InvitationTokenHash] IS NOT NULL");
 
         builder
             .HasOne(relationship => relationship.Parent)

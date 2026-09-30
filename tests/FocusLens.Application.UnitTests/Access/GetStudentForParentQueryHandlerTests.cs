@@ -42,6 +42,8 @@ public class GetStudentForParentQueryHandlerTests
                 StudentSubject.Predefined(StudentSubjectType.Math),
                 StudentSubject.Custom("Economics")
             ]);
+        student.SetPreferredName("Youssef");
+        student.SetDateOfBirth(new DateOnly(2010, 5, 12));
 
         ParentStudentRelationship relationship =
             new(parent.Id, student.Id);

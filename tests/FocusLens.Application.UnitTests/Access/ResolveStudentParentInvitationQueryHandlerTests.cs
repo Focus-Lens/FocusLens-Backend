@@ -25,7 +25,7 @@ public sealed class ResolveStudentParentInvitationQueryHandlerTests
             student,
             Now.AddDays(7));
 
-        ResolveStudentParentInvitationQueryHandler handler = CreateHandler(invitation);
+        ResolveStudentParentInvitationQueryHandler handler = CreateHandler([invitation]);
 
         Result<ResolveStudentParentInvitationResponse> result = await handler.Handle(
             new ResolveStudentParentInvitationQuery(RawToken),
@@ -52,7 +52,7 @@ public sealed class ResolveStudentParentInvitationQueryHandlerTests
             StudentParentInvitationType.Link,
             null);
 
-        ResolveStudentParentInvitationQueryHandler handler = CreateHandler(invitation);
+        ResolveStudentParentInvitationQueryHandler handler = CreateHandler([invitation]);
 
         Result<ResolveStudentParentInvitationResponse> result = await handler.Handle(
             new ResolveStudentParentInvitationQuery(RawToken),
@@ -82,7 +82,7 @@ public sealed class ResolveStudentParentInvitationQueryHandlerTests
             student,
             Now.AddDays(7));
 
-        ResolveStudentParentInvitationQueryHandler handler = CreateHandler(invitation);
+        ResolveStudentParentInvitationQueryHandler handler = CreateHandler([invitation]);
 
         Result<ResolveStudentParentInvitationResponse> result = await handler.Handle(
             new ResolveStudentParentInvitationQuery(RawToken),
@@ -100,7 +100,7 @@ public sealed class ResolveStudentParentInvitationQueryHandlerTests
             student,
             Now.AddDays(7));
 
-        ResolveStudentParentInvitationQueryHandler handler = CreateHandler(invitation);
+        ResolveStudentParentInvitationQueryHandler handler = CreateHandler([invitation]);
 
         Result<ResolveStudentParentInvitationResponse> result = await handler.Handle(
             new ResolveStudentParentInvitationQuery(RawToken),
@@ -148,7 +148,7 @@ public sealed class ResolveStudentParentInvitationQueryHandlerTests
             student,
             Now.AddMinutes(-1));
 
-        ResolveStudentParentInvitationQueryHandler handler = CreateHandler(invitation);
+        ResolveStudentParentInvitationQueryHandler handler = CreateHandler([invitation]);
 
         Result<ResolveStudentParentInvitationResponse> result = await handler.Handle(
             new ResolveStudentParentInvitationQuery(RawToken),
@@ -169,7 +169,7 @@ public sealed class ResolveStudentParentInvitationQueryHandlerTests
             Now.AddDays(7));
         invitation.Decline(Now.AddMinutes(-1));
 
-        ResolveStudentParentInvitationQueryHandler handler = CreateHandler(invitation);
+        ResolveStudentParentInvitationQueryHandler handler = CreateHandler([invitation]);
 
         Result<ResolveStudentParentInvitationResponse> result = await handler.Handle(
             new ResolveStudentParentInvitationQuery(RawToken),
@@ -182,15 +182,53 @@ public sealed class ResolveStudentParentInvitationQueryHandlerTests
     }
 
     private static ResolveStudentParentInvitationQueryHandler CreateHandler(
-        StudentParentInvitation? invitation = null)
+        StudentParentInvitation[]? invitations = null,
+        ParentStudentRelationship[]? relationships = null)
     {
-        InMemoryRepository<StudentParentInvitation> repository = invitation is null
-            ? new()
-            : new(invitation);
-
         return new ResolveStudentParentInvitationQueryHandler(
-            repository,
+            new InMemoryRepository<StudentParentInvitation>(invitations ?? []),
+            new InMemoryRepository<ParentStudentRelationship>(relationships ?? []),
             new FixedTimeProvider(Now));
+    }
+
+    [Fact]
+    public async Task Handle_WithParentToStudentRelationshipToken_ReturnsPrivacySafePreview()
+    {
+        Student student = CreateStudent(new DateOnly(2012, 5, 12));
+        student.SetPreferredName("Youssef");
+        student.SetPrivateProperty(
+            "User",
+            new ApplicationUser
+            {
+                FirstName = "Youssef",
+                Email = "student@example.com"
+            });
+
+        Parent parent = new(Guid.NewGuid());
+        ParentStudentRelationship relationship = new(
+            parent.Id,
+            student.Id,
+            InvitationInitiator.Parent,
+            Now.AddDays(7));
+        relationship.SetPrivateProperty("Student", student);
+        relationship.SetInvitationTokenHash(Hash(RawToken));
+
+        ResolveStudentParentInvitationQueryHandler handler = CreateHandler(
+            relationships: [relationship]);
+
+        Result<ResolveStudentParentInvitationResponse> result = await handler.Handle(
+            new ResolveStudentParentInvitationQuery(RawToken),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(relationship.Id, result.Value.InvitationId);
+        Assert.Equal("Pending", result.Value.Status);
+        Assert.Equal("Relationship", result.Value.Type);
+        Assert.Equal("student@example.com", result.Value.TargetEmail);
+        Assert.Equal("Youssef", result.Value.StudentPreferredName);
+        Assert.Equal("13–15", result.Value.AgeRange);
+        Assert.Equal(relationship.ExpiresAtUtc, result.Value.ExpiresAtUtc);
+        Assert.True(result.Value.RequiresSignIn);
     }
 
     private static StudentParentInvitation CreateInvitation(
@@ -229,6 +267,9 @@ public sealed class ResolveStudentParentInvitationQueryHandlerTests
 
         return student;
     }
+
+    private static string Hash(string token) =>
+        Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(token)));
 
     private static DateOnly DateOfBirthForAge(int age)
     {

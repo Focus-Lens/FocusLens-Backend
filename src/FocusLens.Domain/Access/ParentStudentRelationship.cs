@@ -49,6 +49,8 @@ public class ParentStudentRelationship : AuditableEntity
     /// </summary>
     public DateTimeOffset? ExpiresAtUtc { get; private set; }
 
+    public string? InvitationTokenHash { get; private set; }
+
     public DateTimeOffset? RevokedAtUtc { get; private set; }
 
     public Parent Parent { get; private set; } = null!;
@@ -103,6 +105,28 @@ public class ParentStudentRelationship : AuditableEntity
 
         Status = RelationshipStatus.Revoked;
         RevokedAtUtc = DateTimeOffset.UtcNow;
+    }
+
+    public void SetInvitationTokenHash(string tokenHash)
+    {
+        if (string.IsNullOrWhiteSpace(tokenHash))
+        {
+            throw new ArgumentException("Invitation token hash is required.", nameof(tokenHash));
+        }
+
+        InvitationTokenHash = tokenHash;
+    }
+
+    public void RenewInvitation(string tokenHash, DateTimeOffset expiresAtUtc)
+    {
+        if (Status != RelationshipStatus.Pending)
+        {
+            throw new InvalidOperationException(
+                "Only a pending relationship can be renewed.");
+        }
+
+        SetInvitationTokenHash(tokenHash);
+        ExpiresAtUtc = expiresAtUtc;
     }
 
     public void Reinvite() => Reinvite(null);
