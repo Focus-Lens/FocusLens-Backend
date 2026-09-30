@@ -140,35 +140,11 @@ public sealed class GoogleLoginCommandHandler
         }
 
         if (roles.Contains(ApplicationRoles.Student, StringComparer.Ordinal)
-            && student is not null
-            && !student.IsOnboardingCompleted)
+            && student is null)
         {
-            if (accountCreated)
-            {
-                (string Token, DateTimeOffset ExpiresOnUtc) registrationToken =
-                    await _tokenProvider.CreateOnboardingTokenAsync(user);
-
-                return new AuthResponse(
-                    user.Id,
-                    user.Email ?? string.Empty,
-                    user.FirstName,
-                    user.LastName,
-                    roles,
-                    null,
-                    true,
-                    registrationToken.Token,
-                    registrationToken.ExpiresOnUtc,
-                    true);
-            }
-
-            TokenPair incompleteOnboardingTokenPair = await _tokenProvider.CreateTokenPairAsync(
-                user,
-                cancellationToken);
-
-            return user.ToAuthResponse(
-                roles,
-                incompleteOnboardingTokenPair,
-                false);
+            return Error.NotFound(
+                "Students.NotFound",
+                "The current user does not have a student profile.");
         }
 
         TokenPair tokenPair = await _tokenProvider.CreateTokenPairAsync(
@@ -178,7 +154,8 @@ public sealed class GoogleLoginCommandHandler
         return user.ToAuthResponse(
             roles,
             tokenPair,
-            student?.IsOnboardingCompleted);
+            student,
+            accountCreated);
     }
 
     private async Task<Result<Success>> CreateGoogleAccountAsync(

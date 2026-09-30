@@ -9,9 +9,6 @@ public interface ITokenProvider
         ApplicationUser user,
         CancellationToken cancellationToken = default);
 
-    Task<(string Token, DateTimeOffset ExpiresOnUtc)> CreateOnboardingTokenAsync(
-        ApplicationUser user);
-
     ClaimsPrincipal GetPrincipalFromExpiredToken(string accessToken);
 
     string GenerateRefreshToken();

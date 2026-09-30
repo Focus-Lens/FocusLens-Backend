@@ -17,7 +17,6 @@ public sealed class TokenProvider : ITokenProvider
 {
     public const string TokenTypeClaim = "token_type";
     public const string AccessTokenType = "access";
-    public const string OnboardingTokenType = "onboarding";
     private static readonly TimeSpan ClockSkew = TimeSpan.Zero;
 
     private readonly ApplicationDbContext _dbContext;
@@ -60,14 +59,6 @@ public sealed class TokenProvider : ITokenProvider
             accessTokenExpiresOnUtc,
             refreshTokenValue,
             refreshToken.ExpiresOnUtc);
-    }
-
-    public async Task<(string Token, DateTimeOffset ExpiresOnUtc)> CreateOnboardingTokenAsync(
-        ApplicationUser user)
-    {
-        DateTimeOffset expiresOnUtc = _timeProvider.GetUtcNow().AddMinutes(15);
-
-        return (await GenerateJwtAsync(user, expiresOnUtc, OnboardingTokenType), expiresOnUtc);
     }
 
     public ClaimsPrincipal GetPrincipalFromExpiredToken(string accessToken)

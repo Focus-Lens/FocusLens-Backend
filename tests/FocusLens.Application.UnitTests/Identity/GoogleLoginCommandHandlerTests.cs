@@ -2,6 +2,7 @@ using System.Security.Claims;
 using FocusLens.Application.Common.Interfaces;
 using FocusLens.Application.Common.Models;
 using FocusLens.Application.Features.Identity.Commands.GoogleLogin;
+using FocusLens.Application.Features.Identity.Commands.Login;
 using FocusLens.Application.Features.Identity.Dtos;
 using FocusLens.Application.UnitTests.Access;
 using FocusLens.Domain;
@@ -17,7 +18,7 @@ namespace FocusLens.Application.UnitTests.Identity;
 public class GoogleLoginCommandHandlerTests
 {
     [Fact]
-    public async Task Handle_WhenGoogleUserIsNew_CreatesAccountAndStudentAndReturnsRegistrationToken()
+    public async Task Handle_WhenGoogleUserIsNew_CreatesAccountAndStudentAndReturnsTokensAndIncompleteStatus()
     {
         TestFixture fixture = CreateFixture();
 
@@ -26,9 +27,11 @@ public class GoogleLoginCommandHandlerTests
             CancellationToken.None);
 
         Assert.True(result.IsSuccess);
-        Assert.Null(result.Value.Tokens);
-        Assert.True(result.Value.RequiresOnboarding);
-        Assert.Equal("registration-token", result.Value.RegistrationToken);
+        Assert.NotNull(result.Value.Tokens);
+        Assert.Equal("access-token", result.Value.Tokens.AccessToken);
+        Assert.Equal("refresh-token", result.Value.Tokens.RefreshToken);
+        Assert.Equal("incomplete", result.Value.OnboardingStatus);
+        Assert.True(result.Value.AccountCreated);
         Assert.Single(fixture.Identity.Users);
         Assert.Equal(
             new[] { ApplicationRoles.Student },
@@ -53,8 +56,6 @@ public class GoogleLoginCommandHandlerTests
         Assert.NotNull(result.Value.Tokens);
         Assert.Equal("access-token", result.Value.Tokens.AccessToken);
         Assert.Equal("refresh-token", result.Value.Tokens.RefreshToken);
-        Assert.True(result.Value.RequiresOnboarding);
-        Assert.Null(result.Value.RegistrationToken);
         Assert.Equal("incomplete", result.Value.OnboardingStatus);
     }
 
@@ -72,6 +73,7 @@ public class GoogleLoginCommandHandlerTests
             [StudentSubject.Predefined(StudentSubjectType.Math)]);
         student.SetPreferredName("Focus Student");
         student.SetDateOfBirth(new DateOnly(2010, 5, 12));
+        student.SetStudyTimeGoal(StudyTimeGoal.Create(StudyTimeGoalPeriod.Daily, 60, [DayOfWeek.Monday], new DateOnly(2026, 1, 1)).Value);
         fixture.Students.Add(student);
 
         Result<AuthResponse> result = await fixture.Handler.Handle(
@@ -80,7 +82,6 @@ public class GoogleLoginCommandHandlerTests
 
         Assert.True(result.IsSuccess);
         Assert.NotNull(result.Value.Tokens);
-        Assert.False(result.Value.RequiresOnboarding);
         Assert.Equal("completed", result.Value.OnboardingStatus);
     }
 
@@ -111,7 +112,6 @@ public class GoogleLoginCommandHandlerTests
 
         Assert.True(result.IsSuccess);
         Assert.NotNull(result.Value.Tokens);
-        Assert.False(result.Value.RequiresOnboarding);
         Assert.Single(fixture.Identity.Users);
         Assert.Equal(
             new[] { ApplicationRoles.Parent },
@@ -157,7 +157,6 @@ public class GoogleLoginCommandHandlerTests
             "Identity_External_Account_Type_Mismatch",
             result.TopError.Code);
         Assert.Equal(0, fixture.TokenProvider.TokenPairRequests);
-        Assert.Equal(0, fixture.TokenProvider.OnboardingTokenRequests);
         Assert.Equal(new[] { ApplicationRoles.Parent }, fixture.Identity.GetRoles(user));
     }
 
@@ -179,8 +178,88 @@ public class GoogleLoginCommandHandlerTests
             "Identity_External_Account_Type_Mismatch",
             result.TopError.Code);
         Assert.Equal(0, fixture.TokenProvider.TokenPairRequests);
-        Assert.Equal(0, fixture.TokenProvider.OnboardingTokenRequests);
         Assert.Equal(new[] { ApplicationRoles.Student }, fixture.Identity.GetRoles(user));
+    }
+
+    [Fact]
+    public async Task Login_WhenCredentialsAreInvalid_ReturnsInvalidCredentialsWithoutTokens()
+    {
+        FakeIdentityService identity = new() { PasswordIsValid = false };
+        identity.AddExistingGoogleParent("password-parent", "parent@example.com");
+        FakeTokenProvider tokenProvider = new();
+        LoginCommandHandler handler = new(identity, tokenProvider, new InMemoryRepository<Student>());
+
+        Result<AuthResponse> result = await handler.Handle(
+            new LoginCommand("parent@example.com", "wrong-password"),
+            CancellationToken.None);
+
+        Assert.True(result.IsError);
+        Assert.Equal("Identity_Invalid_Credentials", result.TopError.Code);
+        Assert.Equal(0, tokenProvider.TokenPairRequests);
+    }
+
+    [Fact]
+    public async Task Login_WhenStudentOnboardingIsIncomplete_ReturnsTokensAndIncompleteStatus()
+    {
+        FakeIdentityService identity = new();
+        ApplicationUser user = identity.AddExistingGoogleStudent("password-student", "student@example.com");
+        FakeTokenProvider tokenProvider = new();
+        InMemoryRepository<Student> students = new(new Student(user.Id));
+        LoginCommandHandler handler = new(identity, tokenProvider, students);
+
+        Result<AuthResponse> result = await handler.Handle(
+            new LoginCommand("student@example.com", "password"),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.NotNull(result.Value.Tokens);
+        Assert.Equal("incomplete", result.Value.OnboardingStatus);
+    }
+
+    [Fact]
+    public async Task Login_WhenStudentOnboardingIsCompleted_ReturnsTokensAndCompletedStatus()
+    {
+        FakeIdentityService identity = new();
+        ApplicationUser user = identity.AddExistingGoogleStudent("password-student", "student@example.com");
+        Student student = CreateCompletedStudent(user.Id);
+        LoginCommandHandler handler = new(identity, new FakeTokenProvider(), new InMemoryRepository<Student>(student));
+
+        Result<AuthResponse> result = await handler.Handle(
+            new LoginCommand("student@example.com", "password"),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.NotNull(result.Value.Tokens);
+        Assert.Equal("completed", result.Value.OnboardingStatus);
+    }
+
+    [Fact]
+    public async Task Login_WhenParent_ReturnsTokensWithoutOnboardingStatus()
+    {
+        FakeIdentityService identity = new();
+        identity.AddExistingGoogleParent("password-parent", "parent@example.com");
+        LoginCommandHandler handler = new(identity, new FakeTokenProvider(), new InMemoryRepository<Student>());
+
+        Result<AuthResponse> result = await handler.Handle(
+            new LoginCommand("parent@example.com", "password"),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.NotNull(result.Value.Tokens);
+        Assert.Null(result.Value.OnboardingStatus);
+    }
+
+    private static Student CreateCompletedStudent(Guid userId)
+    {
+        Student student = new(userId);
+        student.CompleteOnboarding(
+            StudentGoal.FocusBetter,
+            StudentGrade.Grade10,
+            [StudentSubject.Predefined(StudentSubjectType.Math)]);
+        student.SetPreferredName("Focus Student");
+        student.SetDateOfBirth(new DateOnly(2010, 5, 12));
+        student.SetStudyTimeGoal(StudyTimeGoal.Create(StudyTimeGoalPeriod.Daily, 60, [DayOfWeek.Monday], new DateOnly(2026, 1, 1)).Value);
+        return student;
     }
 
     private static TestFixture CreateFixture()
@@ -246,8 +325,10 @@ public class GoogleLoginCommandHandlerTests
                     ? _users[userId]
                     : null);
 
+        public bool PasswordIsValid { get; set; } = true;
+
         public Task<bool> CheckPasswordAsync(ApplicationUser user, string password)
-            => Task.FromResult(true);
+            => Task.FromResult(PasswordIsValid);
 
         public Task<bool> IsEmailConfirmedAsync(ApplicationUser user)
             => Task.FromResult(user.EmailConfirmed);
@@ -371,8 +452,6 @@ public class GoogleLoginCommandHandlerTests
     {
         public int TokenPairRequests { get; private set; }
 
-        public int OnboardingTokenRequests { get; private set; }
-
         public Task<TokenPair> CreateTokenPairAsync(
             ApplicationUser user,
             CancellationToken cancellationToken = default)
@@ -384,14 +463,6 @@ public class GoogleLoginCommandHandlerTests
                 DateTimeOffset.UtcNow.AddMinutes(15),
                 "refresh-token",
                 DateTimeOffset.UtcNow.AddDays(30)));
-        }
-
-        public Task<(string Token, DateTimeOffset ExpiresOnUtc)> CreateOnboardingTokenAsync(
-            ApplicationUser user)
-        {
-            OnboardingTokenRequests++;
-
-            return Task.FromResult(("registration-token", DateTimeOffset.UtcNow.AddMinutes(15)));
         }
 
         public ClaimsPrincipal GetPrincipalFromExpiredToken(string accessToken)

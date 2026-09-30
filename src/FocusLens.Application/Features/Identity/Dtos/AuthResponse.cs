@@ -7,8 +7,5 @@ public sealed record AuthResponse(
     string LastName,
     IReadOnlyCollection<string> Roles,
     TokenResponse? Tokens,
-    bool RequiresOnboarding = false,
-    string? RegistrationToken = null,
-    DateTimeOffset? RegistrationTokenExpiresOnUtc = null,
     bool AccountCreated = false,
     string? OnboardingStatus = null);

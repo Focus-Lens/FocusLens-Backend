@@ -1,5 +1,7 @@
 using FocusLens.Application.Common.Errors;
 using FocusLens.Application.Features.Identity.Dtos;
+using FocusLens.Domain;
+using FocusLens.Domain.Common.Constants;
 using FocusLens.Domain.Common.Interfaces;
 using FocusLens.Domain.Common.Results;
 using FocusLens.Domain.Identity;
@@ -13,13 +15,16 @@ public sealed class LoginCommandHandler
 {
     private readonly IIdentityService _identityService;
     private readonly ITokenProvider _tokenProvider;
+    private readonly IBaseRepository<Student> _studentRepository;
 
     public LoginCommandHandler(
         IIdentityService identityService,
-        ITokenProvider tokenProvider)
+        ITokenProvider tokenProvider,
+        IBaseRepository<Student> studentRepository)
     {
         _identityService = identityService;
         _tokenProvider = tokenProvider;
+        _studentRepository = studentRepository;
     }
 
     public async Task<Result<AuthResponse>> Handle(
@@ -51,10 +56,26 @@ public sealed class LoginCommandHandler
         }
 
         IReadOnlyCollection<string> roles = await _identityService.GetRolesAsync(user);
+
+        Student? student = null;
+        if (roles.Contains(ApplicationRoles.Student, StringComparer.Ordinal))
+        {
+            student = await _studentRepository.FirstOrDefaultAsync(
+                item => item.UserId == user.Id);
+
+            if (student is null)
+            {
+                return Error.NotFound(
+                    "Students.NotFound",
+                    "The current user does not have a student profile.");
+            }
+
+
+        }
         TokenPair tokenPair = await _tokenProvider.CreateTokenPairAsync(
             user,
             cancellationToken);
 
-        return user.ToAuthResponse(roles, tokenPair);
+        return user.ToAuthResponse(roles, tokenPair, student);
     }
 }

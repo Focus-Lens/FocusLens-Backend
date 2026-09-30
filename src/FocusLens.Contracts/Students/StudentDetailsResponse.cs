@@ -18,5 +18,6 @@ public sealed record StudentDetailsResponse(
     bool ShareSessionSummariesWithParents,
     bool ShareSubjectTrendsWithParents,
     bool ShareDetailedAnswersWithParents,
-    bool OnboardingCompleted
+    string OnboardingStatus,
+    IReadOnlyCollection<string> MissingFields
 );

@@ -127,7 +127,7 @@ public class UpdateStudentPreferencesCommandHandlerTests
         Assert.True(result.IsSuccess);
         Assert.Null(student.DateOfBirth);
         Assert.Null(result.Value.DateOfBirth);
-        Assert.False(result.Value.OnboardingCompleted);
+        Assert.False(result.Value.OnboardingStatus == "completed");
     }
 
     [Fact]
@@ -146,7 +146,7 @@ public class UpdateStudentPreferencesCommandHandlerTests
         Assert.True(result.IsSuccess);
         Assert.Equal("Year 13", student.CustomGrade);
         Assert.Equal("Year 13", result.Value.CustomGrade);
-        Assert.True(result.Value.OnboardingCompleted);
+        Assert.True(result.Value.OnboardingStatus == "completed");
     }
 
     [Fact]
@@ -207,7 +207,7 @@ public class UpdateStudentPreferencesCommandHandlerTests
 
         Assert.False(result.IsSuccess);
         Assert.Equal("Students.StudyTimeGoalControlledByParent", result.TopError.Code);
-        Assert.Null(student.StudyTimeGoal);
+        Assert.NotNull(student.StudyTimeGoal);
     }
 
     [Fact]
@@ -258,7 +258,7 @@ public class UpdateStudentPreferencesCommandHandlerTests
         Assert.True(result.IsSuccess);
         Assert.Null(student.PreferredName);
         Assert.Null(result.Value.PreferredName);
-        Assert.False(result.Value.OnboardingCompleted);
+        Assert.False(result.Value.OnboardingStatus == "completed");
     }
 
     [Fact]
@@ -305,6 +305,7 @@ public class UpdateStudentPreferencesCommandHandlerTests
             [StudentSubject.Predefined(StudentSubjectType.Math)]);
         student.SetPreferredName("Test Student");
         student.SetDateOfBirth(new DateOnly(2010, 5, 12));
+        student.SetStudyTimeGoal(StudyTimeGoal.Create(StudyTimeGoalPeriod.Daily, 60, [DayOfWeek.Monday], new DateOnly(2026, 1, 1)).Value);
         return student;
     }
 }

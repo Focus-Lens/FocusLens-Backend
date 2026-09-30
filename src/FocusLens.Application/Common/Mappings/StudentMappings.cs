@@ -61,6 +61,7 @@ internal static class StudentMappings
             student.ShareSessionSummariesWithParents,
             student.ShareSubjectTrendsWithParents,
             false,
-            student.IsOnboardingCompleted);
+            student.IsOnboardingCompleted ? "completed" : "incomplete",
+            student.GetMissingOnboardingFields());
     }
 }

@@ -91,7 +91,11 @@ public class Student : AuditableEntity
         UpdateOnboardingCompletionStatus();
     }
 
-    public void SetStudyTimeGoal(StudyTimeGoal? studyTimeGoal) => StudyTimeGoal = studyTimeGoal;
+    public void SetStudyTimeGoal(StudyTimeGoal? studyTimeGoal)
+    {
+        StudyTimeGoal = studyTimeGoal;
+        UpdateOnboardingCompletionStatus();
+    }
 
     public void SetPreferredName(string? preferredName)
     {
@@ -126,12 +130,21 @@ public class Student : AuditableEntity
         ReplaceSubjects(subjects);
     }
 
+    public IReadOnlyCollection<string> GetMissingOnboardingFields()
+    {
+        List<string> missingFields = [];
+
+        if (string.IsNullOrWhiteSpace(PreferredName)) missingFields.Add("preferredName");
+        if (DateOfBirth is null) missingFields.Add("dateOfBirth");
+        if (Goal is null) missingFields.Add("goal");
+        if (Grade is null) missingFields.Add("grade");
+        if (Grade is StudentGrade.Other && string.IsNullOrWhiteSpace(CustomGrade)) missingFields.Add("customGrade");
+        if (Subjects.Count == 0) missingFields.Add("subjects");
+        if (StudyTimeGoal is null) missingFields.Add("studyTimeGoal");
+
+        return missingFields;
+    }
+
     private void UpdateOnboardingCompletionStatus() =>
-        IsOnboardingCompleted =
-            !string.IsNullOrWhiteSpace(PreferredName)
-            && DateOfBirth is not null
-            && Goal is not null
-            && Grade is not null
-            && (Grade is not StudentGrade.Other || !string.IsNullOrWhiteSpace(CustomGrade))
-            && Subjects.Count > 0;
+        IsOnboardingCompleted = GetMissingOnboardingFields().Count == 0;
 }

@@ -44,6 +44,7 @@ public class GetStudentForParentQueryHandlerTests
             ]);
         student.SetPreferredName("Youssef");
         student.SetDateOfBirth(new DateOnly(2010, 5, 12));
+        student.SetStudyTimeGoal(StudyTimeGoal.Create(FocusLens.Domain.Students.StudyTimeGoalPeriod.Daily, 60, [DayOfWeek.Monday], new DateOnly(2026, 1, 1)).Value);
 
         ParentStudentRelationship relationship =
             new(parent.Id, student.Id);
@@ -65,7 +66,7 @@ public class GetStudentForParentQueryHandlerTests
         Assert.Equal(student.UserId, result.UserId);
         Assert.Equal(ContractStudentGoal.FocusBetter, result.Goal);
         Assert.Equal(ContractStudentGrade.Grade10, result.Grade);
-        Assert.True(result.OnboardingCompleted);
+        Assert.True(result.OnboardingStatus == "completed");
         Assert.Equal(2, result.Subjects.Count);
         Assert.Contains(
             result.Subjects,

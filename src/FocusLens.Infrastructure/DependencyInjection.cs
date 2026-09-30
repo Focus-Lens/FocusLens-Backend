@@ -180,16 +180,6 @@ public static class DependencyInjection
                 {
                     OnTokenValidated = async context =>
                     {
-                        string? tokenType = context.Principal?.FindFirst(
-                            TokenProvider.TokenTypeClaim)?.Value;
-
-                        if (tokenType == TokenProvider.OnboardingTokenType
-                            && !IsStudentOnboardingRequest(context.HttpContext))
-                        {
-                            context.Fail("Onboarding token is only valid for student onboarding.");
-                            return;
-                        }
-
                         string? userIdValue = context.Principal?.FindFirstValue(
                             ClaimTypes.NameIdentifier);
                         if (!Guid.TryParse(userIdValue, out Guid userId))
@@ -218,10 +208,4 @@ public static class DependencyInjection
 
         return services;
     }
-
-    private static bool IsStudentOnboardingRequest(HttpContext httpContext)
-        => HttpMethods.IsPost(httpContext.Request.Method)
-           && httpContext.Request.Path.Equals(
-               "/api/students/onboarding",
-               StringComparison.OrdinalIgnoreCase);
 }

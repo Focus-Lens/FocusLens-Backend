@@ -57,18 +57,6 @@ public sealed class CustomWebApplicationFactory
                     {
                         OnTokenValidated = context =>
                         {
-                            string? tokenType = context.Principal?.FindFirst(
-                                TokenProvider.TokenTypeClaim)?.Value;
-
-                            if (tokenType == TokenProvider.OnboardingTokenType
-                                && !(HttpMethods.IsPost(context.HttpContext.Request.Method)
-                                     && context.HttpContext.Request.Path.Equals(
-                                         "/api/students/onboarding",
-                                         StringComparison.OrdinalIgnoreCase)))
-                            {
-                                context.Fail("Onboarding token is only valid for student onboarding.");
-                            }
-
                             return Task.CompletedTask;
                         }
                     };

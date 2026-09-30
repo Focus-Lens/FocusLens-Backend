@@ -1,4 +1,5 @@
 using FocusLens.Domain.Common.Interfaces;
+using FocusLens.Domain;
 using FocusLens.Domain.Identity;
 
 namespace FocusLens.Application.Features.Identity.Dtos;
@@ -18,7 +19,8 @@ internal static class IdentityMappings
         this ApplicationUser user,
         IReadOnlyCollection<string> roles,
         TokenPair tokenPair,
-        bool? isOnboardingCompleted = null)
+        Student? student = null,
+        bool accountCreated = false)
     {
         return new AuthResponse(
             user.Id,
@@ -27,11 +29,9 @@ internal static class IdentityMappings
             user.LastName,
             roles,
             tokenPair.ToResponse(),
-            isOnboardingCompleted == false,
-            OnboardingStatus: isOnboardingCompleted is null
+            accountCreated,
+            OnboardingStatus: student is null
                 ? null
-                : isOnboardingCompleted.Value
-                    ? "completed"
-                    : "incomplete");
+                : student.IsOnboardingCompleted ? "completed" : "incomplete");
     }
 }

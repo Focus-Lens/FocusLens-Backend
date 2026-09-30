@@ -45,7 +45,9 @@ public class CompleteStudentOnboardingCommandHandlerTests
                     ContractStudentGoal.FocusBetter,
                     ContractStudentGrade.Grade10,
                     [new StudentSubjectRequest(ContractStudentSubjectType.Math, null)],
-                    null)),
+                    null,
+                    new StudyTimeGoalRequest(StudyTimeGoalPeriod.Daily, 60, [DayOfWeek.Monday], new DateOnly(2026, 1, 1))
+                )),
             CancellationToken.None)).Value;
 
         Assert.False(student.IsOnboardingCompleted);
@@ -68,7 +70,9 @@ public class CompleteStudentOnboardingCommandHandlerTests
                     ContractStudentGoal.FocusBetter,
                     ContractStudentGrade.Grade10,
                     [new StudentSubjectRequest(ContractStudentSubjectType.Math, null)],
-                    null)),
+                    null,
+                    new StudyTimeGoalRequest(StudyTimeGoalPeriod.Daily, 60, [DayOfWeek.Monday], new DateOnly(2026, 1, 1))
+                )),
             CancellationToken.None)).Value;
 
         Assert.True(student.IsOnboardingCompleted);
@@ -77,7 +81,7 @@ public class CompleteStudentOnboardingCommandHandlerTests
         Assert.Equal(
             Domain.Students.StudentGoal.FocusBetter,
             student.Goal);
-        Assert.Null(student.StudyTimeGoal);
+        Assert.NotNull(student.StudyTimeGoal);
         Assert.Equal(student.UserId, result.UserId);
         Assert.Equal("Focus", result.FirstName);
         Assert.Equal("Student", result.LastName);

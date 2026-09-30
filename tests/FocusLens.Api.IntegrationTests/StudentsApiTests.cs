@@ -14,7 +14,7 @@ namespace FocusLens.Api.IntegrationTests;
 public class StudentsApiTests
 {
     [Fact]
-    public async Task CompleteOnboarding_WhenOptionalFieldsAreSkipped_LeavesOnboardingIncomplete()
+    public async Task CompleteOnboarding_WhenStudyTimeGoalIsOmitted_LeavesOnboardingIncompleteWithMissingField()
     {
         Guid userId = Guid.NewGuid();
         await using CustomWebApplicationFactory factory = new();
@@ -26,12 +26,17 @@ public class StudentsApiTests
         });
 
         using HttpClient client = CreateStudentClient(factory, userId);
-        using StringContent content = new("{\"preferredName\":\"Dina\"}", Encoding.UTF8, "application/json");
+        using StringContent content = new(
+            """{"preferredName":"Dina","goal":"FocusBetter","grade":"Grade10","subjects":[{"type":"Math","customName":null}],"dateOfBirth":"2010-05-12"}""",
+            Encoding.UTF8,
+            "application/json");
 
         HttpResponseMessage response = await client.PostAsync("/api/students/onboarding", content);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        Assert.False(await GetOnboardingCompletedAsync(client));
+        JsonElement profile = await GetProfileAsync(client);
+        Assert.Equal("incomplete", profile.GetProperty("onboardingStatus").GetString());
+        Assert.Contains("studyTimeGoal", profile.GetProperty("missingFields").EnumerateArray().Select(value => value.GetString()));
     }
 
     [Fact]
@@ -55,12 +60,15 @@ public class StudentsApiTests
         HttpResponseMessage response = await client.PostAsync("/api/students/onboarding", content);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        Assert.True(await GetOnboardingCompletedAsync(client));
+        JsonElement profile = await GetProfileAsync(client);
+        Assert.Equal("completed", profile.GetProperty("onboardingStatus").GetString());
+        Assert.Empty(profile.GetProperty("missingFields").EnumerateArray());
 
         HttpResponseMessage getResponse = await client.GetAsync("/api/students/me");
         Assert.Equal(HttpStatusCode.OK, getResponse.StatusCode);
         using JsonDocument getDocument = JsonDocument.Parse(await getResponse.Content.ReadAsStringAsync());
         Assert.Equal("Dina", getDocument.RootElement.GetProperty("preferredName").GetString());
+        Assert.Equal("Daily", getDocument.RootElement.GetProperty("studyTimeGoal").GetProperty("period").GetString());
     }
 
     [Fact]
@@ -84,7 +92,10 @@ public class StudentsApiTests
         HttpResponseMessage response = await client.PostAsync("/api/students/onboarding", content);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        Assert.False(await GetOnboardingCompletedAsync(client));
+        JsonElement profile = await GetProfileAsync(client);
+        Assert.Equal("incomplete", profile.GetProperty("onboardingStatus").GetString());
+        Assert.Contains("dateOfBirth", profile.GetProperty("missingFields").EnumerateArray().Select(value => value.GetString()));
+        Assert.Contains("studyTimeGoal", profile.GetProperty("missingFields").EnumerateArray().Select(value => value.GetString()));
     }
 
     [Fact]
@@ -143,7 +154,9 @@ public class StudentsApiTests
         Assert.Equal(JsonValueKind.Null, root.GetProperty("goal").ValueKind);
         Assert.Equal("Grade10", root.GetProperty("grade").GetString());
         Assert.Equal(0, root.GetProperty("subjects").GetArrayLength());
-        Assert.False(root.GetProperty("onboardingCompleted").GetBoolean());
+        Assert.Equal("incomplete", root.GetProperty("onboardingStatus").GetString());
+        Assert.Contains("goal", root.GetProperty("missingFields").EnumerateArray().Select(value => value.GetString()));
+        Assert.Contains("subjects", root.GetProperty("missingFields").EnumerateArray().Select(value => value.GetString()));
     }
 
     [Fact]
@@ -311,12 +324,12 @@ public class StudentsApiTests
         db.UserRoles.Add(new IdentityUserRole<Guid> { UserId = userId, RoleId = role.Id });
     }
 
-    private static async Task<bool> GetOnboardingCompletedAsync(HttpClient client)
+    private static async Task<JsonElement> GetProfileAsync(HttpClient client)
     {
         HttpResponseMessage response = await client.GetAsync("/api/students/me");
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
         using JsonDocument document = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
-        return document.RootElement.GetProperty("onboardingCompleted").GetBoolean();
+        return document.RootElement.Clone();
     }
 }
