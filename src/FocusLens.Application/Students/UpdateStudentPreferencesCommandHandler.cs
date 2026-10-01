@@ -76,6 +76,15 @@ public sealed class UpdateStudentPreferencesCommandHandler(
             return studyTimeGoalError!.Value;
         }
 
+        if (!TryUpdateWeekStartsOn(
+                student,
+                request.Request,
+                activeRelationships.Any(),
+                out Error? weekStartsOnError))
+        {
+            return weekStartsOnError!.Value;
+        }
+
         if (!TryUpdateGrade(student, request.Request, out Error? gradeError))
         {
             return gradeError!.Value;
@@ -146,7 +155,41 @@ public sealed class UpdateStudentPreferencesCommandHandler(
                || request.PreferredNameProvided
                || request.ShareSessionSummariesWithParentsProvided
                || request.ShareSubjectTrendsWithParentsProvided
+               || request.WeekStartsOnProvided
                || request.SubjectsProvided;
+    }
+
+    private static bool TryUpdateWeekStartsOn(
+        Student student,
+        UpdateStudentPreferencesRequest request,
+        bool hasActiveParentRelationship,
+        out Error? error)
+    {
+        error = null;
+
+        if (!request.WeekStartsOnProvided)
+        {
+            return true;
+        }
+
+        if (hasActiveParentRelationship)
+        {
+            error = Error.Forbidden(
+                "Students.WeekStartsOnControlledByParent",
+                "Week start is controlled by the parent.");
+            return false;
+        }
+
+        if (request.WeekStartsOn.HasValue && !Enum.IsDefined(request.WeekStartsOn.Value))
+        {
+            error = Error.Validation(
+                "Students.InvalidWeekStartsOn",
+                "WeekStartsOn must be a valid day of week.");
+            return false;
+        }
+
+        student.SetWeekStartsOn(request.WeekStartsOn);
+        return true;
     }
 
     private static bool TryUpdateGoal(

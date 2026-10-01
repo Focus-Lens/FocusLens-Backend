@@ -2,8 +2,10 @@ using FocusLens.Application.Students;
 using FocusLens.Application.UnitTests.Access;
 using FocusLens.Contracts.Students;
 using FocusLens.Domain;
+using FocusLens.Domain.Access;
 using FocusLens.Domain.Common.Constants;
 using FocusLens.Domain.Common.Interfaces;
+using FocusLens.Domain.Common.Results;
 using FocusLens.Domain.Identity;
 using FocusLens.Domain.Interfaces;
 using ContractStudentGoal = FocusLens.Contracts.Students.StudentGoal;
@@ -46,7 +48,7 @@ public class CompleteStudentOnboardingCommandHandlerTests
                     ContractStudentGrade.Grade10,
                     [new StudentSubjectRequest(ContractStudentSubjectType.Math, null)],
                     null,
-                    new StudyTimeGoalRequest(StudyTimeGoalPeriod.Daily, 60, [DayOfWeek.Monday], new DateOnly(2026, 1, 1))
+                    new OnboardingStudyTimeGoalRequest(1)
                 )),
             CancellationToken.None)).Value;
 
@@ -71,7 +73,7 @@ public class CompleteStudentOnboardingCommandHandlerTests
                     ContractStudentGrade.Grade10,
                     [new StudentSubjectRequest(ContractStudentSubjectType.Math, null)],
                     null,
-                    new StudyTimeGoalRequest(StudyTimeGoalPeriod.Daily, 60, [DayOfWeek.Monday], new DateOnly(2026, 1, 1))
+                    new OnboardingStudyTimeGoalRequest(1)
                 )),
             CancellationToken.None)).Value;
 
@@ -88,13 +90,110 @@ public class CompleteStudentOnboardingCommandHandlerTests
         Assert.Equal("completed", result.OnboardingStatus);
     }
 
-    private static CompleteStudentOnboardingCommandHandler CreateHandler(Student student)
+    [Fact]
+    public async Task Handle_WhenOnboardingStudyTimeGoalIsProvided_CreatesWeeklyGoalFromSaturdayByDefault()
+    {
+        Student student = new(Guid.NewGuid());
+
+        Result<CompleteStudentOnboardingResponse> result = await CreateHandler(student).Handle(
+            new CompleteStudentOnboardingCommand(
+                new CompleteStudentOnboardingRequest(
+                    "Student",
+                    null,
+                    null,
+                    null,
+                    null,
+                    StudyTimeGoal: new OnboardingStudyTimeGoalRequest(5))),
+            CancellationToken.None);
+
+        Assert.False(result.IsError);
+        Assert.NotNull(student.StudyTimeGoal);
+        Assert.Equal(Domain.Students.StudyTimeGoalPeriod.Weekly, student.StudyTimeGoal!.Period);
+        Assert.Equal(300, student.StudyTimeGoal.TargetMinutes);
+        Assert.Equal([DayOfWeek.Saturday], student.StudyTimeGoal.Days);
+        Assert.Equal(new DateOnly(2026, 9, 12), student.StudyTimeGoal.StartDate);
+    }
+
+    [Fact]
+    public async Task Handle_WhenStudentHasWeekStart_UsesStudentWeekStart()
+    {
+        Student student = new(Guid.NewGuid());
+        student.SetWeekStartsOn(DayOfWeek.Monday);
+
+        Result<CompleteStudentOnboardingResponse> result = await CreateHandler(student).Handle(
+            new CompleteStudentOnboardingCommand(
+                new CompleteStudentOnboardingRequest(
+                    "Student", null, null, null, null,
+                    StudyTimeGoal: new OnboardingStudyTimeGoalRequest(2.5m))),
+            CancellationToken.None);
+
+        Assert.False(result.IsError);
+        Assert.Equal([DayOfWeek.Monday], student.StudyTimeGoal!.Days);
+        Assert.Equal(new DateOnly(2026, 9, 14), student.StudyTimeGoal.StartDate);
+        Assert.Equal(150, student.StudyTimeGoal.TargetMinutes);
+    }
+
+    [Fact]
+    public async Task Handle_WhenActiveParentHasWeekStart_UsesParentWeekStartBeforeStudentSetting()
+    {
+        Student student = new(Guid.NewGuid());
+        student.SetWeekStartsOn(DayOfWeek.Monday);
+        Parent parent = new(Guid.NewGuid());
+        parent.SetWeekStartsOn(DayOfWeek.Sunday);
+        ParentStudentRelationship relationship = new(parent.Id, student.Id);
+        relationship.Accept();
+        relationship.SetPrivateProperty("Parent", parent);
+
+        Result<CompleteStudentOnboardingResponse> result = await CreateHandler(student, relationship).Handle(
+            new CompleteStudentOnboardingCommand(
+                new CompleteStudentOnboardingRequest(
+                    "Student", null, null, null, null,
+                    StudyTimeGoal: new OnboardingStudyTimeGoalRequest(2))),
+            CancellationToken.None);
+
+        Assert.False(result.IsError);
+        Assert.Equal([DayOfWeek.Sunday], student.StudyTimeGoal!.Days);
+        Assert.Equal(new DateOnly(2026, 9, 13), student.StudyTimeGoal.StartDate);
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(-1)]
+    [InlineData(999999999)]
+    public async Task Handle_WhenTargetHoursIsInvalid_ReturnsValidationError(decimal targetHours)
+    {
+        Student student = new(Guid.NewGuid());
+
+        Result<CompleteStudentOnboardingResponse> result = await CreateHandler(student).Handle(
+            new CompleteStudentOnboardingCommand(
+                new CompleteStudentOnboardingRequest(
+                    "Student", null, null, null, null,
+                    StudyTimeGoal: new OnboardingStudyTimeGoalRequest(targetHours))),
+            CancellationToken.None);
+
+        Assert.True(result.IsError);
+        Assert.Equal("Students.InvalidOnboardingStudyTimeGoal", result.TopError.Code);
+        Assert.Null(student.StudyTimeGoal);
+    }
+
+    private static CompleteStudentOnboardingCommandHandler CreateHandler(
+        Student student,
+        ParentStudentRelationship? relationship = null)
     {
         return new CompleteStudentOnboardingCommandHandler(
             new InMemoryRepository<Student>(student),
+            relationship is null
+                ? new InMemoryRepository<ParentStudentRelationship>()
+                : new InMemoryRepository<ParentStudentRelationship>(relationship),
             new FakeCurrentUser(student.UserId),
             new FakeUnitOfWork(),
-            new TestIdentityService(student.UserId));
+            new TestIdentityService(student.UserId),
+            new FixedTimeProvider(new DateTimeOffset(2026, 9, 16, 12, 0, 0, TimeSpan.Zero)));
+    }
+
+    private sealed class FixedTimeProvider(DateTimeOffset utcNow) : TimeProvider
+    {
+        public override DateTimeOffset GetUtcNow() => utcNow;
     }
 
     private sealed class TestIdentityService(Guid userId) : IIdentityService

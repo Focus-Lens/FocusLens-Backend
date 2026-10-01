@@ -1,3 +1,5 @@
+using FocusLens.Application.Common.Utilities;
+
 namespace FocusLens.Application.Parents;
 
 internal static class ParentWeekdayOrder
@@ -13,8 +15,7 @@ internal static class ParentWeekdayOrder
 
     public static DateOnly GetWeekStart(DateOnly date, DayOfWeek weekStartsOn)
     {
-        int daysSinceWeekStarted = ((int)date.DayOfWeek - (int)weekStartsOn + 7) % 7;
-        return date.AddDays(-daysSinceWeekStarted);
+        return WeekStartCalculator.GetWeekStart(date, weekStartsOn);
     }
 
 }

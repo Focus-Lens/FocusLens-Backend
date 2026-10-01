@@ -35,6 +35,11 @@ public class StudentConfiguration : IEntityTypeConfiguration<Student>
             .HasConversion<string>()
             .HasMaxLength(50);
 
+        builder.Property(student => student.WeekStartsOn)
+            .HasConversion<string>()
+            .HasMaxLength(20)
+            .IsUnicode(false);
+
         builder.OwnsOne(student => student.StudyTimeGoal, goalBuilder =>
         {
             goalBuilder.Property(goal => goal.Period)

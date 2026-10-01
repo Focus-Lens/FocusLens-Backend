@@ -232,6 +232,58 @@ public class UpdateStudentPreferencesCommandHandlerTests
     }
 
     [Fact]
+    public async Task Handle_WhenWeekStartsOnChangesAndStudentHasNoParent_UpdatesAndReturnsWeekStart()
+    {
+        Student student = CreateStudentWithPreferences();
+
+        Result<StudentDetailsResponse> result = await CreateHandler(student).Handle(
+            new UpdateStudentPreferencesCommand(new UpdateStudentPreferencesRequest
+            {
+                WeekStartsOn = DayOfWeek.Monday
+            }),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(DayOfWeek.Monday, student.WeekStartsOn);
+        Assert.Equal(DayOfWeek.Monday, result.Value.WeekStartsOn);
+    }
+
+    [Fact]
+    public async Task Handle_WhenWeekStartsOnChangesAndStudentHasActiveParent_ReturnsForbidden()
+    {
+        Student student = CreateStudentWithPreferences();
+        ParentStudentRelationship relationship = new(Guid.NewGuid(), student.Id);
+        relationship.Accept();
+
+        Result<StudentDetailsResponse> result = await CreateHandler(student, relationships: [relationship]).Handle(
+            new UpdateStudentPreferencesCommand(new UpdateStudentPreferencesRequest
+            {
+                WeekStartsOn = DayOfWeek.Monday
+            }),
+            CancellationToken.None);
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal("Students.WeekStartsOnControlledByParent", result.TopError.Code);
+        Assert.Null(student.WeekStartsOn);
+    }
+
+    [Fact]
+    public async Task Handle_WhenWeekStartsOnIsInvalid_ReturnsValidationError()
+    {
+        Student student = CreateStudentWithPreferences();
+
+        Result<StudentDetailsResponse> result = await CreateHandler(student).Handle(
+            new UpdateStudentPreferencesCommand(new UpdateStudentPreferencesRequest
+            {
+                WeekStartsOn = (DayOfWeek)99
+            }),
+            CancellationToken.None);
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal("Students.InvalidWeekStartsOn", result.TopError.Code);
+    }
+
+    [Fact]
     public async Task Handle_WhenPreferredNameIsProvided_TrimsAndStoresIt()
     {
         Student student = CreateStudentWithPreferences();

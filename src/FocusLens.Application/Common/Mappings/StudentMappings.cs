@@ -58,6 +58,7 @@ internal static class StudentMappings
                     student.StudyTimeGoal.TargetMinutes,
                     student.StudyTimeGoal.Days,
                     student.StudyTimeGoal.StartDate),
+            student.WeekStartsOn,
             student.ShareSessionSummariesWithParents,
             student.ShareSubjectTrendsWithParents,
             false,

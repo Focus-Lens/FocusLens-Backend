@@ -40,6 +40,8 @@ public class Student : AuditableEntity
 
     public StudyTimeGoal? StudyTimeGoal { get; private set; }
 
+    public DayOfWeek? WeekStartsOn { get; private set; }
+
     public bool ShareSessionSummariesWithParents { get; private set; }
 
     public bool ShareSubjectTrendsWithParents { get; private set; }
@@ -95,6 +97,16 @@ public class Student : AuditableEntity
     {
         StudyTimeGoal = studyTimeGoal;
         UpdateOnboardingCompletionStatus();
+    }
+
+    public void SetWeekStartsOn(DayOfWeek? weekStartsOn)
+    {
+        if (weekStartsOn.HasValue && !Enum.IsDefined(weekStartsOn.Value))
+        {
+            throw new ArgumentOutOfRangeException(nameof(weekStartsOn), weekStartsOn, "Week start day is invalid.");
+        }
+
+        WeekStartsOn = weekStartsOn;
     }
 
     public void SetPreferredName(string? preferredName)

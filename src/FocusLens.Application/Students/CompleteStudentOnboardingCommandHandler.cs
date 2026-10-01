@@ -1,7 +1,9 @@
 using FocusLens.Application.Common.Errors;
+using FocusLens.Application.Common.Utilities;
 using FocusLens.Application.Common.Mappings;
 using FocusLens.Contracts.Students;
 using FocusLens.Domain;
+using FocusLens.Domain.Access;
 using FocusLens.Domain.Common.Constants;
 using FocusLens.Domain.Common.Interfaces;
 using FocusLens.Domain.Common.Results;
@@ -19,9 +21,11 @@ namespace FocusLens.Application.Students;
 
 public sealed class CompleteStudentOnboardingCommandHandler(
     IBaseRepository<Student> studentRepository,
+    IBaseRepository<ParentStudentRelationship> relationshipRepository,
     ICurrentUser currentUser,
     IUnitOfWork unitOfWork,
-    IIdentityService identityService)
+    IIdentityService identityService,
+    TimeProvider timeProvider)
     : IRequestHandler<CompleteStudentOnboardingCommand, Result<CompleteStudentOnboardingResponse>>
 {
     public async Task<Result<CompleteStudentOnboardingResponse>> Handle(
@@ -69,11 +73,26 @@ public sealed class CompleteStudentOnboardingCommandHandler(
 
         if (request.Request.StudyTimeGoal is not null)
         {
+            Result<int> targetMinutes = ToTargetMinutes(request.Request.StudyTimeGoal.TargetHours);
+            if (targetMinutes.IsError)
+            {
+                return targetMinutes.Errors;
+            }
+
+            IEnumerable<ParentStudentRelationship> activeRelationships =
+                await relationshipRepository.GetAllAsync(
+                    relationship => relationship.StudentId == student.Id &&
+                                    relationship.Status == RelationshipStatus.Active,
+                    relationship => relationship.Parent);
+
+            DayOfWeek weekStartsOn = ResolveWeekStartsOn(activeRelationships, student);
+
+            DateOnly today = DateOnly.FromDateTime(timeProvider.GetUtcNow().UtcDateTime);
             Result<StudyTimeGoal> studyTimeGoal = StudyTimeGoal.Create(
-                (DomainStudyTimeGoalPeriod)request.Request.StudyTimeGoal.Period,
-                request.Request.StudyTimeGoal.TargetMinutes,
-                request.Request.StudyTimeGoal.Days ?? [],
-                request.Request.StudyTimeGoal.StartDate);
+                DomainStudyTimeGoalPeriod.Weekly,
+                targetMinutes.Value,
+                [weekStartsOn],
+                WeekStartCalculator.GetWeekStart(today, weekStartsOn));
 
             if (studyTimeGoal.IsError)
             {
@@ -125,5 +144,38 @@ public sealed class CompleteStudentOnboardingCommandHandler(
         return subject.Type == ContractStudentSubjectType.Other
             ? StudentSubject.Custom(subject.CustomName!)
             : StudentSubject.Predefined(StudentEnumMapper.ToDomain(subject.Type));
+    }
+
+    private static DayOfWeek ResolveWeekStartsOn(
+        IEnumerable<ParentStudentRelationship> relationships,
+        Student student)
+    {
+        DayOfWeek? parentWeekStart = relationships
+            .Select(relationship => relationship.Parent.WeekStartsOn)
+            .FirstOrDefault(weekStartsOn => weekStartsOn.HasValue);
+
+        return parentWeekStart
+               ?? student.WeekStartsOn
+               ?? DayOfWeek.Saturday;
+    }
+
+    private static Result<int> ToTargetMinutes(decimal targetHours)
+    {
+        if (targetHours <= 0 || targetHours > int.MaxValue / 60m)
+        {
+            return Error.Validation(
+                "Students.InvalidOnboardingStudyTimeGoal",
+                "TargetHours must be greater than zero and within the supported range.");
+        }
+
+        decimal targetMinutes = targetHours * 60m;
+        if (decimal.Truncate(targetMinutes) != targetMinutes)
+        {
+            return Error.Validation(
+                "Students.InvalidOnboardingStudyTimeGoal",
+                "TargetHours must convert to a whole number of minutes.");
+        }
+
+        return decimal.ToInt32(targetMinutes);
     }
 }
