@@ -10,5 +10,5 @@ public sealed record UpdateChildSetupDraftRequest(
     string? CustomGrade,
     IReadOnlyCollection<StudentSubjectRequest>? Subjects,
     StudentGoal? Goal,
-    StudyTimeGoalRequest? StudyTimeGoal
+    ChildSetupStudyTimeGoalRequest? StudyTimeGoal
 );

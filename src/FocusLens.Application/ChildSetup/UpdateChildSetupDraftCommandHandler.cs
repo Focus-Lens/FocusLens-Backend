@@ -1,4 +1,5 @@
 using FocusLens.Application.Common.Mappings;
+using FocusLens.Application.Common.Utilities;
 using FocusLens.Application.Parents;
 using FocusLens.Contracts.ChildSetup;
 using FocusLens.Contracts.Students;
@@ -11,7 +12,7 @@ using MediatR;
 using ContractStudentSubjectType = FocusLens.Contracts.Students.StudentSubjectType;
 using ContractStudentGrade = FocusLens.Contracts.Students.StudentGrade;
 using ICurrentUser = FocusLens.Application.Common.Interfaces.ICurrentUser;
-using StudyTimeGoalPeriod = FocusLens.Domain.Students.StudyTimeGoalPeriod;
+using DomainStudyTimeGoalPeriod = FocusLens.Domain.Students.StudyTimeGoalPeriod;
 
 namespace FocusLens.Application.ChildSetup;
 
@@ -19,7 +20,8 @@ public sealed class UpdateChildSetupDraftCommandHandler(
     IBaseRepository<Parent> parentRepository,
     IBaseRepository<ChildSetupDraft> childSetupDraftRepository,
     ICurrentUser currentUser,
-    IUnitOfWork unitOfWork)
+    IUnitOfWork unitOfWork,
+    TimeProvider timeProvider)
     : IRequestHandler<UpdateChildSetupDraftCommand, Result<ChildSetupDraftResponse>>
 {
     public async Task<Result<ChildSetupDraftResponse>> Handle(
@@ -167,13 +169,25 @@ public sealed class UpdateChildSetupDraftCommandHandler(
 
         if (request.Request.StudyTimeGoal is not null)
         {
-            Result<StudyTimeGoal> studyTimeGoalResult =
-                StudyTimeGoal.Create(
-                    Enum.Parse<StudyTimeGoalPeriod>(
-                        request.Request.StudyTimeGoal.Period.ToString()),
-                    request.Request.StudyTimeGoal.TargetMinutes,
-                    request.Request.StudyTimeGoal.Days ?? [],
-                    request.Request.StudyTimeGoal.StartDate);
+            if (parent.WeekStartsOn is not DayOfWeek weekStartsOn)
+            {
+                return Error.Validation(
+                    "ChildSetup.WeekStartsOnRequired",
+                    "Choose a week start day before setting up a study-time goal.");
+            }
+
+            Result<int> targetMinutes = ToTargetMinutes(request.Request.StudyTimeGoal.TargetHours);
+            if (targetMinutes.IsError)
+            {
+                return targetMinutes.Errors;
+            }
+
+            DateOnly today = DateOnly.FromDateTime(timeProvider.GetUtcNow().UtcDateTime);
+            Result<StudyTimeGoal> studyTimeGoalResult = StudyTimeGoal.Create(
+                DomainStudyTimeGoalPeriod.Weekly,
+                targetMinutes.Value,
+                [weekStartsOn],
+                WeekStartCalculator.GetWeekStart(today, weekStartsOn));
 
             if (studyTimeGoalResult.IsError)
             {
@@ -254,81 +268,6 @@ public sealed class UpdateChildSetupDraftCommandHandler(
         return true;
     }
 
-    private static bool TryCreateStudyTimeGoal(
-        StudyTimeGoalRequest? request,
-        DayOfWeek? weekStartsOn,
-        DateOnly today,
-        out StudyTimeGoal? goal,
-        out Error? error)
-    {
-        goal = null;
-        error = null;
-
-        if (request is null)
-        {
-            return true;
-        }
-
-        if (!Enum.IsDefined(request.Period))
-        {
-            error = Error.Validation(
-                "ChildSetup.InvalidStudyTimeGoalPeriod",
-                "Study-time goal period is invalid.");
-            return false;
-        }
-
-        if (request.TargetMinutes <= 0)
-        {
-            error = Error.Validation(
-                "ChildSetup.InvalidStudyTimeGoal",
-                "Study-time goal must be greater than zero.");
-            return false;
-        }
-
-        StudyTimeGoalPeriod period =
-            Enum.Parse<StudyTimeGoalPeriod>(
-                request.Period.ToString());
-
-        if (period == StudyTimeGoalPeriod.Weekly && weekStartsOn is null)
-        {
-            error = Error.Validation(
-                "ChildSetup.WeekStartsOnRequired",
-                "Choose a week start day before setting up a weekly study-time goal.");
-            return false;
-        }
-
-        DateOnly startDate =
-            request.StartDate ??
-            ParentWeekdayOrder.GetWeekStart(
-                today,
-                weekStartsOn ?? DayOfWeek.Monday);
-
-        Result<StudyTimeGoal> result = StudyTimeGoal.Create(
-            period,
-            request.TargetMinutes,
-            period == StudyTimeGoalPeriod.Weekly
-                ? [weekStartsOn!.Value]
-                : request.Days ??
-                    [
-                        DayOfWeek.Monday,
-                        DayOfWeek.Tuesday,
-                        DayOfWeek.Wednesday,
-                        DayOfWeek.Thursday,
-                        DayOfWeek.Friday
-                    ],
-            startDate);
-
-        if (result.IsError)
-        {
-            error = result.TopError;
-            return false;
-        }
-
-        goal = result.Value;
-
-        return true;
-    }
-
     private static ChildSetupSubject MapSubject(
         StudentSubjectRequest subject)
     {
@@ -336,6 +275,26 @@ public sealed class UpdateChildSetupDraftCommandHandler(
             ? ChildSetupSubject.Custom(subject.CustomName!)
             : ChildSetupSubject.Predefined(
                 StudentEnumMapper.ToDomain(subject.Type));
+    }
+
+    private static Result<int> ToTargetMinutes(decimal targetHours)
+    {
+        if (targetHours <= 0 || targetHours > int.MaxValue / 60m)
+        {
+            return Error.Validation(
+                "ChildSetup.InvalidStudyTimeGoal",
+                "TargetHours must be greater than zero and within the supported range.");
+        }
+
+        decimal targetMinutes = targetHours * 60m;
+        if (decimal.Truncate(targetMinutes) != targetMinutes)
+        {
+            return Error.Validation(
+                "ChildSetup.InvalidStudyTimeGoal",
+                "TargetHours must convert to a whole number of minutes.");
+        }
+
+        return decimal.ToInt32(targetMinutes);
     }
 
     private static ChildSetupDraftResponse ToResponse(

@@ -373,6 +373,52 @@ public sealed class ChildSetupApiTests
     }
 
     [Fact]
+    public async Task UpdateChildSetup_WithTargetHours_DerivesWeeklyGoalFromParentSettings()
+    {
+        Guid parentUserId = Guid.NewGuid();
+        Parent parent = new(parentUserId);
+        parent.SetWeekStartsOn(DayOfWeek.Saturday);
+        ChildSetupDraft draft = new(parent.Id);
+
+        await using CustomWebApplicationFactory factory = new(
+            new DateTimeOffset(2026, 9, 16, 12, 0, 0, TimeSpan.Zero));
+
+        await factory.SeedAsync(db =>
+        {
+            db.Users.Add(new ApplicationUser
+            {
+                Id = parentUserId,
+                Email = "parent@example.com",
+                UserName = "parent@example.com",
+                FirstName = "Mariam",
+                LastName = "Parent"
+            });
+            db.Parents.Add(parent);
+            db.ChildSetupDrafts.Add(draft);
+            return Task.CompletedTask;
+        });
+
+        using HttpClient client = CreateClient(factory, parentUserId, "Parent");
+        using StringContent content = new(
+            """{"firstName":"Youssef","lastName":"Mahmoud","dateOfBirth":"2010-05-12","grade":"Grade10","customGrade":null,"subjects":[{"type":"Math","customName":null}],"goal":"FocusBetter","studyTimeGoal":{"targetHours":5}}""",
+            Encoding.UTF8,
+            "application/json");
+
+        HttpResponseMessage response = await client.PutAsync(
+            $"/api/parents/child-setups/{draft.Id}",
+            content);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        using JsonDocument document = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        JsonElement studyTimeGoal = document.RootElement.GetProperty("studyTimeGoal");
+        Assert.Equal("Weekly", studyTimeGoal.GetProperty("period").GetString());
+        Assert.Equal(300, studyTimeGoal.GetProperty("targetMinutes").GetInt32());
+        Assert.Equal("Saturday", studyTimeGoal.GetProperty("days")[0].GetString());
+        Assert.Equal("2026-09-12", studyTimeGoal.GetProperty("startDate").GetString());
+    }
+
+    [Fact]
     public async Task UpdateChildSetup_WithOtherGradeWithoutCustomGrade_ReturnsBadRequest()
     {
         Guid parentUserId = Guid.NewGuid();
