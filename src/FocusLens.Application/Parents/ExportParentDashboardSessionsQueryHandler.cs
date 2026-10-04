@@ -4,6 +4,8 @@ using FocusLens.Domain.Access;
 using FocusLens.Domain.Common.Interfaces;
 using FocusLens.Domain.Common.Results;
 using FocusLens.Domain.StudySessions;
+using FocusLens.Domain.Students;
+using FocusLens.Application.Common.Interfaces;
 using MediatR;
 using ICurrentUser = FocusLens.Application.Common.Interfaces.ICurrentUser;
 
@@ -14,8 +16,11 @@ public sealed class ExportParentDashboardSessionsQueryHandler(
     IBaseRepository<ParentStudentRelationship> relationshipRepository,
     IBaseRepository<Student> studentRepository,
     IBaseRepository<StudySession> studySessionRepository,
+    IBaseRepository<StudentWeek> weekRepository,
     ICurrentUser currentUser,
-    TimeProvider timeProvider)
+    TimeProvider timeProvider,
+    IUnitOfWork? unitOfWork = null,
+    IStudentLocalTime? studentLocalTime = null)
     : IRequestHandler<ExportParentDashboardSessionsQuery, Result<ParentDashboardSessionsCsvExport>>
 {
     public async Task<Result<ParentDashboardSessionsCsvExport>> Handle(
@@ -33,6 +38,9 @@ public sealed class ExportParentDashboardSessionsQueryHandler(
         {
             return contextResult.Errors;
         }
+        studentLocalTime ??= new Common.Services.StudentLocalTime(timeProvider);
+        Result<ParentOverviewWeekResponse> week = await OverviewWeekResolver.ResolveAsync(contextResult.Value, studentLocalTime, weekRepository, unitOfWork);
+        if (week.IsError) return week.Errors;
 
         if (!contextResult.Value.Student.ShareSessionSummariesWithParents)
         {
@@ -52,18 +60,20 @@ public sealed class ExportParentDashboardSessionsQueryHandler(
 
         StudySession[] startedSessions = (await studySessionRepository.GetAllAsync(session =>
                 session.StudentId == request.StudentId &&
-                session.StartedAtUtc != null))
+                session.StartedAtUtc != null,
+                session => session.PauseIntervals))
             .ToArray();
 
         DateTimeOffset utcNow = timeProvider.GetUtcNow();
         IReadOnlyDictionary<Guid, string?> subjectNamesById =
             ParentDashboardHelpers.GetSubjectNamesById(contextResult.Value.Student);
 
-        ParentDashboardStudySessionResponse[] sessions = ParentDashboardHelpers
-            .OrderSessions(ParentDashboardHelpers.ApplyFilters(startedSessions, filtersResult.Value))
-            .Select(session => ParentDashboardHelpers.ToSessionResponse(session, subjectNamesById, utcNow))
+        StudySession[] sessions = ParentDashboardHelpers
+            .OrderSessions(ParentDashboardHelpers.ApplyFilters(startedSessions.Where(session =>
+                studentLocalTime.GetLocalDate(session.StartedAtUtc!.Value, contextResult.Value.Student) >= week.Value.StartsOn &&
+                studentLocalTime.GetLocalDate(session.StartedAtUtc!.Value, contextResult.Value.Student) <= week.Value.EndsOn), filtersResult.Value))
             .ToArray();
 
-        return ParentDashboardHelpers.CreateCsvExport(request.StudentId, sessions, utcNow);
+        return ParentDashboardHelpers.CreateRawCsvExport(request.StudentId, sessions, subjectNamesById, utcNow);
     }
 }

@@ -4,6 +4,7 @@ using FocusLens.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace FocusLens.Infrastructure.Data.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDBContextModelSnapshot : ModelSnapshot
+    [Migration("20261003015249_AddSelectedParentOverviewWeek")]
+    partial class AddSelectedParentOverviewWeek
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -785,32 +788,6 @@ namespace FocusLens.Infrastructure.Data.Migrations
                         .IsUnique();
 
                     b.ToTable("Students", (string)null);
-                });
-
-            modelBuilder.Entity("FocusLens.Domain.Students.StudentWeek", b =>
-                {
-                    b.Property<Guid>("Id").ValueGeneratedOnAdd().HasColumnType("uniqueidentifier");
-                    b.Property<DateTimeOffset>("CreatedAtUtc").HasColumnType("datetimeoffset");
-                    b.Property<string>("CreatedBy").HasColumnType("nvarchar(max)");
-                    b.Property<DateOnly>("EndsOn").HasColumnType("date");
-                    b.Property<DateTimeOffset>("LastModifiedUtc").HasColumnType("datetimeoffset");
-                    b.Property<string>("LastModifiedBy").HasColumnType("nvarchar(max)");
-                    b.Property<DateOnly>("StartsOn").HasColumnType("date");
-                    b.Property<Guid>("StudentId").HasColumnType("uniqueidentifier");
-                    b.HasKey("Id");
-                    b.HasIndex("StudentId", "StartsOn").IsUnique();
-                    b.ToTable("StudentWeeks", (string)null);
-                });
-
-            modelBuilder.Entity("FocusLens.Domain.Students.StudentWeek", b =>
-                {
-                    b.HasOne("FocusLens.Domain.Student", "Student")
-                        .WithMany("Weeks")
-                        .HasForeignKey("StudentId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Student");
                 });
 
             modelBuilder.Entity("FocusLens.Domain.Students.StudyGoalProposal", b =>

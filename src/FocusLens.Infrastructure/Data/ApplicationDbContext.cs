@@ -22,6 +22,8 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
 
     public DbSet<Student> Students => Set<Student>();
 
+    public DbSet<StudentWeek> StudentWeeks => Set<StudentWeek>();
+
     public DbSet<StudySession> StudySessions => Set<StudySession>();
 
     public DbSet<StudyMaterial> StudyMaterials => Set<StudyMaterial>();

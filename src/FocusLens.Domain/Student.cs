@@ -37,14 +37,22 @@ public class Student : AuditableEntity
 
     public ICollection<StudentSubject> Subjects { get; } = [];
 
+    public ICollection<StudentWeek> Weeks { get; } = [];
+
 
     public StudyTimeGoal? StudyTimeGoal { get; private set; }
 
     public DayOfWeek? WeekStartsOn { get; private set; }
 
+    // IANA identifier supplied by the student's device. Null means legacy accounts
+    // use the explicit UTC fallback until their device reports a time zone.
+    public string? TimeZoneId { get; private set; }
+
     public bool ShareSessionSummariesWithParents { get; private set; }
 
     public bool ShareSubjectTrendsWithParents { get; private set; }
+
+    public bool ShareDetailedAnswersWithParents { get; private set; }
 
     public bool IsOnboardingCompleted { get; private set; }
 
@@ -109,6 +117,12 @@ public class Student : AuditableEntity
         WeekStartsOn = weekStartsOn;
     }
 
+    public void SetTimeZoneId(string timeZoneId)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(timeZoneId);
+        TimeZoneId = timeZoneId.Trim();
+    }
+
     public void SetPreferredName(string? preferredName)
     {
         PreferredName = preferredName?.Trim();
@@ -122,10 +136,12 @@ public class Student : AuditableEntity
 
     public void SetParentSharingPreferences(
         bool shareSessionSummaries,
-        bool shareSubjectTrends)
+        bool shareSubjectTrends,
+        bool shareDetailedAnswers = false)
     {
         ShareSessionSummariesWithParents = shareSessionSummaries;
         ShareSubjectTrendsWithParents = shareSubjectTrends;
+        ShareDetailedAnswersWithParents = shareDetailedAnswers;
     }
 
     public void CompleteOnboarding(

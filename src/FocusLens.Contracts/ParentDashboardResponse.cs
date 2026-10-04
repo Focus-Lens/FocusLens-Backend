@@ -1,19 +1,13 @@
-using FocusLens.Contracts.Students;
-
 namespace FocusLens.Contracts;
 
 public sealed record ParentDashboardResponse(
     Guid StudentId,
-    StudyTimeGoalResponse? CurrentStudyGoal,
-    ParentDashboardStudyGoalProgressResponse? CurrentStudyGoalProgress,
-    StudyGoalProposalResponse? PendingStudyGoalProposal,
-    StudyGoalProposalResponse? CurrentStudyGoalAcceptedProposal,
-    IReadOnlyCollection<ParentDashboardStudySessionResponse> RecentStudySessions,
-    int CompletedSessionsCount,
-    int ActiveStudyDaysCount,
-    int? FocusQuality,
-    ParentDashboardWeeklyStudyPulseResponse WeeklyStudyPulse
-);
+    ParentDashboardWeekResponse Week,
+    ParentDashboardWeeklyStudyPulseResponse WeeklyStudyPulse,
+    ParentDashboardFocusPatternResponse FocusPattern)
+;
+
+public sealed record ParentDashboardWeekResponse(DateOnly StartsOn, DateOnly EndsOn, bool IsCurrentWeek);
 
 public sealed record ParentDashboardStudySessionResponse(
     Guid Id,
@@ -25,38 +19,66 @@ public sealed record ParentDashboardStudySessionResponse(
     DateTimeOffset? LastActivityAtUtc,
     Guid? SelectedSubjectId,
     string? SubjectName,
-    int ActualStudyMinutes,
-    int? PlannedFocusDurationMinutes
+    string ActualStudyMinutes,
+    string? PlannedFocusDurationMinutes,
+    int? FocusQuality,
+    string? FocusState,
+    string? FocusTrend
 );
 
 public sealed record ParentDashboardWeeklyStudyPulseResponse(
-    DayOfWeek WeekStartsOn,
-    DateOnly StartsOn,
-    DateOnly EndsOn,
-    int ActualStudyMinutes,
-    int PreviousPeriodActualStudyMinutes,
-    int ActualStudyMinutesTrend,
-    IReadOnlyCollection<ParentDashboardWeeklyStudyPulseDayResponse> Days
+    string TotalStudyMinutes,
+    string PreviousWeekStudyMinutes,
+    string StudyMinutesTrend,
+    IReadOnlyCollection<ParentDashboardWeeklyStudyPulseDayResponse> Days,
+    ParentDashboardWeeklyStudyPulseDayResponse? PeakDay,
+    int TotalSessions,
+    int CompletedSessions,
+    int ActiveStudyDays,
+    ParentDashboardFocusQualityResponse FocusQuality
 );
+
+public sealed record ParentDashboardFocusQualityResponse(string? Trend);
+
+public sealed record ParentOverviewWeekResponse(DateOnly StartsOn, DateOnly EndsOn, bool IsCurrentWeek);
+
+public sealed record ParentOverviewWeeksResponse(IReadOnlyCollection<ParentOverviewWeekResponse> Weeks);
+
+public sealed record UpdateParentOverviewWeekRequest(DateOnly? WeekStart);
 
 public sealed record ParentDashboardWeeklyStudyPulseDayResponse(
     DateOnly Date,
-    int ActualStudyMinutes
+    string Day,
+    string StudyMinutes
 );
 
-public sealed record ParentDashboardStudyGoalProgressResponse(
-    int CompletedMinutes,
-    decimal CompletionPercentage,
-    int DaysRemaining,
-    DateOnly StartsOn,
-    DateOnly EndsOn,
-    IReadOnlyCollection<ParentDashboardWeeklyStudyPulseDayResponse> Days
+public sealed record ParentDashboardFocusPatternResponse(
+    IReadOnlyCollection<ParentDashboardFocusPatternDayResponse> Days,
+    ParentDashboardFocusPatternTimeBlockResponse? MostActiveTimeBlock
+);
+
+public sealed record ParentDashboardFocusPatternDayResponse(
+    string Day,
+    IReadOnlyCollection<ParentDashboardFocusPatternSessionResponse> Sessions
+);
+
+public sealed record ParentDashboardFocusPatternSessionResponse(
+    string StartTime,
+    string StudyMinutes
+);
+
+public sealed record ParentDashboardFocusPatternTimeBlockResponse(
+    string StartTime,
+    string EndTime
 );
 
 public sealed record ParentDashboardSessionHistoryResponse(
     IReadOnlyCollection<ParentDashboardStudySessionResponse> Sessions,
     ParentDashboardPaginationResponse Pagination
-);
+)
+{
+    public ParentDashboardWeekResponse? Week { get; init; }
+}
 
 public sealed record ParentDashboardPaginationResponse(
     int Page,

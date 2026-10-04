@@ -22,6 +22,17 @@ public sealed class StudentsController(ISender sender) : ApiController
         return student is null ? NotFound() : Ok(student);
     }
 
+    /// <summary>Sets the authenticated student's device IANA time zone (for example, Africa/Cairo).</summary>
+    [HttpPut("timezone")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    public async Task<IActionResult> UpdateTimeZone(
+        [FromBody] UpdateStudentTimeZoneRequest request,
+        CancellationToken cancellationToken)
+    {
+        Result<Success> result = await sender.Send(new UpdateStudentTimeZoneCommand(request), cancellationToken);
+        return result.Match(_ => NoContent(), Problem);
+    }
+
     [HttpGet("me/child-setup")]
     public async Task<IActionResult> GetMyChildSetup(
         CancellationToken cancellationToken)

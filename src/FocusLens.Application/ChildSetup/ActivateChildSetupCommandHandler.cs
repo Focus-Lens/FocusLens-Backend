@@ -22,7 +22,8 @@ public sealed class ActivateChildSetupCommandHandler(
     IBaseRepository<ParentStudentRelationship> relationshipRepository,
     ICurrentUser currentUser,
     IIdentityService identityService,
-    IUnitOfWork unitOfWork
+    IUnitOfWork unitOfWork,
+    IBaseRepository<Parent>? parentRepository = null
 ) : IRequestHandler<ActivateChildSetupCommand, Result<StudentDetailsResponse>>
 {
     public async Task<Result<StudentDetailsResponse>> Handle(
@@ -71,6 +72,18 @@ public sealed class ActivateChildSetupCommandHandler(
                 "ChildSetup.NotReadyForActivation",
                 "Only a claimed child setup can be activated."
             );
+        }
+
+        // A parent's calendar choice becomes the student's persisted calendar
+        // preference when the parent-managed setup is activated. Overview reads
+        // only the student-owned value thereafter.
+        Parent? parent = parentRepository is null
+            ? null
+            : await parentRepository.GetByIdAsync(draft.ParentId);
+
+        if (parent?.WeekStartsOn is DayOfWeek weekStartsOn)
+        {
+            student.SetWeekStartsOn(weekStartsOn);
         }
 
         ApplicationUser? user = await identityService.FindByIdAsync(userId);
@@ -172,6 +185,8 @@ public sealed class ActivateChildSetupCommandHandler(
             relationship.Accept();
             relationshipRepository.Update(relationship);
         }
+
+        student.SetParentSharingPreferences(true, true, true);
 
         if (!string.IsNullOrWhiteSpace(draft.ProfileImageStorageReference))
         {

@@ -155,6 +155,7 @@ public sealed class UpdateStudentPreferencesCommandHandler(
                || request.PreferredNameProvided
                || request.ShareSessionSummariesWithParentsProvided
                || request.ShareSubjectTrendsWithParentsProvided
+               || request.ShareDetailedAnswersWithParentsProvided
                || request.WeekStartsOnProvided
                || request.SubjectsProvided;
     }
@@ -360,7 +361,8 @@ public sealed class UpdateStudentPreferencesCommandHandler(
         error = null;
 
         if (!request.ShareSessionSummariesWithParentsProvided &&
-            !request.ShareSubjectTrendsWithParentsProvided)
+            !request.ShareSubjectTrendsWithParentsProvided &&
+            !request.ShareDetailedAnswersWithParentsProvided)
         {
             return true;
         }
@@ -371,7 +373,10 @@ public sealed class UpdateStudentPreferencesCommandHandler(
                 : student.ShareSessionSummariesWithParents,
             request.ShareSubjectTrendsWithParentsProvided
                 ? request.ShareSubjectTrendsWithParents!.Value
-                : student.ShareSubjectTrendsWithParents);
+                : student.ShareSubjectTrendsWithParents,
+            request.ShareDetailedAnswersWithParentsProvided
+                ? request.ShareDetailedAnswersWithParents!.Value
+                : student.ShareDetailedAnswersWithParents);
 
         return true;
     }
@@ -384,8 +389,11 @@ public sealed class UpdateStudentPreferencesCommandHandler(
         bool trendsChanged = request.ShareSubjectTrendsWithParentsProvided &&
                              request.ShareSubjectTrendsWithParents !=
                              student.ShareSubjectTrendsWithParents;
+        bool detailedAnswersChanged = request.ShareDetailedAnswersWithParentsProvided &&
+                                    request.ShareDetailedAnswersWithParents !=
+                                    student.ShareDetailedAnswersWithParents;
 
-        return summariesChanged || trendsChanged;
+        return summariesChanged || trendsChanged || detailedAnswersChanged;
     }
 
     private static bool TryUpdateCustomGrade(

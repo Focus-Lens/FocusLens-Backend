@@ -16,6 +16,7 @@ public sealed record StudentDetailsResponse(
     IReadOnlyCollection<StudentSubjectResponse> Subjects,
     StudyTimeGoalResponse? StudyTimeGoal,
     DayOfWeek? WeekStartsOn,
+    string? TimeZoneId,
     bool ShareSessionSummariesWithParents,
     bool ShareSubjectTrendsWithParents,
     bool ShareDetailedAnswersWithParents,

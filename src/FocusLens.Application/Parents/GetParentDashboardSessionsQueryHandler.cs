@@ -4,6 +4,8 @@ using FocusLens.Domain.Access;
 using FocusLens.Domain.Common.Interfaces;
 using FocusLens.Domain.Common.Results;
 using FocusLens.Domain.StudySessions;
+using FocusLens.Domain.Students;
+using FocusLens.Application.Common.Interfaces;
 using MediatR;
 using ICurrentUser = FocusLens.Application.Common.Interfaces.ICurrentUser;
 
@@ -14,8 +16,11 @@ public sealed class GetParentDashboardSessionsQueryHandler(
     IBaseRepository<ParentStudentRelationship> relationshipRepository,
     IBaseRepository<Student> studentRepository,
     IBaseRepository<StudySession> studySessionRepository,
+    IBaseRepository<StudentWeek> weekRepository,
     ICurrentUser currentUser,
-    TimeProvider timeProvider)
+    TimeProvider timeProvider,
+    IUnitOfWork? unitOfWork = null,
+    IStudentLocalTime? studentLocalTime = null)
     : IRequestHandler<GetParentDashboardSessionsQuery, Result<ParentDashboardSessionHistoryResponse>>
 {
     public async Task<Result<ParentDashboardSessionHistoryResponse>> Handle(
@@ -33,6 +38,9 @@ public sealed class GetParentDashboardSessionsQueryHandler(
         {
             return contextResult.Errors;
         }
+        studentLocalTime ??= new Common.Services.StudentLocalTime(timeProvider);
+        Result<ParentOverviewWeekResponse> week = await OverviewWeekResolver.ResolveAsync(contextResult.Value, studentLocalTime, weekRepository, unitOfWork);
+        if (week.IsError) return week.Errors;
 
         if (!contextResult.Value.Student.ShareSessionSummariesWithParents)
         {
@@ -54,11 +62,14 @@ public sealed class GetParentDashboardSessionsQueryHandler(
 
         StudySession[] startedSessions = (await studySessionRepository.GetAllAsync(session =>
                 session.StudentId == request.StudentId &&
-                session.StartedAtUtc != null))
+                session.StartedAtUtc != null,
+                session => session.PauseIntervals))
             .ToArray();
 
         StudySession[] matchingSessions = ParentDashboardHelpers
-            .ApplyFilters(startedSessions, filtersResult.Value)
+            .ApplyFilters(startedSessions.Where(session =>
+                studentLocalTime.GetLocalDate(session.StartedAtUtc!.Value, contextResult.Value.Student) >= week.Value.StartsOn &&
+                studentLocalTime.GetLocalDate(session.StartedAtUtc!.Value, contextResult.Value.Student) <= week.Value.EndsOn), filtersResult.Value)
             .ToArray();
 
         int totalCount = matchingSessions.Length;
@@ -83,6 +94,9 @@ public sealed class GetParentDashboardSessionsQueryHandler(
                 request.Page,
                 request.PageSize,
                 totalCount,
-                totalPages));
+                totalPages))
+        {
+            Week = new ParentDashboardWeekResponse(week.Value.StartsOn, week.Value.EndsOn, week.Value.IsCurrentWeek)
+        };
     }
 }

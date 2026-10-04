@@ -172,6 +172,15 @@ public sealed class StudySessionQuestionHandler(
 
         DateTimeOffset now = timeProvider.GetUtcNow();
 
+        // Answering a question is genuine study activity.  Keep the session's
+        // activity watermark current so a later completion is not measured
+        // from an unrelated stale heartbeat.
+        Result<Success> activityResult = session.UpdateProgress(null, now);
+        if (activityResult.IsError)
+        {
+            return activityResult.TopError;
+        }
+
         if (session.Selection?.AiExtractedText is not { Length: > 0 } content)
         {
             return Error.Validation(

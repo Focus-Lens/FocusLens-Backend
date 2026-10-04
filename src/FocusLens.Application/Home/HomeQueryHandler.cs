@@ -1,3 +1,4 @@
+using FocusLens.Application.Common.Interfaces;
 using FocusLens.Contracts.Home;
 using FocusLens.Domain;
 using FocusLens.Domain.Common.Interfaces;
@@ -10,7 +11,8 @@ namespace FocusLens.Application.Home;
 public sealed class HomeQueryHandler(
     IBaseRepository<Student> studentRepository,
     IBaseRepository<StudySession> studySessionRepository,
-    ICurrentUser currentUser)
+    ICurrentUser currentUser,
+    IStudentLocalTime studentLocalTime)
     : IRequestHandler<GetStudyOverviewQuery, StudyOverviewResponse?>,
         IRequestHandler<GetStudyStreakQuery, StudyStreakResponse?>,
         IRequestHandler<GetSessionsByDayQuery, SessionsByDayResponse?>
@@ -18,13 +20,13 @@ public sealed class HomeQueryHandler(
     public async Task<SessionsByDayResponse?> Handle(GetSessionsByDayQuery request,
         CancellationToken cancellationToken)
     {
-        IReadOnlyCollection<DateOnly>? sessionDates = await GetSessionDatesAsync();
-        if (sessionDates is null)
+        (Student Student, IReadOnlyCollection<DateOnly> SessionDates)? data = await GetSessionDatesAsync();
+        if (data is null)
         {
             return null;
         }
 
-        return new SessionsByDayResponse(sessionDates
+        return new SessionsByDayResponse(data.Value.SessionDates
             .GroupBy(date => date)
             .OrderBy(group => group.Key)
             .Select(group => new SessionsByDayItemResponse(group.Key, group.Count()))
@@ -34,29 +36,29 @@ public sealed class HomeQueryHandler(
     public async Task<StudyOverviewResponse?> Handle(GetStudyOverviewQuery request,
         CancellationToken cancellationToken)
     {
-        IReadOnlyCollection<DateOnly>? sessionDates = await GetSessionDatesAsync();
-        if (sessionDates is null)
+        (Student Student, IReadOnlyCollection<DateOnly> SessionDates)? data = await GetSessionDatesAsync();
+        if (data is null)
         {
             return null;
         }
 
-        DateOnly today = DateOnly.FromDateTime(DateTime.UtcNow);
+        DateOnly today = studentLocalTime.GetToday(data.Value.Student);
         return new StudyOverviewResponse(
-            GetStreakDays(sessionDates, today),
-            sessionDates.Count(date => date == today),
+            GetStreakDays(data.Value.SessionDates, today),
+            data.Value.SessionDates.Count(date => date == today),
             null,
             null);
     }
 
     public async Task<StudyStreakResponse?> Handle(GetStudyStreakQuery request, CancellationToken cancellationToken)
     {
-        IReadOnlyCollection<DateOnly>? sessionDates = await GetSessionDatesAsync();
-        return sessionDates is null
+        (Student Student, IReadOnlyCollection<DateOnly> SessionDates)? data = await GetSessionDatesAsync();
+        return data is null
             ? null
-            : new StudyStreakResponse(GetStreakDays(sessionDates, DateOnly.FromDateTime(DateTime.UtcNow)));
+            : new StudyStreakResponse(GetStreakDays(data.Value.SessionDates, studentLocalTime.GetToday(data.Value.Student)));
     }
 
-    private async Task<IReadOnlyCollection<DateOnly>?> GetSessionDatesAsync()
+    private async Task<(Student Student, IReadOnlyCollection<DateOnly> SessionDates)?> GetSessionDatesAsync()
     {
         if (currentUser.UserId is not Guid userId || userId == Guid.Empty)
         {
@@ -72,9 +74,9 @@ public sealed class HomeQueryHandler(
         IEnumerable<StudySession> sessions =
             await studySessionRepository.GetAllAsync(item =>
                 item.StudentId == student.Id && item.StartedAtUtc != null);
-        return sessions
-            .Select(item => DateOnly.FromDateTime(item.StartedAtUtc!.Value.UtcDateTime))
-            .ToArray();
+        return (student, sessions
+            .Select(item => studentLocalTime.GetLocalDate(item.StartedAtUtc!.Value, student))
+            .ToArray());
     }
 
     private static int GetStreakDays(IReadOnlyCollection<DateOnly> sessionDates, DateOnly today)

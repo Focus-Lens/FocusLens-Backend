@@ -29,6 +29,8 @@ public class ParentStudentRelationshipConfiguration
 
         builder.Property(relationship => relationship.RevokedAtUtc).IsRequired(false);
 
+        builder.Property(relationship => relationship.SelectedOverviewWeekStart).IsRequired(false);
+
         builder
             .HasIndex(relationship => new { relationship.ParentId, relationship.StudentId })
             .IsUnique();

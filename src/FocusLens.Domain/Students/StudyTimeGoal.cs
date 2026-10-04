@@ -28,6 +28,24 @@ public sealed record StudyTimeGoal
 
     public DateOnly? StartDate { get; private set; }
 
+    /// <summary>
+    /// The inclusive end of a finite goal period. Weekly goals are deliberately
+    /// tied to the week in which they were created; they do not renew.
+    /// </summary>
+    public DateOnly? EndDate => Period == StudyTimeGoalPeriod.Weekly && StartDate is DateOnly startDate
+        ? startDate.AddDays(6)
+        : null;
+
+    public bool IsActiveOn(DateOnly date)
+    {
+        if (StartDate is not DateOnly startDate || date < startDate)
+        {
+            return false;
+        }
+
+        return EndDate is not DateOnly endDate || date <= endDate;
+    }
+
     public static Result<StudyTimeGoal> Create(
         StudyTimeGoalPeriod period,
         int targetMinutes,

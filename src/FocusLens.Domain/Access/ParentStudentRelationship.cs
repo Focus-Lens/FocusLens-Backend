@@ -53,9 +53,15 @@ public class ParentStudentRelationship : AuditableEntity
 
     public DateTimeOffset? RevokedAtUtc { get; private set; }
 
+    // UI context owned by one parent/student relationship, not a shared student preference.
+    public DateOnly? SelectedOverviewWeekStart { get; private set; }
+
     public Parent Parent { get; private set; } = null!;
 
     public Student Student { get; private set; } = null!;
+
+    public void SetSelectedOverviewWeekStart(DateOnly? weekStart) =>
+        SelectedOverviewWeekStart = weekStart;
 
     public bool IsExpired(DateTimeOffset now)
     {

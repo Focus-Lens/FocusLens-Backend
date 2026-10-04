@@ -1,4 +1,5 @@
 using FocusLens.Application.Common.Errors;
+using FocusLens.Application.Common.Interfaces;
 using FocusLens.Application.Common.Utilities;
 using FocusLens.Application.Common.Mappings;
 using FocusLens.Contracts.Students;
@@ -25,7 +26,8 @@ public sealed class CompleteStudentOnboardingCommandHandler(
     ICurrentUser currentUser,
     IUnitOfWork unitOfWork,
     IIdentityService identityService,
-    TimeProvider timeProvider)
+    TimeProvider timeProvider,
+    IStudentLocalTime? studentLocalTime = null)
     : IRequestHandler<CompleteStudentOnboardingCommand, Result<CompleteStudentOnboardingResponse>>
 {
     public async Task<Result<CompleteStudentOnboardingResponse>> Handle(
@@ -87,7 +89,8 @@ public sealed class CompleteStudentOnboardingCommandHandler(
 
             DayOfWeek weekStartsOn = ResolveWeekStartsOn(activeRelationships, student);
 
-            DateOnly today = DateOnly.FromDateTime(timeProvider.GetUtcNow().UtcDateTime);
+            studentLocalTime ??= new FocusLens.Application.Common.Services.StudentLocalTime(timeProvider);
+            DateOnly today = studentLocalTime.GetToday(student);
             Result<StudyTimeGoal> studyTimeGoal = StudyTimeGoal.Create(
                 DomainStudyTimeGoalPeriod.Weekly,
                 targetMinutes.Value,

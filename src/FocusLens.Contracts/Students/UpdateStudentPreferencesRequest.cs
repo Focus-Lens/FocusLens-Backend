@@ -11,6 +11,7 @@ public sealed class UpdateStudentPreferencesRequest
     private string? _preferredName;
     private bool? _shareSessionSummariesWithParents;
     private bool? _shareSubjectTrendsWithParents;
+    private bool? _shareDetailedAnswersWithParents;
     private DayOfWeek? _weekStartsOn;
     
     private StudyTimeGoalRequest? _studyTimeGoal;
@@ -106,6 +107,16 @@ public sealed class UpdateStudentPreferencesRequest
         }
     }
 
+    public bool? ShareDetailedAnswersWithParents
+    {
+        get => _shareDetailedAnswersWithParents;
+        set
+        {
+            ShareDetailedAnswersWithParentsProvided = true;
+            _shareDetailedAnswersWithParents = value;
+        }
+    }
+
     public DayOfWeek? WeekStartsOn
     {
         get => _weekStartsOn;
@@ -135,6 +146,8 @@ public sealed class UpdateStudentPreferencesRequest
     [JsonIgnore] public bool ShareSessionSummariesWithParentsProvided { get; private set; }
 
     [JsonIgnore] public bool ShareSubjectTrendsWithParentsProvided { get; private set; }
+
+    [JsonIgnore] public bool ShareDetailedAnswersWithParentsProvided { get; private set; }
 
     [JsonIgnore] public bool WeekStartsOnProvided { get; private set; }
 }

@@ -7,5 +7,6 @@ public sealed record StudyTimeGoalResponse(
     string Period,
     int TargetMinutes,
     IReadOnlyCollection<DayOfWeek> Days,
-    DateOnly? StartDate
+    DateOnly? StartDate,
+    DateOnly? EndDate
 );

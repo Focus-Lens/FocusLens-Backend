@@ -1,4 +1,5 @@
 using FocusLens.Application.Reports;
+using FocusLens.Application.Common.Interfaces;
 using FocusLens.Contracts.Progress;
 using FocusLens.Domain;
 using FocusLens.Domain.Access;
@@ -17,7 +18,8 @@ public sealed class ProgressQueryHandler(
     IBaseRepository<StudySession> sessionRepository,
     ReportSessionMetricsCalculator metricsCalculator,
     ICurrentUser currentUser,
-    TimeProvider timeProvider)
+    TimeProvider timeProvider,
+    IStudentLocalTime? studentLocalTime = null)
     : IRequestHandler<GetProgressQuery, ProgressResponse?>
 {
     // v1 intentionally evaluates sufficiency inside the selected range.
@@ -26,8 +28,14 @@ public sealed class ProgressQueryHandler(
     public async Task<ProgressResponse?> Handle(GetProgressQuery request, CancellationToken cancellationToken)
     {
         Student? student = await GetAuthorizedStudentAsync(request.StudentId);
-        DateRange? range = ResolveRange(request);
-        if (student is null || range is null)
+        if (student is null)
+        {
+            return null;
+        }
+
+        studentLocalTime ??= new FocusLens.Application.Common.Services.StudentLocalTime(timeProvider);
+        DateRange? range = ResolveRange(request, student);
+        if (range is null)
         {
             return null;
         }
@@ -40,13 +48,13 @@ public sealed class ProgressQueryHandler(
                            session.Status != StudySessionStatus.Ready,
                 session => session.Selection!.SelectedSections,
                 session => session.CompletedSections))
-            .Where(session => IsWithinRange(session.StartedAtUtc!.Value, range))
+            .Where(session => IsWithinRange(session.StartedAtUtc!.Value, range, student))
             .ToList();
 
         IReadOnlyDictionary<Guid, ReportSessionMetrics> metrics = await metricsCalculator.CalculateAsync(sessions);
         ProgressDailyItemResponse[] daily = Enumerable.Range(0, range.DateTo.DayNumber - range.DateFrom.DayNumber + 1)
             .Select(offset => range.DateFrom.AddDays(offset))
-            .Select(date => CreateDaily(date, sessions, metrics))
+            .Select(date => CreateDaily(date, sessions, metrics, student))
             .ToArray();
         ProgressSubjectItemResponse[] subjects = sessions
             .GroupBy(session => session.SelectedSubjectId)
@@ -111,9 +119,9 @@ public sealed class ProgressQueryHandler(
             : null;
     }
 
-    private DateRange? ResolveRange(GetProgressQuery request)
+    private DateRange? ResolveRange(GetProgressQuery request, Student student)
     {
-        DateOnly today = DateOnly.FromDateTime(timeProvider.GetUtcNow().UtcDateTime);
+        DateOnly today = studentLocalTime!.GetToday(student);
         string range = string.IsNullOrWhiteSpace(request.Range) ? "Last30Days" : request.Range.Trim();
         return range.ToLowerInvariant() switch
         {
@@ -125,20 +133,20 @@ public sealed class ProgressQueryHandler(
         };
     }
 
-    private static bool IsWithinRange(DateTimeOffset startedAtUtc, DateRange range)
+    private bool IsWithinRange(DateTimeOffset startedAtUtc, DateRange range, Student student)
     {
-        // v1 groups calendar days in UTC. A user-timezone contract can replace this when introduced.
-        DateOnly date = DateOnly.FromDateTime(startedAtUtc.UtcDateTime);
+        DateOnly date = studentLocalTime!.GetLocalDate(startedAtUtc, student);
         return date >= range.DateFrom && date <= range.DateTo;
     }
 
-    private static ProgressDailyItemResponse CreateDaily(
+    private ProgressDailyItemResponse CreateDaily(
         DateOnly date,
         IEnumerable<StudySession> sessions,
-        IReadOnlyDictionary<Guid, ReportSessionMetrics> metrics)
+        IReadOnlyDictionary<Guid, ReportSessionMetrics> metrics,
+        Student student)
     {
         StudySession[] matching = sessions.Where(session =>
-            DateOnly.FromDateTime(session.StartedAtUtc!.Value.UtcDateTime) == date).ToArray();
+            studentLocalTime!.GetLocalDate(session.StartedAtUtc!.Value, student) == date).ToArray();
         return new ProgressDailyItemResponse(date, matching.Length,
             matching.Sum(session => metrics[session.Id].DurationMinutes));
     }

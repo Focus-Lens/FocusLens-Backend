@@ -16,16 +16,16 @@ internal static class StudentMappings
             student.PreferredName,
             student.User.FirstName,
             student.User.LastName,
-            student.Grade is null
-                ? null
-                : StudentEnumMapper.ToContract(student.Grade.Value),
-            student.Subjects
-                .Select(subject => new StudentSubjectResponse(
+            student.Grade is null ? null : StudentEnumMapper.ToContract(student.Grade.Value),
+            student
+                .Subjects.Select(subject => new StudentSubjectResponse(
                     subject.Id,
                     StudentEnumMapper.ToContract(subject.Type),
-                    subject.CustomName))
+                    subject.CustomName
+                ))
                 .ToList(),
-            student.IsOnboardingCompleted);
+            student.IsOnboardingCompleted
+        );
     }
 
     public static StudentDetailsResponse ToDetailsResponse(this Student student)
@@ -41,15 +41,14 @@ internal static class StudentMappings
             student.ProfileImageStorageReference,
             student.DateOfBirth,
             student.Goal is null ? null : StudentEnumMapper.ToContract(student.Goal.Value),
-            student.Grade is null
-                ? null
-                : StudentEnumMapper.ToContract(student.Grade.Value),
+            student.Grade is null ? null : StudentEnumMapper.ToContract(student.Grade.Value),
             student.CustomGrade,
-            student.Subjects
-                .Select(subject => new StudentSubjectResponse(
+            student
+                .Subjects.Select(subject => new StudentSubjectResponse(
                     subject.Id,
                     StudentEnumMapper.ToContract(subject.Type),
-                    subject.CustomName))
+                    subject.CustomName
+                ))
                 .ToList(),
             student.StudyTimeGoal is null
                 ? null
@@ -57,12 +56,16 @@ internal static class StudentMappings
                     student.StudyTimeGoal.Period.ToString(),
                     student.StudyTimeGoal.TargetMinutes,
                     student.StudyTimeGoal.Days,
-                    student.StudyTimeGoal.StartDate),
+                    student.StudyTimeGoal.StartDate,
+                    student.StudyTimeGoal.EndDate
+                ),
             student.WeekStartsOn,
+            student.TimeZoneId,
             student.ShareSessionSummariesWithParents,
             student.ShareSubjectTrendsWithParents,
-            false,
+            student.ShareDetailedAnswersWithParents,
             student.IsOnboardingCompleted ? "completed" : "incomplete",
-            student.GetMissingOnboardingFields());
+            student.GetMissingOnboardingFields()
+        );
     }
 }

@@ -31,7 +31,8 @@ internal static class StudyGoalProposalMappings
             weekStartsOn is DayOfWeek value
                 ? ParentWeekdayOrder.OrderDays(goal.Days, value)
                 : goal.Days,
-            goal.StartDate);
+            goal.StartDate,
+            goal.EndDate);
     }
 
     private static string? GetSuggestedByParentName(Parent? parent)

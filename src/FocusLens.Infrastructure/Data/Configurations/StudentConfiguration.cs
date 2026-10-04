@@ -40,6 +40,10 @@ public class StudentConfiguration : IEntityTypeConfiguration<Student>
             .HasMaxLength(20)
             .IsUnicode(false);
 
+        builder.Property(student => student.TimeZoneId)
+            .HasMaxLength(100)
+            .IsUnicode(false);
+
         builder.OwnsOne(student => student.StudyTimeGoal, goalBuilder =>
         {
             goalBuilder.Property(goal => goal.Period)
@@ -76,6 +80,10 @@ public class StudentConfiguration : IEntityTypeConfiguration<Student>
             .HasDefaultValue(false);
 
         builder.Property(student => student.ShareSubjectTrendsWithParents)
+            .IsRequired()
+            .HasDefaultValue(false);
+
+        builder.Property(student => student.ShareDetailedAnswersWithParents)
             .IsRequired()
             .HasDefaultValue(false);
 

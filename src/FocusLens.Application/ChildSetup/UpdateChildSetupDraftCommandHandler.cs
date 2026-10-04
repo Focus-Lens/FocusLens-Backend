@@ -328,7 +328,8 @@ public sealed class UpdateChildSetupDraftCommandHandler(
                     weekStartsOn is DayOfWeek value
                         ? ParentWeekdayOrder.OrderDays(draft.StudyTimeGoal.Days, value)
                         : draft.StudyTimeGoal.Days,
-                    draft.StudyTimeGoal.StartDate),
+                    draft.StudyTimeGoal.StartDate,
+                    draft.StudyTimeGoal.EndDate),
             draft.ProfileSetupMode?.ToString(),
             draft.ProfileImageStorageReference);
     }

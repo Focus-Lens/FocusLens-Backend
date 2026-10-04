@@ -230,6 +230,10 @@ public sealed class StudySession : AuditableEntity
         AccumulatedPausedSeconds = 0;
         CompletedAtUtc = null;
         CancelledAtUtc = null;
+        // An active session is only live while the client continues to report
+        // activity.  This also gives a newly started session a deterministic
+        // heartbeat baseline.
+        LastActivityAtUtc = startedAtUtc;
         return Result.Success;
     }
 
@@ -320,7 +324,12 @@ public sealed class StudySession : AuditableEntity
             CurrentPage = currentPage;
         }
 
-        LastActivityAtUtc = activityAtUtc;
+        // Retries and delayed requests must never move the activity watermark
+        // backwards (or make a previously counted interval count again).
+        if (LastActivityAtUtc is null || activityAtUtc > LastActivityAtUtc.Value)
+        {
+            LastActivityAtUtc = activityAtUtc;
+        }
         return Result.Success;
     }
 

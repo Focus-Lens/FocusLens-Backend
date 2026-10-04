@@ -3,6 +3,7 @@ using FocusLens.Application.Common.Behaviours;
 using FocusLens.Application.Common.Interfaces;
 using FocusLens.Application.StudySessions;
 using FocusLens.Application.Notifications;
+using FocusLens.Application.Common.Services;
 using MediatR;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -26,6 +27,7 @@ public static class DependencyInjection
 
         services.AddScoped<INotificationWriter, NotificationWriter>();
         services.AddScoped<IStudySessionFinalBehaviorAnalysisService, StudySessionFinalBehaviorAnalysisService>();
+        services.AddScoped<IStudentLocalTime, StudentLocalTime>();
 
         return services;
     }

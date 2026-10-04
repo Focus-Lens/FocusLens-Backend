@@ -6,8 +6,8 @@ using FocusLens.Domain.Access;
 using FocusLens.Domain.Common.Results;
 using FocusLens.Domain.Identity;
 using FocusLens.Domain.Students;
+using MediatR;
 using DomainStudyTimeGoalPeriod = FocusLens.Domain.Students.StudyTimeGoalPeriod;
-using ContractStudyTimeGoalPeriod = FocusLens.Contracts.Students.StudyTimeGoalPeriod;
 
 namespace FocusLens.Application.UnitTests.Students;
 
@@ -18,10 +18,17 @@ public sealed class StudyGoalProposalCommandHandlerTests
     {
         Guid parentUserId = Guid.NewGuid();
         Parent parent = CreateParent(parentUserId);
-        parent.SetPrivateProperty("User", new ApplicationUser { FirstName = "Mona", LastName = "Hassan" });
+        parent.SetPrivateProperty("User", new ApplicationUser
+        {
+            FirstName = "Mona",
+            LastName = "Hassan"
+        });
+
         Student student = CreateStudent();
+
         ParentStudentRelationship relationship = new(parent.Id, student.Id);
         relationship.Accept();
+
         InMemoryRepository<StudyGoalProposal> proposalRepository = new();
         FakeUnitOfWork unitOfWork = new();
 
@@ -32,14 +39,13 @@ public sealed class StudyGoalProposalCommandHandlerTests
             proposalRepository,
             new FakeCurrentUser(parentUserId),
             unitOfWork,
-            new FixedTimeProvider(new DateTimeOffset(2026, 9, 16, 12, 0, 0, TimeSpan.Zero)));
+            new FixedTimeProvider(
+                new DateTimeOffset(2026, 9, 16, 12, 0, 0, TimeSpan.Zero)));
 
         Result<StudyGoalProposalResponse> result = await handler.Handle(
             new CreateStudyGoalProposalCommand(
                 student.Id,
-                new CreateStudyGoalProposalRequest(
-                    ContractStudyTimeGoalPeriod.Weekly,
-                    1.5m)),
+                new CreateStudyGoalProposalRequest(1.5m)),
             CancellationToken.None);
 
         Assert.True(result.IsSuccess);
@@ -48,17 +54,19 @@ public sealed class StudyGoalProposalCommandHandlerTests
         Assert.Equal(parent.Id, result.Value.ParentId);
         Assert.Equal("Mona Hassan", result.Value.SuggestedByParentName);
         Assert.Equal(90, result.Value.Goal.TargetMinutes);
+        Assert.Equal(DomainStudyTimeGoalPeriod.Weekly, proposalRepository.GetAll().Single().Goal.Period);
         Assert.Equal(new DateOnly(2026, 9, 14), result.Value.Goal.StartDate);
         Assert.Single(proposalRepository.GetAll());
         Assert.Equal(1, unitOfWork.SaveChangesCalls);
     }
 
     [Fact]
-    public async Task Create_WhenPeriodIsNotWeekly_ReturnsValidationError()
+    public async Task Create_WhenTargetHoursIsZero_ReturnsValidationError()
     {
         Guid parentUserId = Guid.NewGuid();
         Parent parent = CreateParent(parentUserId);
         Student student = CreateStudent();
+
         ParentStudentRelationship relationship = new(parent.Id, student.Id);
         relationship.Accept();
 
@@ -69,19 +77,20 @@ public sealed class StudyGoalProposalCommandHandlerTests
             new InMemoryRepository<StudyGoalProposal>(),
             new FakeCurrentUser(parentUserId),
             new FakeUnitOfWork(),
-            new FixedTimeProvider(new DateTimeOffset(2026, 9, 16, 12, 0, 0, TimeSpan.Zero)));
+            new FixedTimeProvider(
+                new DateTimeOffset(2026, 9, 16, 12, 0, 0, TimeSpan.Zero)));
 
         Result<StudyGoalProposalResponse> result = await handler.Handle(
             new CreateStudyGoalProposalCommand(
                 student.Id,
-                new CreateStudyGoalProposalRequest(
-                    ContractStudyTimeGoalPeriod.Daily,
-                    1.5m)),
+                new CreateStudyGoalProposalRequest(0m)),
             CancellationToken.None);
 
         Assert.True(result.IsError);
         Assert.Equal(ErrorKind.Validation, result.TopError.Type);
-        Assert.Equal("StudyGoalProposals.WeeklyPeriodRequired", result.TopError.Code);
+        Assert.Equal(
+            "StudyGoalProposals.TargetHoursInvalid",
+            result.TopError.Code);
     }
 
     [Fact]
@@ -90,8 +99,10 @@ public sealed class StudyGoalProposalCommandHandlerTests
         Guid parentUserId = Guid.NewGuid();
         Parent parent = CreateParent(parentUserId, DayOfWeek.Saturday);
         Student student = CreateStudent();
+
         ParentStudentRelationship relationship = new(parent.Id, student.Id);
         relationship.Accept();
+
         InMemoryRepository<StudyGoalProposal> proposalRepository = new();
 
         CreateStudyGoalProposalCommandHandler handler = new(
@@ -101,20 +112,22 @@ public sealed class StudyGoalProposalCommandHandlerTests
             proposalRepository,
             new FakeCurrentUser(parentUserId),
             new FakeUnitOfWork(),
-            new FixedTimeProvider(new DateTimeOffset(2026, 9, 20, 12, 0, 0, TimeSpan.Zero)));
+            new FixedTimeProvider(
+                new DateTimeOffset(2026, 9, 20, 12, 0, 0, TimeSpan.Zero)));
 
         Result<StudyGoalProposalResponse> result = await handler.Handle(
             new CreateStudyGoalProposalCommand(
                 student.Id,
-                new CreateStudyGoalProposalRequest(
-                    ContractStudyTimeGoalPeriod.Weekly,
-                    3m)),
+                new CreateStudyGoalProposalRequest(3m)),
             CancellationToken.None);
 
         Assert.True(result.IsSuccess);
+
         StudyGoalProposal proposal = proposalRepository.GetAll().Single();
+
         Assert.Equal([DayOfWeek.Saturday], proposal.Goal.Days);
         Assert.Equal([DayOfWeek.Saturday], result.Value.Goal.Days);
+        Assert.Equal(DomainStudyTimeGoalPeriod.Weekly, proposal.Goal.Period);
         Assert.Equal(new DateOnly(2026, 9, 19), proposal.Goal.StartDate);
     }
 
@@ -131,19 +144,20 @@ public sealed class StudyGoalProposalCommandHandlerTests
             new InMemoryRepository<StudyGoalProposal>(),
             new FakeCurrentUser(parentUserId),
             new FakeUnitOfWork(),
-            new FixedTimeProvider(new DateTimeOffset(2026, 9, 16, 12, 0, 0, TimeSpan.Zero)));
+            new FixedTimeProvider(
+                new DateTimeOffset(2026, 9, 16, 12, 0, 0, TimeSpan.Zero)));
 
         Result<StudyGoalProposalResponse> result = await handler.Handle(
             new CreateStudyGoalProposalCommand(
                 Guid.NewGuid(),
-                new CreateStudyGoalProposalRequest(
-                    ContractStudyTimeGoalPeriod.Weekly,
-                    3m)),
+                new CreateStudyGoalProposalRequest(3m)),
             CancellationToken.None);
 
         Assert.True(result.IsError);
         Assert.Equal(ErrorKind.Validation, result.TopError.Type);
-        Assert.Equal("StudyGoalProposals.WeekStartsOnRequired", result.TopError.Code);
+        Assert.Equal(
+            "StudyGoalProposals.WeekStartsOnRequired",
+            result.TopError.Code);
     }
 
     [Fact]
@@ -152,8 +166,10 @@ public sealed class StudyGoalProposalCommandHandlerTests
         Guid parentUserId = Guid.NewGuid();
         Parent parent = CreateParent(parentUserId);
         Student student = CreateStudent();
+
         ParentStudentRelationship relationship = new(parent.Id, student.Id);
         relationship.Accept();
+
         StudyGoalProposal pendingProposal = new(
             parent.Id,
             student.Id,
@@ -166,19 +182,20 @@ public sealed class StudyGoalProposalCommandHandlerTests
             new InMemoryRepository<StudyGoalProposal>(pendingProposal),
             new FakeCurrentUser(parentUserId),
             new FakeUnitOfWork(),
-            new FixedTimeProvider(new DateTimeOffset(2026, 9, 16, 12, 0, 0, TimeSpan.Zero)));
+            new FixedTimeProvider(
+                new DateTimeOffset(2026, 9, 16, 12, 0, 0, TimeSpan.Zero)));
 
         Result<StudyGoalProposalResponse> result = await handler.Handle(
             new CreateStudyGoalProposalCommand(
                 student.Id,
-                new CreateStudyGoalProposalRequest(
-                    ContractStudyTimeGoalPeriod.Weekly,
-                    3m)),
+                new CreateStudyGoalProposalRequest(3m)),
             CancellationToken.None);
 
         Assert.True(result.IsError);
         Assert.Equal(ErrorKind.Conflict, result.TopError.Type);
-        Assert.Equal("StudyGoalProposals.PendingProposalExists", result.TopError.Code);
+        Assert.Equal(
+            "StudyGoalProposals.PendingProposalExists",
+            result.TopError.Code);
     }
 
     [Fact]
@@ -187,13 +204,17 @@ public sealed class StudyGoalProposalCommandHandlerTests
         Guid parentUserId = Guid.NewGuid();
         Parent parent = CreateParent(parentUserId);
         Student student = CreateStudent();
+
         ParentStudentRelationship relationship = new(parent.Id, student.Id);
         relationship.Accept();
+
         StudyGoalProposal acceptedProposal = new(
             parent.Id,
             student.Id,
             CreateGoal(new DateOnly(2026, 9, 14)));
-        acceptedProposal.Accept(new DateTimeOffset(2026, 9, 15, 9, 0, 0, TimeSpan.Zero));
+
+        acceptedProposal.Accept(
+            new DateTimeOffset(2026, 9, 15, 9, 0, 0, TimeSpan.Zero));
 
         CreateStudyGoalProposalCommandHandler handler = new(
             new InMemoryRepository<Parent>(parent),
@@ -202,19 +223,20 @@ public sealed class StudyGoalProposalCommandHandlerTests
             new InMemoryRepository<StudyGoalProposal>(acceptedProposal),
             new FakeCurrentUser(parentUserId),
             new FakeUnitOfWork(),
-            new FixedTimeProvider(new DateTimeOffset(2026, 9, 16, 12, 0, 0, TimeSpan.Zero)));
+            new FixedTimeProvider(
+                new DateTimeOffset(2026, 9, 16, 12, 0, 0, TimeSpan.Zero)));
 
         Result<StudyGoalProposalResponse> result = await handler.Handle(
             new CreateStudyGoalProposalCommand(
                 student.Id,
-                new CreateStudyGoalProposalRequest(
-                    ContractStudyTimeGoalPeriod.Weekly,
-                    3m)),
+                new CreateStudyGoalProposalRequest(3m)),
             CancellationToken.None);
 
         Assert.True(result.IsError);
         Assert.Equal(ErrorKind.Conflict, result.TopError.Type);
-        Assert.Equal("StudyGoalProposals.AcceptedProposalExistsForCurrentWeek", result.TopError.Code);
+        Assert.Equal(
+            "StudyGoalProposals.AcceptedProposalExistsForCurrentWeek",
+            result.TopError.Code);
     }
 
     [Fact]
@@ -223,14 +245,20 @@ public sealed class StudyGoalProposalCommandHandlerTests
         Guid parentUserId = Guid.NewGuid();
         Parent parent = CreateParent(parentUserId);
         Student student = CreateStudent();
+
         ParentStudentRelationship relationship = new(parent.Id, student.Id);
         relationship.Accept();
+
         StudyGoalProposal rejectedProposal = new(
             parent.Id,
             student.Id,
             CreateGoal(new DateOnly(2026, 9, 14)));
-        rejectedProposal.Reject(new DateTimeOffset(2026, 9, 15, 9, 0, 0, TimeSpan.Zero));
-        InMemoryRepository<StudyGoalProposal> proposalRepository = new(rejectedProposal);
+
+        rejectedProposal.Reject(
+            new DateTimeOffset(2026, 9, 15, 9, 0, 0, TimeSpan.Zero));
+
+        InMemoryRepository<StudyGoalProposal> proposalRepository =
+            new(rejectedProposal);
 
         CreateStudyGoalProposalCommandHandler handler = new(
             new InMemoryRepository<Parent>(parent),
@@ -239,18 +267,18 @@ public sealed class StudyGoalProposalCommandHandlerTests
             proposalRepository,
             new FakeCurrentUser(parentUserId),
             new FakeUnitOfWork(),
-            new FixedTimeProvider(new DateTimeOffset(2026, 9, 16, 12, 0, 0, TimeSpan.Zero)));
+            new FixedTimeProvider(
+                new DateTimeOffset(2026, 9, 16, 12, 0, 0, TimeSpan.Zero)));
 
         Result<StudyGoalProposalResponse> result = await handler.Handle(
             new CreateStudyGoalProposalCommand(
                 student.Id,
-                new CreateStudyGoalProposalRequest(
-                    ContractStudyTimeGoalPeriod.Weekly,
-                    3m)),
+                new CreateStudyGoalProposalRequest(3m)),
             CancellationToken.None);
 
         Assert.True(result.IsSuccess);
         Assert.Equal(2, proposalRepository.GetAll().Count());
+
         Assert.Contains(
             proposalRepository.GetAll(),
             proposal =>
@@ -264,14 +292,22 @@ public sealed class StudyGoalProposalCommandHandlerTests
         Guid parentUserId = Guid.NewGuid();
         Parent parent = CreateParent(parentUserId, DayOfWeek.Saturday);
         Student student = CreateStudent();
+
         ParentStudentRelationship relationship = new(parent.Id, student.Id);
         relationship.Accept();
+
         StudyGoalProposal rejectedProposal = new(
             parent.Id,
             student.Id,
-            CreateGoal(new DateOnly(2026, 9, 19), DayOfWeek.Saturday));
-        rejectedProposal.Reject(new DateTimeOffset(2026, 9, 20, 9, 0, 0, TimeSpan.Zero));
-        InMemoryRepository<StudyGoalProposal> proposalRepository = new(rejectedProposal);
+            CreateGoal(
+                new DateOnly(2026, 9, 19),
+                DayOfWeek.Saturday));
+
+        rejectedProposal.Reject(
+            new DateTimeOffset(2026, 9, 20, 9, 0, 0, TimeSpan.Zero));
+
+        InMemoryRepository<StudyGoalProposal> proposalRepository =
+            new(rejectedProposal);
 
         CreateStudyGoalProposalCommandHandler handler = new(
             new InMemoryRepository<Parent>(parent),
@@ -280,19 +316,23 @@ public sealed class StudyGoalProposalCommandHandlerTests
             proposalRepository,
             new FakeCurrentUser(parentUserId),
             new FakeUnitOfWork(),
-            new FixedTimeProvider(new DateTimeOffset(2026, 9, 21, 12, 0, 0, TimeSpan.Zero)));
+            new FixedTimeProvider(
+                new DateTimeOffset(2026, 9, 21, 12, 0, 0, TimeSpan.Zero)));
 
         Result<StudyGoalProposalResponse> result = await handler.Handle(
             new CreateStudyGoalProposalCommand(
                 student.Id,
-                new CreateStudyGoalProposalRequest(
-                    ContractStudyTimeGoalPeriod.Weekly,
-                    3m)),
+                new CreateStudyGoalProposalRequest(3m)),
             CancellationToken.None);
 
         Assert.True(result.IsSuccess);
-        Assert.Equal(new DateOnly(2026, 9, 19), result.Value.Goal.StartDate);
-        Assert.NotEqual(new DateOnly(2026, 9, 21), result.Value.Goal.StartDate);
+        Assert.Equal(
+            new DateOnly(2026, 9, 19),
+            result.Value.Goal.StartDate);
+
+        Assert.NotEqual(
+            new DateOnly(2026, 9, 21),
+            result.Value.Goal.StartDate);
     }
 
     [Fact]
@@ -301,14 +341,20 @@ public sealed class StudyGoalProposalCommandHandlerTests
         Guid parentUserId = Guid.NewGuid();
         Parent parent = CreateParent(parentUserId);
         Student student = CreateStudent();
+
         ParentStudentRelationship relationship = new(parent.Id, student.Id);
         relationship.Accept();
+
         StudyGoalProposal previousWeekAcceptedProposal = new(
             parent.Id,
             student.Id,
             CreateGoal(new DateOnly(2026, 9, 7)));
-        previousWeekAcceptedProposal.Accept(new DateTimeOffset(2026, 9, 10, 9, 0, 0, TimeSpan.Zero));
-        InMemoryRepository<StudyGoalProposal> proposalRepository = new(previousWeekAcceptedProposal);
+
+        previousWeekAcceptedProposal.Accept(
+            new DateTimeOffset(2026, 9, 10, 9, 0, 0, TimeSpan.Zero));
+
+        InMemoryRepository<StudyGoalProposal> proposalRepository =
+            new(previousWeekAcceptedProposal);
 
         CreateStudyGoalProposalCommandHandler handler = new(
             new InMemoryRepository<Parent>(parent),
@@ -317,18 +363,20 @@ public sealed class StudyGoalProposalCommandHandlerTests
             proposalRepository,
             new FakeCurrentUser(parentUserId),
             new FakeUnitOfWork(),
-            new FixedTimeProvider(new DateTimeOffset(2026, 9, 16, 12, 0, 0, TimeSpan.Zero)));
+            new FixedTimeProvider(
+                new DateTimeOffset(2026, 9, 16, 12, 0, 0, TimeSpan.Zero)));
 
         Result<StudyGoalProposalResponse> result = await handler.Handle(
             new CreateStudyGoalProposalCommand(
                 student.Id,
-                new CreateStudyGoalProposalRequest(
-                    ContractStudyTimeGoalPeriod.Weekly,
-                    3m)),
+                new CreateStudyGoalProposalRequest(3m)),
             CancellationToken.None);
 
         Assert.True(result.IsSuccess);
-        Assert.Equal(new DateOnly(2026, 9, 14), result.Value.Goal.StartDate);
+        Assert.Equal(
+            new DateOnly(2026, 9, 14),
+            result.Value.Goal.StartDate);
+
         Assert.Equal(2, proposalRepository.GetAll().Count());
     }
 
@@ -345,14 +393,13 @@ public sealed class StudyGoalProposalCommandHandlerTests
             new InMemoryRepository<StudyGoalProposal>(),
             new FakeCurrentUser(parentUserId),
             new FakeUnitOfWork(),
-            new FixedTimeProvider(new DateTimeOffset(2026, 9, 16, 12, 0, 0, TimeSpan.Zero)));
+            new FixedTimeProvider(
+                new DateTimeOffset(2026, 9, 16, 12, 0, 0, TimeSpan.Zero)));
 
         Result<StudyGoalProposalResponse> result = await handler.Handle(
             new CreateStudyGoalProposalCommand(
                 Guid.NewGuid(),
-                new CreateStudyGoalProposalRequest(
-                    ContractStudyTimeGoalPeriod.Weekly,
-                    3m)),
+                new CreateStudyGoalProposalRequest(3m)),
             CancellationToken.None);
 
         Assert.True(result.IsError);
@@ -364,8 +411,14 @@ public sealed class StudyGoalProposalCommandHandlerTests
     {
         Student student = CreateStudent();
         Parent parent = CreateParent(Guid.NewGuid());
-        StudyGoalProposal proposal = new(parent.Id, student.Id, CreateGoal());
+
+        StudyGoalProposal proposal = new(
+            parent.Id,
+            student.Id,
+            CreateGoal());
+
         proposal.SetPrivateProperty("Parent", parent);
+
         FakeUnitOfWork unitOfWork = new();
 
         AcceptStudyGoalProposalCommandHandler handler = new(
@@ -384,7 +437,10 @@ public sealed class StudyGoalProposalCommandHandlerTests
         Assert.Equal(StudyGoalProposalStatus.Accepted, proposal.Status);
         Assert.NotNull(proposal.RespondedAtUtc);
         Assert.NotNull(student.StudyTimeGoal);
-        Assert.Equal(DomainStudyTimeGoalPeriod.Weekly, student.StudyTimeGoal.Period);
+        Assert.Equal(
+            DomainStudyTimeGoalPeriod.Weekly,
+            student.StudyTimeGoal.Period);
+
         Assert.Equal(240, student.StudyTimeGoal.TargetMinutes);
         Assert.Equal(1, unitOfWork.SaveChangesCalls);
     }
@@ -393,7 +449,12 @@ public sealed class StudyGoalProposalCommandHandlerTests
     public async Task Accept_WhenProposalIsNotPending_ReturnsConflictAndDoesNotChangeGoal()
     {
         Student student = CreateStudent();
-        StudyGoalProposal proposal = new(Guid.NewGuid(), student.Id, CreateGoal());
+
+        StudyGoalProposal proposal = new(
+            Guid.NewGuid(),
+            student.Id,
+            CreateGoal());
+
         proposal.Reject(DateTimeOffset.UtcNow);
 
         AcceptStudyGoalProposalCommandHandler handler = new(
@@ -418,7 +479,12 @@ public sealed class StudyGoalProposalCommandHandlerTests
     {
         Student student = CreateStudent();
         Parent parent = CreateParent(Guid.NewGuid());
-        StudyGoalProposal proposal = new(parent.Id, student.Id, CreateGoal());
+
+        StudyGoalProposal proposal = new(
+            parent.Id,
+            student.Id,
+            CreateGoal());
+
         proposal.SetPrivateProperty("Parent", parent);
 
         RejectStudyGoalProposalCommandHandler handler = new(
@@ -443,7 +509,11 @@ public sealed class StudyGoalProposalCommandHandlerTests
     public async Task Reject_WhenProposalBelongsToDifferentStudent_ReturnsForbidden()
     {
         Student student = CreateStudent();
-        StudyGoalProposal proposal = new(Guid.NewGuid(), Guid.NewGuid(), CreateGoal());
+
+        StudyGoalProposal proposal = new(
+            Guid.NewGuid(),
+            Guid.NewGuid(),
+            CreateGoal());
 
         RejectStudyGoalProposalCommandHandler handler = new(
             new InMemoryRepository<Student>(student),
@@ -466,7 +536,11 @@ public sealed class StudyGoalProposalCommandHandlerTests
     {
         Guid parentUserId = Guid.NewGuid();
         Parent parent = CreateParent(parentUserId);
-        StudyGoalProposal proposal = new(parent.Id, Guid.NewGuid(), CreateGoal());
+
+        StudyGoalProposal proposal = new(
+            parent.Id,
+            Guid.NewGuid(),
+            CreateGoal());
 
         CancelStudyGoalProposalCommandHandler handler = new(
             new InMemoryRepository<Parent>(parent),
@@ -488,7 +562,11 @@ public sealed class StudyGoalProposalCommandHandlerTests
     public async Task Cancel_WhenProposalBelongsToDifferentParent_ReturnsForbidden()
     {
         Parent parent = new(Guid.NewGuid());
-        StudyGoalProposal proposal = new(Guid.NewGuid(), Guid.NewGuid(), CreateGoal());
+
+        StudyGoalProposal proposal = new(
+            Guid.NewGuid(),
+            Guid.NewGuid(),
+            CreateGoal());
 
         CancelStudyGoalProposalCommandHandler handler = new(
             new InMemoryRepository<Parent>(parent),
@@ -510,19 +588,37 @@ public sealed class StudyGoalProposalCommandHandlerTests
     {
         Student student = CreateStudent();
         Parent parent = CreateParent(Guid.NewGuid());
-        parent.SetPrivateProperty("User", new ApplicationUser { FirstName = "Ahmed", LastName = "Mahmoud" });
-        StudyGoalProposal firstProposal = new(parent.Id, student.Id, CreateGoal());
-        StudyGoalProposal otherProposal = new(Guid.NewGuid(), Guid.NewGuid(), CreateGoal());
+
+        parent.SetPrivateProperty(
+            "User",
+            new ApplicationUser
+            {
+                FirstName = "Ahmed",
+                LastName = "Mahmoud"
+            });
+
+        StudyGoalProposal firstProposal = new(
+            parent.Id,
+            student.Id,
+            CreateGoal());
+
+        StudyGoalProposal otherProposal = new(
+            Guid.NewGuid(),
+            Guid.NewGuid(),
+            CreateGoal());
 
         GetMyStudyGoalProposalsQueryHandler handler = new(
             new InMemoryRepository<Student>(student),
             new InMemoryRepository<Parent>(parent),
-            new InMemoryRepository<StudyGoalProposal>(firstProposal, otherProposal),
+            new InMemoryRepository<StudyGoalProposal>(
+                firstProposal,
+                otherProposal),
             new FakeCurrentUser(student.UserId));
 
-        IReadOnlyList<StudyGoalProposalResponse> result = await handler.Handle(
-            new GetMyStudyGoalProposalsQuery(),
-            CancellationToken.None);
+        IReadOnlyList<StudyGoalProposalResponse> result =
+            await handler.Handle(
+                new GetMyStudyGoalProposalsQuery(),
+                CancellationToken.None);
 
         Assert.Single(result);
         Assert.Equal(firstProposal.Id, result[0].Id);
@@ -545,25 +641,35 @@ public sealed class StudyGoalProposalCommandHandlerTests
     private static Student CreateStudent()
     {
         Student student = new(Guid.NewGuid());
-        student.SetPrivateProperty("User", new ApplicationUser
-        {
-            FirstName = "Test",
-            LastName = "Student",
-            Email = "test@example.com"
-        });
+
+        student.SetPrivateProperty(
+            "User",
+            new ApplicationUser
+            {
+                FirstName = "Test",
+                LastName = "Student",
+                Email = "test@example.com"
+            });
+
         return student;
     }
 
-    private static Parent CreateParent(Guid userId, DayOfWeek weekStartsOn = DayOfWeek.Monday)
+    private static Parent CreateParent(
+        Guid userId,
+        DayOfWeek weekStartsOn = DayOfWeek.Monday)
     {
         Parent parent = new(userId);
         parent.SetWeekStartsOn(weekStartsOn);
-        parent.SetPrivateProperty("User", new ApplicationUser
-        {
-            FirstName = "Test",
-            LastName = "Parent",
-            Email = "parent@example.com"
-        });
+
+        parent.SetPrivateProperty(
+            "User",
+            new ApplicationUser
+            {
+                FirstName = "Test",
+                LastName = "Parent",
+                Email = "parent@example.com"
+            });
+
         return parent;
     }
 

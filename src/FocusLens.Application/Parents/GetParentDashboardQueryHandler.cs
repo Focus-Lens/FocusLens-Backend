@@ -1,15 +1,16 @@
-using FocusLens.Application.Students;
+using System.Globalization;
+using FocusLens.Application.Common.Interfaces;
 using FocusLens.Contracts;
-using FocusLens.Contracts.Students;
 using FocusLens.Domain;
 using FocusLens.Domain.Access;
 using FocusLens.Domain.Common.Interfaces;
 using FocusLens.Domain.Common.Results;
 using FocusLens.Domain.Students;
 using FocusLens.Domain.StudySessions;
+using FocusLens.Application.Progress;
+using FocusLens.Application.Common.Utilities;
 using MediatR;
 using ICurrentUser = FocusLens.Application.Common.Interfaces.ICurrentUser;
-using DomainStudyTimeGoalPeriod = FocusLens.Domain.Students.StudyTimeGoalPeriod;
 
 namespace FocusLens.Application.Parents;
 
@@ -20,16 +21,21 @@ public sealed class GetParentDashboardQueryHandler(
     IBaseRepository<StudyGoalProposal> studyGoalProposalRepository,
     IBaseRepository<StudySession> studySessionRepository,
     IBaseRepository<StudySessionBehaviorWindow> behaviorWindowRepository,
+    IBaseRepository<StudentWeek> weekRepository,
     ICurrentUser currentUser,
-    TimeProvider timeProvider)
+    TimeProvider timeProvider,
+    IUnitOfWork? unitOfWork = null,
+    IStudentLocalTime? studentLocalTime = null)
     : IRequestHandler<GetParentDashboardQuery, Result<ParentDashboardResponse>>
 {
-    private const int RecentSessionCount = 5;
-
     public async Task<Result<ParentDashboardResponse>> Handle(
         GetParentDashboardQuery request,
         CancellationToken cancellationToken)
     {
+        studentLocalTime ??= new FocusLens.Application.Common.Services.StudentLocalTime(timeProvider);
+        // Goal reads live in the dedicated Study Goals query.
+        _ = studyGoalProposalRepository;
+
         Result<ParentDashboardContext> contextResult = await ParentDashboardHelpers.ResolveContextAsync(
             request.StudentId,
             parentRepository,
@@ -43,244 +49,142 @@ public sealed class GetParentDashboardQueryHandler(
         }
 
         Student student = contextResult.Value.Student;
-        Parent parent = contextResult.Value.Parent;
-        bool shareSummaries = student.ShareSessionSummariesWithParents;
         bool shareTrends = student.ShareSubjectTrendsWithParents;
-
-        if (parent.WeekStartsOn is not DayOfWeek weekStartsOn)
-        {
-            return Error.Validation(
-                "ParentDashboard.WeekStartsOnRequired",
-                "Choose a week start day before viewing weekly dashboard data.");
-        }
-
-        StudyGoalProposal? pendingProposal =
-            await studyGoalProposalRepository.FirstOrDefaultAsync(proposal =>
-                proposal.StudentId == student.Id &&
-                proposal.Status == StudyGoalProposalStatus.Pending);
-
-        StudyGoalProposal? acceptedProposal = (await studyGoalProposalRepository.GetAllAsync(proposal =>
-                proposal.StudentId == student.Id &&
-                proposal.Status == StudyGoalProposalStatus.Accepted))
-            .OrderByDescending(proposal => proposal.RespondedAtUtc)
-            .ThenByDescending(proposal => proposal.CreatedAtUtc)
-            .FirstOrDefault();
-
-        Parent? acceptedProposalParent = acceptedProposal is null
-            ? null
-            : await parentRepository.FirstOrDefaultAsync(
-                parent => parent.Id == acceptedProposal.ParentId,
-                parent => parent.User);
-
+        Result<ParentOverviewWeekResponse> resolvedWeek = await OverviewWeekResolver.ResolveAsync(contextResult.Value, studentLocalTime, weekRepository, unitOfWork);
+        if (resolvedWeek.IsError) return resolvedWeek.Errors;
+        DateTimeOffset utcNow = timeProvider.GetUtcNow();
+        DateOnly weekStart = resolvedWeek.Value.StartsOn;
+        DateOnly weekEnd = resolvedWeek.Value.EndsOn;
         StudySession[] startedSessions = (await studySessionRepository.GetAllAsync(session =>
                 session.StudentId == student.Id &&
-                session.StartedAtUtc != null))
+                session.StartedAtUtc != null,
+                session => session.PauseIntervals))
             .ToArray();
-
-        int? focusQuality = null;
-
-        if (shareTrends && startedSessions.Length > 0)
-        {
-            Guid[] sessionIds = startedSessions
-                .Select(session => session.Id)
-                .ToArray();
-
-            int[] focusScores = (await behaviorWindowRepository.GetAllAsync(window =>
-                    sessionIds.Contains(window.StudySessionId) &&
-                    window.FocusScore != null))
-                .Select(window => window.FocusScore!.Value)
-                .ToArray();
-
-            if (focusScores.Length > 0)
-            {
-                focusQuality = (int)Math.Round(
-                    focusScores.Average(),
-                    MidpointRounding.AwayFromZero);
-            }
-        }
-
-        DateTimeOffset utcNow = timeProvider.GetUtcNow();
-        IReadOnlyDictionary<Guid, string?> subjectNamesById = ParentDashboardHelpers.GetSubjectNamesById(student);
-        ParentDashboardWeeklyStudyPulseResponse weeklyPulse = CreateWeeklyPulse(startedSessions, utcNow, weekStartsOn);
-
+        ParentDashboardWeeklyStudyPulseResponse weeklyPulse = await CreateWeeklyPulse(startedSessions, utcNow, weekStart, weekEnd, student, studentLocalTime);
+        ParentDashboardFocusPatternResponse focusPattern = CreateFocusPattern(
+            startedSessions,
+            utcNow,
+            weekStart,
+            shareTrends, student, studentLocalTime);
         return new ParentDashboardResponse(
             student.Id,
-            shareTrends ? ToCurrentGoalResponse(student.StudyTimeGoal, weekStartsOn) : null,
-            shareTrends ? CreateCurrentGoalProgress(student.StudyTimeGoal, startedSessions, utcNow) : null,
-            pendingProposal?.ToResponse(weekStartsOn, parent),
-            acceptedProposal?.ToResponse(acceptedProposalParent?.WeekStartsOn ?? weekStartsOn, acceptedProposalParent),
-            shareSummaries
-                ? ParentDashboardHelpers.OrderSessions(startedSessions)
-                    .Take(RecentSessionCount)
-                    .Select(session => ParentDashboardHelpers.ToSessionResponse(session, subjectNamesById, utcNow))
-                    .ToArray()
-                : [],
-            shareSummaries
-                ? startedSessions.Count(session =>
-                {
-                    DateOnly sessionDate = DateOnly.FromDateTime(session.StartedAtUtc!.Value.UtcDateTime);
-                    return session.Status == StudySessionStatus.Completed &&
-                           sessionDate >= weeklyPulse.StartsOn &&
-                           sessionDate <= weeklyPulse.EndsOn;
-                })
-                : 0,
-            shareTrends ? weeklyPulse.Days.Count(day => day.ActualStudyMinutes > 0) : 0,
-            focusQuality,
-            shareTrends
-                ? weeklyPulse
-                : new ParentDashboardWeeklyStudyPulseResponse(
-                    weekStartsOn,
-                    weeklyPulse.StartsOn,
-                    weeklyPulse.EndsOn,
-                    0,
-                    0,
-                    0,
-                    weeklyPulse.Days
-                        .Select(day => new ParentDashboardWeeklyStudyPulseDayResponse(day.Date, 0))
-                        .ToArray()));
+            new ParentDashboardWeekResponse(weekStart, weekEnd, resolvedWeek.Value.IsCurrentWeek),
+            shareTrends ? weeklyPulse : weeklyPulse with { TotalStudyMinutes = FormatMinutes(0), PreviousWeekStudyMinutes = FormatMinutes(0), StudyMinutesTrend = FormatMinutes(0), PeakDay = null, TotalSessions = 0, CompletedSessions = 0, ActiveStudyDays = 0, FocusQuality = new(null), Days = weeklyPulse.Days.Select(day => day with { StudyMinutes = FormatMinutes(0) }).ToArray() },
+            focusPattern);
     }
 
-    private static StudyTimeGoalResponse? ToCurrentGoalResponse(StudyTimeGoal? goal, DayOfWeek weekStartsOn)
-    {
-        return goal is null
-            ? null
-            : StudyGoalProposalMappings.ToResponse(goal, weekStartsOn);
-    }
-
-    private static ParentDashboardWeeklyStudyPulseResponse CreateWeeklyPulse(
+    private async Task<ParentDashboardWeeklyStudyPulseResponse> CreateWeeklyPulse(
         IReadOnlyCollection<StudySession> sessions,
         DateTimeOffset utcNow,
-        DayOfWeek weekStartsOn)
+        DateOnly startsOn,
+        DateOnly endsOn,
+        Student student,
+        IStudentLocalTime studentLocalTime)
     {
-        DateOnly today = DateOnly.FromDateTime(utcNow.UtcDateTime);
-        DateOnly startsOn = ParentWeekdayOrder.GetWeekStart(today, weekStartsOn);
         DateOnly previousStartsOn = startsOn.AddDays(-ParentDashboardHelpers.PulseDays);
-        DateOnly endsOn = startsOn.AddDays(ParentDashboardHelpers.PulseDays - 1);
         DateOnly previousEndsOn = previousStartsOn.AddDays(ParentDashboardHelpers.PulseDays - 1);
 
-        ParentDashboardWeeklyStudyPulseDayResponse[] days = Enumerable
+        (DateOnly Date, string Day, int StudyMinutes)[] dailyMinutes = Enumerable
             .Range(0, ParentDashboardHelpers.PulseDays)
             .Select(offset =>
             {
                 DateOnly date = startsOn.AddDays(offset);
-                return new ParentDashboardWeeklyStudyPulseDayResponse(
+                return (
                     date,
-                    ParentDashboardHelpers.GetActualStudyMinutesForDates(sessions, date, date, utcNow));
+                    date.DayOfWeek.ToString(),
+                    ParentDashboardHelpers.GetActualStudyMinutesForDates(
+                        sessions, date, date, utcNow, student, studentLocalTime));
             })
             .ToArray();
 
-        int actualStudyMinutes = days.Sum(day => day.ActualStudyMinutes);
+        int actualStudyMinutes = dailyMinutes.Sum(day => day.StudyMinutes);
         int previousPeriodActualStudyMinutes = ParentDashboardHelpers.GetActualStudyMinutesForDates(
-            sessions,
-            previousStartsOn,
-            previousEndsOn,
-            utcNow);
+            sessions, previousStartsOn, previousEndsOn, utcNow, student, studentLocalTime);
 
+        StudySession[] selectedSessions = sessions.Where(session => IsInWeek(session, startsOn, endsOn, student, studentLocalTime)).ToArray();
+        Guid[] selectedSessionIds = selectedSessions.Select(session => session.Id).ToArray();
+        StudySessionBehaviorWindow[] windows = selectedSessionIds.Length == 0 ? [] :
+            (await behaviorWindowRepository.GetAllAsync(window => selectedSessionIds.Contains(window.StudySessionId))).ToArray();
+        string? focusTrend = FocusQualityTrendCalculator.Calculate(windows, startsOn, endsOn,
+            window => studentLocalTime.GetLocalDate(window.WindowEndUtc, student));
+        ParentDashboardWeeklyStudyPulseDayResponse[] days = dailyMinutes
+            .Select(day => new ParentDashboardWeeklyStudyPulseDayResponse(
+                day.Date, day.Day, FormatMinutes(day.StudyMinutes)))
+            .ToArray();
+        (DateOnly Date, string Day, int StudyMinutes)? peakDay = dailyMinutes
+            .Where(day => day.StudyMinutes > 0)
+            .OrderByDescending(day => day.StudyMinutes)
+            .ThenBy(day => day.Date)
+            .Select(day => ((DateOnly Date, string Day, int StudyMinutes)?)day)
+            .FirstOrDefault();
         return new ParentDashboardWeeklyStudyPulseResponse(
-            weekStartsOn,
-            startsOn,
-            endsOn,
-            actualStudyMinutes,
-            previousPeriodActualStudyMinutes,
-            actualStudyMinutes - previousPeriodActualStudyMinutes,
-            days);
+            FormatMinutes(actualStudyMinutes),
+            FormatMinutes(previousPeriodActualStudyMinutes),
+            FormatMinutes(actualStudyMinutes - previousPeriodActualStudyMinutes),
+            days,
+            peakDay is null ? null : new ParentDashboardWeeklyStudyPulseDayResponse(
+                peakDay.Value.Date, peakDay.Value.Day, FormatMinutes(peakDay.Value.StudyMinutes)),
+            selectedSessions.Length,
+            selectedSessions.Count(session => session.Status == StudySessionStatus.Completed),
+            selectedSessions.Select(session => studentLocalTime.GetLocalDate(session.StartedAtUtc!.Value, student)).Distinct().Count(),
+            new ParentDashboardFocusQualityResponse(focusTrend));
     }
+    private static bool IsInWeek(StudySession session, DateOnly startsOn, DateOnly endsOn, Student student, IStudentLocalTime studentLocalTime) =>
+        studentLocalTime.GetLocalDate(session.StartedAtUtc!.Value, student) is DateOnly date && date >= startsOn && date <= endsOn;
 
-    private static ParentDashboardStudyGoalProgressResponse? CreateCurrentGoalProgress(
-        StudyTimeGoal? goal,
+    private static ParentDashboardFocusPatternResponse CreateFocusPattern(
         IReadOnlyCollection<StudySession> sessions,
-        DateTimeOffset utcNow)
-    {
-        if (goal is null || goal.StartDate is null)
-        {
-            return null;
-        }
-
-        DateOnly today = DateOnly.FromDateTime(utcNow.UtcDateTime);
-        if (today < goal.StartDate.Value)
-        {
-            DateOnly futureStartsOn = goal.StartDate.Value;
-            DateOnly futureEndsOn = goal.Period == DomainStudyTimeGoalPeriod.Weekly
-                ? futureStartsOn.AddDays(ParentDashboardHelpers.PulseDays - 1)
-                : futureStartsOn;
-
-            return new ParentDashboardStudyGoalProgressResponse(
-                0,
-                0,
-                futureEndsOn.DayNumber - futureStartsOn.DayNumber + 1,
-                futureStartsOn,
-                futureEndsOn,
-                CreateGoalProgressDays(sessions, futureStartsOn, futureEndsOn, utcNow, goal.StartDate.Value));
-        }
-
-        DateOnly startsOn;
-        DateOnly endsOn;
-        int daysRemaining;
-
-        if (goal.Period == DomainStudyTimeGoalPeriod.Daily)
-        {
-            if (!goal.Days.Contains(today.DayOfWeek))
-            {
-                return new ParentDashboardStudyGoalProgressResponse(
-                    0,
-                    0,
-                    0,
-                    today,
-                    today,
-                    CreateGoalProgressDays(sessions, today, today, utcNow, today));
-            }
-
-            startsOn = today;
-            endsOn = today;
-            daysRemaining = 1;
-        }
-        else
-        {
-            DayOfWeek goalWeekStartsOn = goal.Days.Single();
-            startsOn = ParentWeekdayOrder.GetWeekStart(today, goalWeekStartsOn);
-            endsOn = startsOn.AddDays(6);
-            daysRemaining = endsOn.DayNumber - today.DayNumber + 1;
-        }
-
-        ParentDashboardWeeklyStudyPulseDayResponse[] days = CreateGoalProgressDays(
-            sessions,
-            startsOn,
-            endsOn,
-            utcNow,
-            goal.StartDate.Value);
-        int completedMinutes = days.Sum(day => day.ActualStudyMinutes);
-
-        decimal completionPercentage = goal.TargetMinutes <= 0
-            ? 0
-            : Math.Round(completedMinutes * 100m / goal.TargetMinutes, 2);
-
-        return new ParentDashboardStudyGoalProgressResponse(
-            completedMinutes,
-            completionPercentage,
-            daysRemaining,
-            startsOn,
-            endsOn,
-            days);
-    }
-
-    private static ParentDashboardWeeklyStudyPulseDayResponse[] CreateGoalProgressDays(
-        IReadOnlyCollection<StudySession> sessions,
-        DateOnly startsOn,
-        DateOnly endsOn,
         DateTimeOffset utcNow,
-        DateOnly countFromDate)
+        DateOnly weekStart,
+        bool includeStudyTiming,
+        Student student,
+        IStudentLocalTime studentLocalTime)
     {
-        return Enumerable
-            .Range(0, endsOn.DayNumber - startsOn.DayNumber + 1)
+        StudySession[] selectedSessions = includeStudyTiming
+            ? sessions.Where(session => IsInWeek(session, weekStart, weekStart.AddDays(ParentDashboardHelpers.PulseDays - 1), student, studentLocalTime)).ToArray()
+            : [];
+
+        ParentDashboardFocusPatternDayResponse[] days = Enumerable
+            .Range(0, ParentDashboardHelpers.PulseDays)
             .Select(offset =>
             {
-                DateOnly date = startsOn.AddDays(offset);
-                int actualStudyMinutes = date < countFromDate
-                    ? 0
-                    : ParentDashboardHelpers.GetActualStudyMinutesForDates(sessions, date, date, utcNow);
+                DateOnly date = weekStart.AddDays(offset);
+                ParentDashboardFocusPatternSessionResponse[] daySessions = selectedSessions
+                    .Where(session => studentLocalTime.GetLocalDate(session.StartedAtUtc!.Value, student) == date)
+                    .OrderBy(session => session.StartedAtUtc)
+                    .ThenBy(session => session.Id)
+                    .Select(session => new ParentDashboardFocusPatternSessionResponse(
+                        FormatStartTime(studentLocalTime.ConvertFromUtc(session.StartedAtUtc!.Value, student)),
+                        FormatMinutes(ParentDashboardHelpers.GetActualStudyMinutes(session, utcNow))))
+                    .ToArray();
 
-                return new ParentDashboardWeeklyStudyPulseDayResponse(date, actualStudyMinutes);
+                return new ParentDashboardFocusPatternDayResponse(date.DayOfWeek.ToString(), daySessions);
             })
             .ToArray();
+
+        int? mostActiveHour = selectedSessions
+            .GroupBy(session => studentLocalTime.ConvertFromUtc(session.StartedAtUtc!.Value, student).Hour)
+            .OrderByDescending(group => group.Count())
+            .ThenBy(group => group.Key)
+            .Select(group => (int?)group.Key)
+            .FirstOrDefault();
+
+        ParentDashboardFocusPatternTimeBlockResponse? mostActiveTimeBlock = mostActiveHour is int hour
+            ? new ParentDashboardFocusPatternTimeBlockResponse(
+                FormatHour(hour),
+                FormatHour((hour + 2) % 24))
+            : null;
+
+        return new ParentDashboardFocusPatternResponse(days, mostActiveTimeBlock);
     }
+
+    private static string FormatStartTime(DateTimeOffset value) =>
+        value.UtcDateTime.ToString("h tt", CultureInfo.InvariantCulture);
+
+    private static string FormatHour(int hour) =>
+        new DateTime(2000, 1, 1, hour, 0, 0, DateTimeKind.Utc)
+            .ToString("h tt", CultureInfo.InvariantCulture);
+
+    private static string FormatMinutes(int minutes) => DurationDisplayFormatter.FormatMinutes(minutes);
+
 }

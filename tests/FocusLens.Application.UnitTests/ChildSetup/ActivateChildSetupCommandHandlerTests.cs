@@ -18,6 +18,43 @@ namespace FocusLens.Application.UnitTests.ChildSetup;
 public sealed class ActivateChildSetupCommandHandlerTests
 {
     [Fact]
+    public async Task Activate_WithParentWeekStart_PersistsWeekStartOnStudent()
+    {
+        Guid studentUserId = Guid.NewGuid();
+        Parent parent = new(Guid.NewGuid());
+        parent.SetWeekStartsOn(DayOfWeek.Saturday);
+        Student student = new(studentUserId);
+        ChildSetupDraft draft = new(parent.Id);
+        draft.MarkInvited();
+        draft.MarkClaimed(student.Id);
+        ApplicationUser user = new()
+        {
+            Id = studentUserId,
+            Email = "student@example.com",
+            UserName = "student@example.com",
+            FirstName = "Student",
+            LastName = "Name"
+        };
+        student.SetPrivateProperty("User", user);
+
+        ActivateChildSetupCommandHandler handler = new(
+            new InMemoryRepository<Student>(student),
+            new InMemoryRepository<ChildSetupDraft>(draft),
+            new InMemoryRepository<ParentStudentRelationship>(),
+            new FakeCurrentUser(studentUserId),
+            new TestIdentityService(user),
+            new FakeUnitOfWork(),
+            new InMemoryRepository<Parent>(parent));
+
+        Result<StudentDetailsResponse> result = await handler.Handle(
+            new ActivateChildSetupCommand(),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(DayOfWeek.Saturday, student.WeekStartsOn);
+    }
+
+    [Fact]
     public async Task Activate_WithEmptyClaimedDraft_PreservesStudentOnboardingProfile()
     {
         Guid studentUserId = Guid.NewGuid();
@@ -156,6 +193,9 @@ public sealed class ActivateChildSetupCommandHandlerTests
         Assert.Equal(parent.Id, relationship.ParentId);
         Assert.Equal(student.Id, relationship.StudentId);
         Assert.Equal(RelationshipStatus.Active, relationship.Status);
+        Assert.True(student.ShareSessionSummariesWithParents);
+        Assert.True(student.ShareSubjectTrendsWithParents);
+        Assert.True(student.ShareDetailedAnswersWithParents);
     }
 
     [Fact]

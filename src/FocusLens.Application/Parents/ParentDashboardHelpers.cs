@@ -7,6 +7,8 @@ using FocusLens.Domain.Common.Interfaces;
 using FocusLens.Domain.Common.Results;
 using FocusLens.Domain.Students;
 using FocusLens.Domain.StudySessions;
+using FocusLens.Application.Common.Interfaces;
+using FocusLens.Application.Common.Utilities;
 using ICurrentUser = FocusLens.Application.Common.Interfaces.ICurrentUser;
 using DomainStudentSubjectType = FocusLens.Domain.Students.StudentSubjectType;
 
@@ -65,7 +67,8 @@ internal static class ParentDashboardHelpers
 
         Student? student = await studentRepository.FirstOrDefaultAsync(
             student => student.Id == studentId,
-            student => student.Subjects);
+            student => student.Subjects,
+            student => student.User);
 
         if (student is null)
         {
@@ -74,7 +77,7 @@ internal static class ParentDashboardHelpers
                 "The student profile was not found.");
         }
 
-        return new ParentDashboardContext(parent, student);
+        return new ParentDashboardContext(parent, student, relationship);
     }
 
     public static Result<ParentDashboardSessionFilters> CreateFilters(
@@ -172,7 +175,8 @@ internal static class ParentDashboardHelpers
     public static ParentDashboardStudySessionResponse ToSessionResponse(
         StudySession session,
         IReadOnlyDictionary<Guid, string?> subjectNamesById,
-        DateTimeOffset utcNow)
+        DateTimeOffset utcNow,
+        StudySessionBehaviorWindow? behaviorWindow = null)
     {
         string? subjectName = session.SelectedSubjectId is Guid subjectId &&
                               subjectNamesById.TryGetValue(subjectId, out string? name)
@@ -189,8 +193,13 @@ internal static class ParentDashboardHelpers
             session.LastActivityAtUtc,
             session.SelectedSubjectId,
             subjectName,
-            GetActualStudyMinutes(session, utcNow),
-            session.FocusDurationMinutes);
+            DurationDisplayFormatter.FormatMinutes(GetActualStudyMinutes(session, utcNow)),
+            session.FocusDurationMinutes is int plannedDuration
+                ? DurationDisplayFormatter.FormatMinutes(plannedDuration)
+                : null,
+            behaviorWindow?.FocusScore,
+            behaviorWindow?.FocusState,
+            behaviorWindow?.FocusTrend);
     }
 
     public static IReadOnlyDictionary<Guid, string?> GetSubjectNamesById(Student student) =>
@@ -201,11 +210,24 @@ internal static class ParentDashboardHelpers
         DateOnly startsOn,
         DateOnly endsOn,
         DateTimeOffset utcNow)
+        => GetActualStudyMinutesForDates(
+            sessions,
+            startsOn,
+            endsOn,
+            utcNow,
+            session => DateOnly.FromDateTime(session.StartedAtUtc!.Value.UtcDateTime));
+
+    public static int GetActualStudyMinutesForDates(
+        IEnumerable<StudySession> sessions,
+        DateOnly startsOn,
+        DateOnly endsOn,
+        DateTimeOffset utcNow,
+        Func<StudySession, DateOnly> getSessionDate)
     {
         return sessions
             .Where(session =>
             {
-                DateOnly sessionDate = DateOnly.FromDateTime(session.StartedAtUtc!.Value.UtcDateTime);
+                DateOnly sessionDate = getSessionDate(session);
                 return sessionDate >= startsOn && sessionDate <= endsOn;
             })
             .Sum(session => GetActualStudyMinutes(session, utcNow));
@@ -224,6 +246,44 @@ internal static class ParentDashboardHelpers
 
         return (int)Math.Ceiling(actualStudyTime.TotalMinutes);
     }
+
+    /// <summary>Allocates active study time to the student's business-calendar days.
+    /// A calendar day is a hard 1,440-minute capacity, even for corrupted legacy data.</summary>
+    public static IReadOnlyDictionary<DateOnly, int> GetActualStudyMinutesByLocalDate(
+        IEnumerable<StudySession> sessions, Student student, IStudentLocalTime studentLocalTime,
+        DateTimeOffset utcNow)
+    {
+        var secondsByDate = new Dictionary<DateOnly, double>();
+        foreach (StudySession session in sessions.Where(x => x.StartedAtUtc is not null))
+        {
+            DateTimeOffset start = session.StartedAtUtc!.Value;
+            DateTimeOffset end = GetEffectiveEnd(session, utcNow);
+            if (end <= start) continue;
+
+            foreach ((DateTimeOffset from, DateTimeOffset to) in GetActiveIntervals(session, start, end))
+            {
+                DateTimeOffset cursor = from;
+                while (cursor < to)
+                {
+                    DateOnly date = studentLocalTime.GetLocalDate(cursor, student);
+                    DateTimeOffset next = FindNextLocalDateBoundary(cursor, to, date, student, studentLocalTime);
+                    secondsByDate[date] = secondsByDate.GetValueOrDefault(date) + (next - cursor).TotalSeconds;
+                    cursor = next;
+                }
+            }
+        }
+
+        return secondsByDate.ToDictionary(
+            x => x.Key,
+            x => Math.Min(1440, (int)Math.Ceiling(x.Value / 60d)));
+    }
+
+    public static int GetActualStudyMinutesForDates(
+        IEnumerable<StudySession> sessions, DateOnly startsOn, DateOnly endsOn,
+        DateTimeOffset utcNow, Student student, IStudentLocalTime studentLocalTime) =>
+        GetActualStudyMinutesByLocalDate(sessions, student, studentLocalTime, utcNow)
+            .Where(x => x.Key >= startsOn && x.Key <= endsOn)
+            .Sum(x => x.Value);
 
     public static ParentDashboardSessionsCsvExport CreateCsvExport(
         Guid studentId,
@@ -258,8 +318,8 @@ internal static class ParentDashboardHelpers
                     session.Mode,
                     session.SelectedSubjectId?.ToString() ?? string.Empty,
                     SanitizeCsvTextValue(session.SubjectName ?? string.Empty),
-                    session.ActualStudyMinutes.ToString(CultureInfo.InvariantCulture),
-                    session.PlannedFocusDurationMinutes?.ToString(CultureInfo.InvariantCulture) ?? string.Empty,
+                    session.ActualStudyMinutes,
+                    session.PlannedFocusDurationMinutes ?? string.Empty,
                     FormatDateTimeOffset(session.CompletedAtUtc),
                     FormatDateTimeOffset(session.CancelledAtUtc),
                     FormatDateTimeOffset(session.LastActivityAtUtc)
@@ -270,6 +330,43 @@ internal static class ParentDashboardHelpers
         return new ParentDashboardSessionsCsvExport(
             $"parent-dashboard-sessions-{studentId:N}-{timestamp}.csv",
             CsvContentType,
+            Encoding.UTF8.GetBytes(builder.ToString()));
+    }
+
+    // CSV is an analytic export, deliberately retaining integer-minute values
+    // even though the interactive Parent Overview presents friendly strings.
+    public static ParentDashboardSessionsCsvExport CreateRawCsvExport(
+        Guid studentId,
+        IEnumerable<StudySession> sessions,
+        IReadOnlyDictionary<Guid, string?> subjectNamesById,
+        DateTimeOffset utcNow)
+    {
+        var builder = new StringBuilder();
+        AppendCsvRow(builder,
+        ["Id", "StartedAtUtc", "Status", "Mode", "SelectedSubjectId", "SubjectName",
+            "ActualStudyMinutes", "PlannedFocusDurationMinutes", "CompletedAtUtc",
+            "CancelledAtUtc", "LastActivityAtUtc"]);
+
+        foreach (StudySession session in sessions)
+        {
+            string? subjectName = session.SelectedSubjectId is Guid subjectId &&
+                                  subjectNamesById.TryGetValue(subjectId, out string? name)
+                ? name : null;
+            AppendCsvRow(builder,
+            [
+                session.Id.ToString(), FormatDateTimeOffset(session.StartedAtUtc), session.Status.ToString(),
+                session.Mode.ToString(), session.SelectedSubjectId?.ToString() ?? string.Empty,
+                SanitizeCsvTextValue(subjectName ?? string.Empty),
+                GetActualStudyMinutes(session, utcNow).ToString(CultureInfo.InvariantCulture),
+                session.FocusDurationMinutes?.ToString(CultureInfo.InvariantCulture) ?? string.Empty,
+                FormatDateTimeOffset(session.CompletedAtUtc), FormatDateTimeOffset(session.CancelledAtUtc),
+                FormatDateTimeOffset(session.LastActivityAtUtc)
+            ]);
+        }
+
+        string timestamp = utcNow.UtcDateTime.ToString("yyyyMMddHHmmss", CultureInfo.InvariantCulture);
+        return new ParentDashboardSessionsCsvExport(
+            $"parent-dashboard-sessions-{studentId:N}-{timestamp}.csv", CsvContentType,
             Encoding.UTF8.GetBytes(builder.ToString()));
     }
 
@@ -290,7 +387,41 @@ internal static class ParentDashboardHelpers
             return session.PausedAtUtc.Value;
         }
 
-        return utcNow;
+        // Do not turn a stale Active row into arbitrary wall-clock study time.
+        // LastActivity is advanced only by a real progress/heartbeat request.
+        return session.Status == StudySessionStatus.Active && session.LastActivityAtUtc is not null
+            ? session.LastActivityAtUtc.Value < utcNow ? session.LastActivityAtUtc.Value : utcNow
+            : utcNow;
+    }
+
+    private static IEnumerable<(DateTimeOffset From, DateTimeOffset To)> GetActiveIntervals(
+        StudySession session, DateTimeOffset start, DateTimeOffset end)
+    {
+        DateTimeOffset cursor = start;
+        foreach (StudySessionPauseInterval pause in session.PauseIntervals.OrderBy(x => x.StartedAtUtc))
+        {
+            DateTimeOffset pauseStart = pause.StartedAtUtc < start ? start : pause.StartedAtUtc;
+            DateTimeOffset pauseEnd = (pause.EndedAtUtc ?? end) > end ? end : pause.EndedAtUtc ?? end;
+            if (pauseStart > cursor) yield return (cursor, pauseStart);
+            if (pauseEnd > cursor) cursor = pauseEnd;
+        }
+        if (cursor < end) yield return (cursor, end);
+    }
+
+    private static DateTimeOffset FindNextLocalDateBoundary(DateTimeOffset from, DateTimeOffset end,
+        DateOnly currentDate, Student student, IStudentLocalTime studentLocalTime)
+    {
+        if (studentLocalTime.GetLocalDate(end, student) == currentDate) return end;
+        long low = from.UtcTicks;
+        long high = end.UtcTicks;
+        while (high - low > TimeSpan.TicksPerSecond)
+        {
+            long middle = low + (high - low) / 2;
+            DateTimeOffset probe = new(middle, TimeSpan.Zero);
+            if (studentLocalTime.GetLocalDate(probe, student) == currentDate) low = middle;
+            else high = middle;
+        }
+        return new DateTimeOffset(high, TimeSpan.Zero);
     }
 
     private static string? GetSubjectName(StudentSubject subject)
@@ -330,7 +461,7 @@ internal static class ParentDashboardHelpers
         value?.ToString("O", CultureInfo.InvariantCulture) ?? string.Empty;
 }
 
-internal sealed record ParentDashboardContext(Parent Parent, Student Student);
+internal sealed record ParentDashboardContext(Parent Parent, Student Student, ParentStudentRelationship Relationship);
 
 internal sealed record ParentDashboardSessionFilters(
     IReadOnlyCollection<StudySessionStatus> Statuses,

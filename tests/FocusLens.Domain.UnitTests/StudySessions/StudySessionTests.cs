@@ -235,6 +235,18 @@ public class StudySessionTests
     }
 
     [Fact]
+    public void ActiveSession_ProgressRetries_DoNotMoveActivityWatermarkBackwards()
+    {
+        StudySession session = CreateReadyDigitalSession();
+        DateTimeOffset start = new(2026, 10, 2, 20, 0, 0, TimeSpan.Zero);
+        Assert.True(session.Start(start).IsSuccess);
+        Assert.True(session.UpdateProgress(null, start.AddMinutes(20)).IsSuccess);
+        Assert.True(session.UpdateProgress(null, start.AddMinutes(10)).IsSuccess);
+
+        Assert.Equal(start.AddMinutes(20), session.LastActivityAtUtc);
+    }
+
+    [Fact]
     public void ChangingDuration_PreservesMaterialAndSections()
     {
         StudySession session = CreateReadyDigitalSession();
