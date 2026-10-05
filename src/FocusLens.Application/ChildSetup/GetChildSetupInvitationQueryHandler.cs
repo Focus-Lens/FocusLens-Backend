@@ -1,10 +1,6 @@
 using System.Security.Cryptography;
 using System.Text;
-using FocusLens.Application.Common.Mappings;
-using FocusLens.Application.Parents;
 using FocusLens.Contracts.ChildSetup;
-using FocusLens.Contracts.Students;
-using FocusLens.Domain;
 using FocusLens.Domain.ChildSetup;
 using FocusLens.Domain.Common.Interfaces;
 using FocusLens.Domain.Common.Results;
@@ -14,8 +10,6 @@ namespace FocusLens.Application.ChildSetup;
 
 public sealed class GetChildSetupInvitationQueryHandler(
     IBaseRepository<ChildSetupInvitation> invitationRepository,
-    IBaseRepository<ChildSetupDraft> draftRepository,
-    IBaseRepository<Parent> parentRepository,
     TimeProvider timeProvider
 ) : IRequestHandler<GetChildSetupInvitationQuery, Result<ChildSetupInvitationDetailsResponse>>
 {
@@ -63,50 +57,10 @@ public sealed class GetChildSetupInvitationQueryHandler(
             return Error.Conflict("ChildSetupInvitation.Expired", "This invitation has expired.");
         }
 
-        ChildSetupDraft? draft = await draftRepository.GetByIdAsync(
-            invitation.ChildSetupDraftId,
-            item => item.Subjects
-        );
-
-        if (draft is null)
-        {
-            return Error.NotFound(
-                "ChildSetupInvitation.NotFound",
-                "The invitation could not be found."
-            );
-        }
-
-        Parent? parent = await parentRepository.GetByIdAsync(draft.ParentId);
-
         return new ChildSetupInvitationDetailsResponse(
             invitation.Status.ToString(),
             invitation.Type.ToString(),
             invitation.TargetEmailNormalized,
-            draft.FirstName,
-            draft.LastName,
-            draft.Grade is null ? null : StudentEnumMapper.ToContract(draft.Grade.Value),
-            draft.CustomGrade,
-            draft
-                .Subjects.Select(subject => new ChildSetupInvitationSubjectResponse(
-                    subject.Type.ToString(),
-                    subject.CustomName
-                ))
-                .ToList(),
-            draft
-                .Goal is null
-                  ? null
-                  : StudentEnumMapper.ToContract(draft.Goal.Value),
-            draft.StudyTimeGoal is null
-                ? null
-                : new StudyTimeGoalResponse(
-                    draft.StudyTimeGoal.Period.ToString(),
-                    draft.StudyTimeGoal.TargetMinutes,
-                    parent?.WeekStartsOn is DayOfWeek weekStartsOn
-                        ? ParentWeekdayOrder.OrderDays(draft.StudyTimeGoal.Days, weekStartsOn)
-                        : draft.StudyTimeGoal.Days,
-                    draft.StudyTimeGoal.StartDate,
-                    draft.StudyTimeGoal.EndDate
-                ),
             invitation.ExpiresAtUtc
         );
     }

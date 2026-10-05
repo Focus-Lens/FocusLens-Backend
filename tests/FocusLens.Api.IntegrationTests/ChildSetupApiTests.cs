@@ -174,10 +174,18 @@ public sealed class ChildSetupApiTests
 
         JsonElement result = document.RootElement;
 
+        Assert.Equal("Pending", result.GetProperty("status").GetString());
         Assert.Equal("Email", result.GetProperty("type").GetString());
         Assert.Equal("YOUSSEF@EXAMPLE.COM", result.GetProperty("targetEmail").GetString());
-        Assert.Equal("Other", result.GetProperty("grade").GetString());
-        Assert.Equal("Year 13", result.GetProperty("customGrade").GetString());
+        Assert.Equal(invitation.ExpiresAtUtc, result.GetProperty("expiresAtUtc").GetDateTimeOffset());
+        Assert.Equal(4, result.EnumerateObject().Count());
+        Assert.False(result.TryGetProperty("firstName", out _));
+        Assert.False(result.TryGetProperty("lastName", out _));
+        Assert.False(result.TryGetProperty("grade", out _));
+        Assert.False(result.TryGetProperty("customGrade", out _));
+        Assert.False(result.TryGetProperty("subjects", out _));
+        Assert.False(result.TryGetProperty("goal", out _));
+        Assert.False(result.TryGetProperty("studyTimeGoal", out _));
     }
 
     [Fact]
@@ -236,8 +244,18 @@ public sealed class ChildSetupApiTests
 
         JsonElement result = document.RootElement;
 
+        Assert.Equal("Pending", result.GetProperty("status").GetString());
         Assert.Equal("Link", result.GetProperty("type").GetString());
         Assert.Equal(JsonValueKind.Null, result.GetProperty("targetEmail").ValueKind);
+        Assert.Equal(invitation.ExpiresAtUtc, result.GetProperty("expiresAtUtc").GetDateTimeOffset());
+        Assert.Equal(4, result.EnumerateObject().Count());
+        Assert.False(result.TryGetProperty("firstName", out _));
+        Assert.False(result.TryGetProperty("lastName", out _));
+        Assert.False(result.TryGetProperty("grade", out _));
+        Assert.False(result.TryGetProperty("customGrade", out _));
+        Assert.False(result.TryGetProperty("subjects", out _));
+        Assert.False(result.TryGetProperty("goal", out _));
+        Assert.False(result.TryGetProperty("studyTimeGoal", out _));
     }
 
     [Fact]
