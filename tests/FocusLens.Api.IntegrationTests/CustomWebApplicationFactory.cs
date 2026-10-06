@@ -29,6 +29,11 @@ public sealed class CustomWebApplicationFactory
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.UseEnvironment("Testing");
+        builder.UseSetting("Jwt:Secret", "FocusLens.IntegrationTests.Jwt.Secret.2026.1234567890abcdef");
+        builder.UseSetting("Jwt:Issuer", "FocusLens.Api");
+        builder.UseSetting("Jwt:Audience", "FocusLens.Client");
+        builder.UseSetting("FocusLensAI:BaseUrl", "http://localhost/");
+        builder.UseSetting("BehavioralIntelligence:BaseUrl", "http://localhost/");
 
         builder.ConfigureServices(services =>
         {

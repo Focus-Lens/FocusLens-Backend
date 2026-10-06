@@ -1,8 +1,11 @@
 using FocusLens.Application.Common.Errors;
 using FocusLens.Application.Common.Interfaces;
 using FocusLens.Application.Features.Users.Dtos;
+using FocusLens.Domain.Common.Interfaces;
 using FocusLens.Domain.Common.Results;
 using FocusLens.Domain.Identity;
+using FocusLens.Domain;
+using FocusLens.Domain.Common.Constants;
 using FocusLens.Domain.Interfaces;
 using MediatR;
 
@@ -13,13 +16,19 @@ public sealed class GetCurrentUserQueryHandler
 {
     private readonly ICurrentUser _currentUser;
     private readonly IIdentityService _identityService;
+    private readonly IBaseRepository<Parent> _parents;
+    private readonly IBaseRepository<Student> _students;
 
     public GetCurrentUserQueryHandler(
         ICurrentUser currentUser,
-        IIdentityService identityService)
+        IIdentityService identityService,
+        IBaseRepository<Parent> parents,
+        IBaseRepository<Student> students)
     {
         _currentUser = currentUser;
         _identityService = identityService;
+        _parents = parents;
+        _students = students;
     }
 
     public async Task<Result<UserProfileDto>> Handle(
@@ -40,6 +49,13 @@ public sealed class GetCurrentUserQueryHandler
 
         IReadOnlyCollection<string> roles = await _identityService.GetRolesAsync(user);
 
-        return user.ToProfileDto(roles);
+        Parent? parent = roles.Contains(ApplicationRoles.Parent, StringComparer.Ordinal)
+            ? await _parents.FirstOrDefaultAsync(item => item.UserId == userId)
+            : null;
+        Student? student = roles.Contains(ApplicationRoles.Student, StringComparer.Ordinal)
+            ? await _students.FirstOrDefaultAsync(item => item.UserId == userId)
+            : null;
+
+        return user.ToProfileDto(roles, parent, student);
     }
 }

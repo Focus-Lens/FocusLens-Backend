@@ -17,6 +17,9 @@ public class ApplicationUserConfiguration : IEntityTypeConfiguration<Application
         builder.Property(user => user.TermsVersion)
             .HasMaxLength(50);
 
+        builder.Property(user => user.CreatedAtUtc)
+            .IsRequired();
+
         builder.Property(user => user.DeletedAtUtc);
 
         builder.Property(user => user.RestoreUntilUtc);

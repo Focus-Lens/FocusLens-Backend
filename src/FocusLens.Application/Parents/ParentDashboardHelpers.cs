@@ -16,6 +16,8 @@ namespace FocusLens.Application.Parents;
 
 internal static class ParentDashboardHelpers
 {
+    private const string NullCsvValue = "NULL";
+
     public const int PulseDays = 7;
     public const int MaxPageSize = 100;
     public const string CsvContentType = "text/csv; charset=utf-8";
@@ -294,7 +296,6 @@ internal static class ParentDashboardHelpers
         AppendCsvRow(
             builder,
             [
-                "Id",
                 "StartedAtUtc",
                 "Status",
                 "Mode",
@@ -312,14 +313,13 @@ internal static class ParentDashboardHelpers
             AppendCsvRow(
                 builder,
                 [
-                    session.Id.ToString(),
                     FormatDateTimeOffset(session.StartedAtUtc),
                     session.Status,
                     session.Mode,
-                    session.SelectedSubjectId?.ToString() ?? string.Empty,
-                    SanitizeCsvTextValue(session.SubjectName ?? string.Empty),
+                    session.SelectedSubjectId?.ToString() ?? NullCsvValue,
+                    session.SubjectName is null ? NullCsvValue : SanitizeCsvTextValue(session.SubjectName),
                     session.ActualStudyMinutes,
-                    session.PlannedFocusDurationMinutes ?? string.Empty,
+                    session.PlannedFocusDurationMinutes ?? NullCsvValue,
                     FormatDateTimeOffset(session.CompletedAtUtc),
                     FormatDateTimeOffset(session.CancelledAtUtc),
                     FormatDateTimeOffset(session.LastActivityAtUtc)
@@ -343,7 +343,7 @@ internal static class ParentDashboardHelpers
     {
         var builder = new StringBuilder();
         AppendCsvRow(builder,
-        ["Id", "StartedAtUtc", "Status", "Mode", "SelectedSubjectId", "SubjectName",
+        ["StartedAtUtc", "Status", "Mode", "SelectedSubjectId", "SubjectName",
             "ActualStudyMinutes", "PlannedFocusDurationMinutes", "CompletedAtUtc",
             "CancelledAtUtc", "LastActivityAtUtc"]);
 
@@ -354,11 +354,11 @@ internal static class ParentDashboardHelpers
                 ? name : null;
             AppendCsvRow(builder,
             [
-                session.Id.ToString(), FormatDateTimeOffset(session.StartedAtUtc), session.Status.ToString(),
-                session.Mode.ToString(), session.SelectedSubjectId?.ToString() ?? string.Empty,
-                SanitizeCsvTextValue(subjectName ?? string.Empty),
+                FormatDateTimeOffset(session.StartedAtUtc), session.Status.ToString(),
+                session.Mode.ToString(), session.SelectedSubjectId?.ToString() ?? NullCsvValue,
+                subjectName is null ? NullCsvValue : SanitizeCsvTextValue(subjectName),
                 GetActualStudyMinutes(session, utcNow).ToString(CultureInfo.InvariantCulture),
-                session.FocusDurationMinutes?.ToString(CultureInfo.InvariantCulture) ?? string.Empty,
+                session.FocusDurationMinutes?.ToString(CultureInfo.InvariantCulture) ?? NullCsvValue,
                 FormatDateTimeOffset(session.CompletedAtUtc), FormatDateTimeOffset(session.CancelledAtUtc),
                 FormatDateTimeOffset(session.LastActivityAtUtc)
             ]);
@@ -458,7 +458,7 @@ internal static class ParentDashboardHelpers
     }
 
     private static string FormatDateTimeOffset(DateTimeOffset? value) =>
-        value?.ToString("O", CultureInfo.InvariantCulture) ?? string.Empty;
+        value?.ToString("MMM dd, yyyy hh:mm tt", CultureInfo.InvariantCulture) ?? NullCsvValue;
 }
 
 internal sealed record ParentDashboardContext(Parent Parent, Student Student, ParentStudentRelationship Relationship);

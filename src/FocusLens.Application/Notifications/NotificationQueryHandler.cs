@@ -10,37 +10,37 @@ public sealed class NotificationQueryHandler(
     IBaseRepository<Notification> notificationRepository,
     IBaseRepository<StudentNotificationPreferences> preferencesRepository,
     ICurrentUser currentUser)
-    : IRequestHandler<GetMyNotificationsQuery, IReadOnlyList<NotificationResponse>>,
+    : IRequestHandler<GetMyNotificationsQuery, NotificationsResponse>,
         IRequestHandler<GetMyStudentNotificationPreferencesQuery, StudentNotificationPreferencesResponse>
 {
-    public async Task<IReadOnlyList<NotificationResponse>> Handle(
+    public async Task<NotificationsResponse> Handle(
         GetMyNotificationsQuery request,
         CancellationToken cancellationToken)
     {
         if (currentUser.UserId is not Guid userId || userId == Guid.Empty)
         {
-            return [];
+            return new NotificationsResponse([], 0);
         }
 
-        IEnumerable<Notification> query = await notificationRepository.GetAllAsync(
-            notification =>
-                notification.RecipientUserId == userId &&
-                !notification.RecipientUser.IsDisabled &&
-                notification.RecipientUser.DeletedAtUtc == null,
-            notification => notification.RecipientUser);
-
-        query = request.Filter switch
+        IEnumerable<Notification> notifications = request.Filter switch
         {
-            NotificationFilter.Unread => query.Where(notification => notification.ReadAtUtc == null),
-            NotificationFilter.System => query.Where(notification =>
-                notification.Category == NotificationCategory.System),
-            _ => query
+            NotificationFilter.Alerts => await notificationRepository.GetAllAsync(notification =>
+                notification.RecipientUserId == userId && AlertCategories.Contains(notification.Category)),
+            NotificationFilter.System => await notificationRepository.GetAllAsync(notification =>
+                notification.RecipientUserId == userId && SystemCategories.Contains(notification.Category)),
+            _ => await notificationRepository.GetAllAsync(notification =>
+                notification.RecipientUserId == userId)
         };
 
-        return query
+        int unreadCount = await notificationRepository.CountAsync(notification =>
+            notification.RecipientUserId == userId && notification.ReadAtUtc == null);
+
+        return new NotificationsResponse(
+            notifications
             .OrderByDescending(notification => notification.CreatedAtUtc)
             .Select(notification => notification.ToResponse())
-            .ToList();
+            .ToList(),
+            unreadCount);
     }
 
     public async Task<StudentNotificationPreferencesResponse> Handle(
@@ -60,4 +60,23 @@ public sealed class NotificationQueryHandler(
 
     private static StudentNotificationPreferencesResponse DefaultStudentPreferences() =>
         new(true, true, true, StudentReminderTime.EightAm.ToString());
+
+    private static readonly NotificationCategory[] AlertCategories =
+    [
+        NotificationCategory.FocusPatternChanged,
+        NotificationCategory.SessionSummaryReady,
+        NotificationCategory.SubjectProgressReportReady,
+        NotificationCategory.ParentConnectionConfirmed,
+        NotificationCategory.StudyReminder,
+        NotificationCategory.StudyTip,
+        NotificationCategory.WeeklyProgressUpdate,
+        NotificationCategory.StudyGoalProposal,
+        NotificationCategory.ParentActivity
+    ];
+
+    private static readonly NotificationCategory[] SystemCategories =
+    [
+        NotificationCategory.PrivacyInformationUpdated,
+        NotificationCategory.System
+    ];
 }

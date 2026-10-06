@@ -11,6 +11,10 @@ public sealed record NotificationResponse(
     DateTimeOffset? ReadAtUtc,
     NotificationActionResponse? Action);
 
+public sealed record NotificationsResponse(
+    IReadOnlyList<NotificationResponse> Notifications,
+    int UnreadCount);
+
 public sealed record NotificationActionResponse(
     string Url,
     string? Text);

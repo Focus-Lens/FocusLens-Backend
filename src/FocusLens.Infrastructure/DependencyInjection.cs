@@ -97,6 +97,7 @@ public static class DependencyInjection
         services.AddSingleton<IPushNotificationProvider, NoopPushNotificationProvider>();
         services.AddHostedService<ScheduledNotificationWorker>();
         services.AddHostedService<PushNotificationDispatcher>();
+        services.AddHostedService<AccountDeletionWorker>();
 
         services.AddDbContext<ApplicationDbContext>((serviceProvider, options) =>
             {

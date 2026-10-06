@@ -17,6 +17,7 @@ public sealed class NotificationCommandHandler(
     IUnitOfWork unitOfWork,
     TimeProvider timeProvider)
     : IRequestHandler<MarkNotificationReadCommand, Result<NotificationResponse>>,
+        IRequestHandler<MarkAllNotificationsReadCommand, Result<Success>>,
         IRequestHandler<UpdateStudentNotificationPreferencesCommand, Result<StudentNotificationPreferencesResponse>>,
         IRequestHandler<RegisterDeviceTokenCommand, Result<DeviceTokenResponse>>,
         IRequestHandler<RemoveDeviceTokenCommand, Result<Success>>
@@ -118,6 +119,36 @@ public sealed class NotificationCommandHandler(
         await unitOfWork.SaveChangesAsync();
 
         return preferences.ToResponse();
+    }
+
+    public async Task<Result<Success>> Handle(
+        MarkAllNotificationsReadCommand request,
+        CancellationToken cancellationToken)
+    {
+        if (currentUser.UserId is not Guid userId || userId == Guid.Empty)
+        {
+            return Error.Unauthorized(
+                "Notifications.CurrentUserUnavailable",
+                "The current user could not be identified.");
+        }
+
+        List<Notification> unreadNotifications = (await notificationRepository.GetAllAsync(
+                notification =>
+                    notification.RecipientUserId == userId && notification.ReadAtUtc == null))
+            .ToList();
+
+        DateTimeOffset now = timeProvider.GetUtcNow();
+        foreach (Notification notification in unreadNotifications)
+        {
+            notification.MarkRead(now);
+        }
+
+        if (unreadNotifications.Count > 0)
+        {
+            await unitOfWork.SaveChangesAsync();
+        }
+
+        return Result.Success;
     }
 
     public async Task<Result<DeviceTokenResponse>> Handle(

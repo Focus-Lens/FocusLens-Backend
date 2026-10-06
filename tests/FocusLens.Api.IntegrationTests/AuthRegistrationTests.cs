@@ -191,13 +191,20 @@ public class AuthRegistrationTests
             $"{audience} terms",
             true,
             new DateTimeOffset(2026, 9, 4, 0, 0, 0, TimeSpan.Zero));
+        LegalDocument currentPrivacy = new(
+            audience,
+            "2026-10-05",
+            $"{audience} privacy",
+            true,
+            new DateTimeOffset(2026, 10, 5, 0, 0, 0, TimeSpan.Zero),
+            LegalDocumentType.Privacy);
 
         await factory.SeedAsync(db =>
         {
             db.Roles.AddRange(
                 CreateRole(ApplicationRoles.Student),
                 CreateRole(ApplicationRoles.Parent));
-            db.LegalDocuments.AddRange(oldTerms, currentTerms);
+            db.LegalDocuments.AddRange(oldTerms, currentTerms, currentPrivacy);
             return Task.CompletedTask;
         });
 

@@ -16,6 +16,10 @@ public sealed class ApplicationUser : IdentityUser<Guid>
 
     public bool IsDisabled { get; set; }
 
+    // Identity users are not AuditableEntity instances; retain their account
+    // creation instant here for the common profile endpoint.
+    public DateTimeOffset CreatedAtUtc { get; set; } = DateTimeOffset.UtcNow;
+
     public DateTimeOffset? DeletedAtUtc { get; private set; }
 
     public DateTimeOffset? RestoreUntilUtc { get; private set; }

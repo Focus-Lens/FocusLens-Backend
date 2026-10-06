@@ -763,7 +763,7 @@ public sealed class StudySessionCommandHandler(
 
         materialRepository.Add(materialResult.Value);
         bool oldMaterialIsShared = oldMaterial is not null
-                                   && studySessionRepository.GetAll().Any(session =>
+                                   && await studySessionRepository.AnyAsync(session =>
                                        session.Id != sessionId && session.StudyMaterialId == oldMaterial.Id);
         if (oldMaterial is not null && !oldMaterialIsShared)
         {

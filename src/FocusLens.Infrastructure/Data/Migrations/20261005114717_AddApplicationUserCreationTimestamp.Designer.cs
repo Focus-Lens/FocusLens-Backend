@@ -4,6 +4,7 @@ using FocusLens.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace FocusLens.Infrastructure.Data.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDBContextModelSnapshot : ModelSnapshot
+    [Migration("20261005114717_AddApplicationUserCreationTimestamp")]
+    partial class AddApplicationUserCreationTimestamp
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -481,11 +484,6 @@ namespace FocusLens.Infrastructure.Data.Migrations
                     b.Property<DateTimeOffset?>("PublishedOnUtc")
                         .HasColumnType("datetimeoffset");
 
-                    b.Property<string>("Type")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("nvarchar(20)");
-
                     b.Property<string>("Version")
                         .IsRequired()
                         .HasMaxLength(50)
@@ -493,10 +491,10 @@ namespace FocusLens.Infrastructure.Data.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("Audience", "Type", "Version")
+                    b.HasIndex("Audience", "Version")
                         .IsUnique();
 
-                    b.HasIndex("Audience", "Type", "IsPublished", "PublishedOnUtc");
+                    b.HasIndex("Audience", "IsPublished", "PublishedOnUtc");
 
                     b.ToTable("LegalDocuments");
                 });

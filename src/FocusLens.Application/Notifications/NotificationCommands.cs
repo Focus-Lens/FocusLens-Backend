@@ -7,6 +7,9 @@ namespace FocusLens.Application.Notifications;
 public sealed record MarkNotificationReadCommand(Guid NotificationId)
     : IRequest<Result<NotificationResponse>>;
 
+public sealed record MarkAllNotificationsReadCommand()
+    : IRequest<Result<Success>>;
+
 public sealed record UpdateStudentNotificationPreferencesCommand(
     UpdateStudentNotificationPreferencesRequest Request)
     : IRequest<Result<StudentNotificationPreferencesResponse>>;

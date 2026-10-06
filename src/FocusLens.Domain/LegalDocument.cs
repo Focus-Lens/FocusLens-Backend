@@ -13,16 +13,20 @@ public sealed class LegalDocument : AuditableEntity
         string version,
         string content,
         bool isPublished,
-        DateTimeOffset? publishedOnUtc)
+        DateTimeOffset? publishedOnUtc,
+        LegalDocumentType type = LegalDocumentType.Terms)
         : base(Guid.CreateVersion7())
     {
         Audience = audience;
+        Type = type;
         SetDraftContent(version, content);
         IsPublished = isPublished;
         PublishedOnUtc = publishedOnUtc;
     }
 
     public LegalDocumentAudience Audience { get; private set; }
+
+    public LegalDocumentType Type { get; private set; }
 
     public string Version { get; private set; } = string.Empty;
 

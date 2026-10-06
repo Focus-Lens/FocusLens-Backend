@@ -42,6 +42,12 @@ public sealed class InMemoryRepository<T> : DomainInterfaces.IBaseRepository<T> 
         params Expression<Func<T, object>>[] includes) =>
         Task.FromResult(_entities.AsQueryable().FirstOrDefault(criteria));
 
+    public Task<int> CountAsync(Expression<Func<T, bool>> criteria) =>
+        Task.FromResult(_entities.AsQueryable().Count(criteria));
+
+    public Task<bool> AnyAsync(Expression<Func<T, bool>> criteria) =>
+        Task.FromResult(_entities.AsQueryable().Any(criteria));
+
     public void Add(T entity) => _entities.Add(entity);
 
     public Task AddRangeAsync(IEnumerable<T> entities)

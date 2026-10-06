@@ -12,6 +12,10 @@ public sealed class LegalDocumentConfiguration : IEntityTypeConfiguration<LegalD
             .HasConversion<string>()
             .HasMaxLength(20);
 
+        builder.Property(document => document.Type)
+            .HasConversion<string>()
+            .HasMaxLength(20);
+
         builder.Property(document => document.Version)
             .HasMaxLength(50)
             .IsRequired();
@@ -19,9 +23,9 @@ public sealed class LegalDocumentConfiguration : IEntityTypeConfiguration<LegalD
         builder.Property(document => document.Content)
             .IsRequired();
 
-        builder.HasIndex(document => new { document.Audience, document.Version })
+        builder.HasIndex(document => new { document.Audience, document.Type, document.Version })
             .IsUnique();
 
-        builder.HasIndex(document => new { document.Audience, document.IsPublished, document.PublishedOnUtc });
+        builder.HasIndex(document => new { document.Audience, document.Type, document.IsPublished, document.PublishedOnUtc });
     }
 }

@@ -4,4 +4,4 @@ using MediatR;
 
 namespace FocusLens.Application.Terms;
 
-public sealed record GetTermsQuery(string Audience) : IRequest<Result<TermsResponse>>;
+public sealed record GetPrivacyQuery(string Audience) : IRequest<Result<TermsResponse>>;

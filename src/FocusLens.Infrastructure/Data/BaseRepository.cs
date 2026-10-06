@@ -67,6 +67,12 @@ public class BaseRepository<T>(ApplicationDbContext context) : IBaseRepository<T
         return await query.FirstOrDefaultAsync(criteria);
     }
 
+    public Task<int> CountAsync(Expression<Func<T, bool>> criteria) =>
+        _dbSet.CountAsync(criteria);
+
+    public Task<bool> AnyAsync(Expression<Func<T, bool>> criteria) =>
+        _dbSet.AnyAsync(criteria);
+
     public void Add(T entity) => _dbSet.Add(entity);
 
     public async Task AddRangeAsync(IEnumerable<T> entities) => await _dbSet.AddRangeAsync(entities);

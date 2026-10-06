@@ -7,19 +7,16 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace FocusLens.API.Controllers;
 
-[Route("api/terms")]
+[Route("api/privacy")]
 [AllowAnonymous]
-public sealed class TermsController(ISender sender) : ApiController
+public sealed class PrivacyController(ISender sender) : ApiController
 {
     [HttpGet]
-    public async Task<IActionResult> GetTerms(
+    public async Task<IActionResult> GetPrivacy(
         [FromQuery] string audience,
         CancellationToken cancellationToken)
     {
-        Result<TermsResponse> result = await sender.Send(new GetTermsQuery(audience), cancellationToken);
-
-        return result.Match(
-            Ok,
-            Problem);
+        Result<TermsResponse> result = await sender.Send(new GetPrivacyQuery(audience), cancellationToken);
+        return result.Match(Ok, Problem);
     }
 }

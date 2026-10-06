@@ -17,11 +17,21 @@ public sealed class NotificationsController(ISender sender) : ApiController
         [FromQuery] NotificationFilter filter = NotificationFilter.All,
         CancellationToken cancellationToken = default)
     {
-        IReadOnlyList<NotificationResponse> notifications = await sender.Send(
+        NotificationsResponse notifications = await sender.Send(
             new GetMyNotificationsQuery(filter),
             cancellationToken);
 
         return Ok(notifications);
+    }
+
+    [HttpPost("read-all")]
+    public async Task<IActionResult> MarkAllRead(CancellationToken cancellationToken)
+    {
+        Result<Success> result = await sender.Send(
+            new MarkAllNotificationsReadCommand(),
+            cancellationToken);
+
+        return result.Match(_ => NoContent(), Problem);
     }
 
     [HttpPost("{notificationId:guid}/read")]

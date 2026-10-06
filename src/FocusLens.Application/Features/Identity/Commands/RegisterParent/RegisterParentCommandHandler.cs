@@ -145,6 +145,7 @@ public sealed class RegisterParentCommandHandler
     {
         IEnumerable<LegalDocument> publishedDocuments =
             await _legalDocumentRepository.GetAllAsync(document => document.Audience == LegalDocumentAudience.Parent
+                                                                   && document.Type == LegalDocumentType.Terms
                                                                    && document.IsPublished
                                                                    && document.PublishedOnUtc != null);
 

@@ -1,7 +1,5 @@
 using FocusLens.Application.Features.Users.Queries.GetCurrentUserAccountStatus;
 using FocusLens.Application.UnitTests.Access;
-using FocusLens.Domain;
-using FocusLens.Domain.Access;
 using FocusLens.Domain.Common.Interfaces;
 using FocusLens.Domain.Identity;
 using FocusLens.Domain.Interfaces;
@@ -11,7 +9,7 @@ namespace FocusLens.Application.UnitTests.Users;
 public sealed class GetCurrentUserAccountStatusQueryHandlerTests
 {
     [Fact]
-    public async Task Handle_WithCurrentParent_ReturnsIdentityAndChildRelationshipStatuses()
+    public async Task Handle_WithCurrentParent_ReturnsCommonAccountStatusOnly()
     {
         ApplicationUser user = new()
         {
@@ -19,21 +17,9 @@ public sealed class GetCurrentUserAccountStatusQueryHandlerTests
             FirstName = "Mona",
             LastName = "Hassan"
         };
-        Parent parent = new(user.Id);
-        Student activeChild = CreateStudent("Lina", "Hassan", "Lulu");
-        Student pendingChild = CreateStudent("Omar", "Hassan");
-        ParentStudentRelationship activeRelationship = new(parent.Id, activeChild.Id);
-        activeRelationship.Accept();
-        ParentStudentRelationship pendingRelationship = new(parent.Id, pendingChild.Id);
-
         GetCurrentUserAccountStatusQueryHandler handler = new(
             new FakeCurrentUser(user.Id),
-            new TestIdentityService(user),
-            new InMemoryRepository<Parent>(parent),
-            new InMemoryRepository<ParentStudentRelationship>(
-                activeRelationship,
-                pendingRelationship),
-            new InMemoryRepository<Student>(activeChild, pendingChild));
+            new TestIdentityService(user));
 
         var result = await handler.Handle(
             new GetCurrentUserAccountStatusQuery(),
@@ -43,26 +29,10 @@ public sealed class GetCurrentUserAccountStatusQueryHandlerTests
         Assert.True(result.Value.EmailConfirmed);
         Assert.Equal("Verified", result.Value.EmailVerificationStatus);
         Assert.Equal("Active", result.Value.AccountStatus);
-        Assert.Collection(
-            result.Value.ChildRelationships,
-            relationship =>
-            {
-                Assert.Equal(activeRelationship.Id, relationship.RelationshipId);
-                Assert.Equal(activeChild.Id, relationship.ChildId);
-                Assert.Equal("Lulu", relationship.ChildName);
-                Assert.Equal("Active", relationship.RelationshipStatus);
-            },
-            relationship =>
-            {
-                Assert.Equal(pendingRelationship.Id, relationship.RelationshipId);
-                Assert.Equal(pendingChild.Id, relationship.ChildId);
-                Assert.Equal("Omar Hassan", relationship.ChildName);
-                Assert.Equal("Pending", relationship.RelationshipStatus);
-            });
     }
 
     [Fact]
-    public async Task Handle_WithStudentUser_ReturnsIdentityStatusWithoutChildRelationships()
+    public async Task Handle_WithStudentUser_ReturnsIdentityStatus()
     {
         ApplicationUser user = new()
         {
@@ -72,10 +42,7 @@ public sealed class GetCurrentUserAccountStatusQueryHandlerTests
 
         GetCurrentUserAccountStatusQueryHandler handler = new(
             new FakeCurrentUser(user.Id),
-            new TestIdentityService(user),
-            new InMemoryRepository<Parent>(),
-            new InMemoryRepository<ParentStudentRelationship>(),
-            new InMemoryRepository<Student>());
+            new TestIdentityService(user));
 
         var result = await handler.Handle(
             new GetCurrentUserAccountStatusQuery(),
@@ -86,24 +53,6 @@ public sealed class GetCurrentUserAccountStatusQueryHandlerTests
         Assert.Equal("Unverified", result.Value.EmailVerificationStatus);
         Assert.True(result.Value.IsDisabled);
         Assert.Equal("Disabled", result.Value.AccountStatus);
-        Assert.Empty(result.Value.ChildRelationships);
-    }
-
-    private static Student CreateStudent(
-        string firstName,
-        string lastName,
-        string? preferredName = null)
-    {
-        ApplicationUser user = new()
-        {
-            FirstName = firstName,
-            LastName = lastName
-        };
-        Student student = new(user.Id);
-        student.SetPrivateProperty("User", user);
-        student.SetPreferredName(preferredName);
-
-        return student;
     }
 
     private sealed class TestIdentityService(ApplicationUser user) : IIdentityService

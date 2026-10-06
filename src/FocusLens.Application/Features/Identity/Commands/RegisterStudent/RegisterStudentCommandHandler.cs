@@ -143,6 +143,7 @@ public sealed class RegisterStudentCommandHandler
     {
         IEnumerable<LegalDocument> publishedDocuments =
             await _legalDocumentRepository.GetAllAsync(document => document.Audience == LegalDocumentAudience.Student
+                                                                   && document.Type == LegalDocumentType.Terms
                                                                    && document.IsPublished
                                                                    && document.PublishedOnUtc != null);
 
