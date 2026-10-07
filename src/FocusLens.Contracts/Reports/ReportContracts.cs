@@ -15,6 +15,7 @@ public sealed record ReportSessionListItemResponse(
     int LearningPercentage,
     int? FocusScore,
     string? FocusState,
+    string? FocusTrend,
     int? UnderstandingScore,
     string? UnderstandingTrend);
 
@@ -23,6 +24,12 @@ public sealed record ReportSessionListResponse(
     int Page,
     int PageSize,
     int TotalCount);
+
+public sealed record ReportSessionFocusQualityPointResponse(
+    int WindowIndex,
+    DateTimeOffset WindowStartLocal,
+    DateTimeOffset WindowEndLocal,
+    int? FocusScore);
 
 public sealed record ReportSessionDetailResponse(
     Guid SessionId,
@@ -43,6 +50,7 @@ public sealed record ReportSessionDetailResponse(
     int? FocusScore,
     string? FocusState,
     string? FocusTrend,
+    IReadOnlyCollection<ReportSessionFocusQualityPointResponse> FocusQuality,
     int? UnderstandingScore,
     string? UnderstandingTrend,
     string Summary,

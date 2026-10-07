@@ -1,3 +1,4 @@
+using FocusLens.Application.Common.Interfaces;
 using FocusLens.Contracts.Reports;
 using FocusLens.Domain;
 using FocusLens.Domain.Access;
@@ -16,7 +17,9 @@ public sealed class ReportQueryHandler(
     IBaseRepository<StudySession> sessionRepository,
     IBaseRepository<StudySessionBehaviorWindow> behaviorWindowRepository,
     ICurrentUser currentUser,
-    ReportSessionMetricsCalculator metricsCalculator)
+    ReportSessionMetricsCalculator metricsCalculator,
+    TimeProvider timeProvider,
+    IStudentLocalTime? studentLocalTime = null)
     : IRequestHandler<GetReportSessionsQuery, ReportSessionListResponse?>,
       IRequestHandler<GetReportSessionDetailQuery, ReportSessionDetailResponse?>
 {
@@ -24,6 +27,8 @@ public sealed class ReportQueryHandler(
         GetReportSessionsQuery request,
         CancellationToken cancellationToken)
     {
+        studentLocalTime ??= new Common.Services.StudentLocalTime(timeProvider);
+
         Student? student = await GetAuthorizedStudentAsync(request.StudentId);
         if (student is null || (request.DateFrom is not null && request.DateTo is not null && request.DateFrom > request.DateTo))
         {
@@ -46,7 +51,7 @@ public sealed class ReportQueryHandler(
                 session => session.Selection!.SelectedSections,
                 session => session.CompletedSections,
                 session => session.PauseIntervals))
-            .Where(session => MatchesFilters(session, request, status))
+            .Where(session => MatchesFilters(session, request, status, student))
             .OrderByDescending(session => session.StartedAtUtc)
             .ToList();
 
@@ -98,10 +103,15 @@ public sealed class ReportQueryHandler(
             return null;
         }
 
+        studentLocalTime ??= new Common.Services.StudentLocalTime(timeProvider);
+
         ReportSessionMetrics metrics = (await metricsCalculator.CalculateAsync([session]))[session.Id];
-        StudySessionBehaviorWindow? latestWindow = (await GetLatestWindowsAsync([session]))
-            .GetValueOrDefault(session.Id);
-        return ToDetail(session, metrics, student, latestWindow);
+        StudySessionBehaviorWindow[] behaviorWindows = (await behaviorWindowRepository.GetAllAsync(
+                item => item.StudySessionId == session.Id))
+            .OrderBy(item => item.WindowIndex)
+            .ToArray();
+        StudySessionBehaviorWindow? latestWindow = behaviorWindows.LastOrDefault();
+        return ToDetail(session, metrics, student, latestWindow, behaviorWindows);
     }
 
     private async Task<Student?> GetAuthorizedStudentAsync(Guid? requestedStudentId)
@@ -151,9 +161,13 @@ public sealed class ReportQueryHandler(
             : null;
     }
 
-    private static bool MatchesFilters(StudySession session, GetReportSessionsQuery request, StudySessionStatus? status)
+    private bool MatchesFilters(
+        StudySession session,
+        GetReportSessionsQuery request,
+        StudySessionStatus? status,
+        Student student)
     {
-        DateOnly startedDate = DateOnly.FromDateTime(session.StartedAtUtc!.Value.UtcDateTime);
+        DateOnly startedDate = studentLocalTime!.GetLocalDate(session.StartedAtUtc!.Value, student);
         return (request.DateFrom is null || startedDate >= request.DateFrom) &&
                (request.DateTo is null || startedDate <= request.DateTo) &&
                (request.SubjectId is null || session.SelectedSubjectId == request.SubjectId) &&
@@ -193,13 +207,14 @@ public sealed class ReportQueryHandler(
             session.Material?.FileName ?? string.Empty, session.Mode.ToString(), session.Status.ToString(),
             metrics.DurationMinutes, metrics.CompletionPercentage, metrics.QuestionCount, metrics.CorrectQuestions,
             metrics.Attempts, metrics.LearningPercentage, behaviorWindow?.FocusScore, behaviorWindow?.FocusState,
-            behaviorWindow?.UnderstandingScore, behaviorWindow?.UnderstandingTrend);
+            behaviorWindow?.FocusTrend, behaviorWindow?.UnderstandingScore, behaviorWindow?.UnderstandingTrend);
 
-    private static ReportSessionDetailResponse ToDetail(
+    private ReportSessionDetailResponse ToDetail(
         StudySession session,
         ReportSessionMetrics metrics,
         Student student,
-        StudySessionBehaviorWindow? behaviorWindow)
+        StudySessionBehaviorWindow? behaviorWindow,
+        IReadOnlyCollection<StudySessionBehaviorWindow> behaviorWindows)
     {
         string summary = CreateSummary(metrics, behaviorWindow);
         string[] highlights = CreateHighlights(session, metrics, behaviorWindow);
@@ -209,9 +224,19 @@ public sealed class ReportQueryHandler(
             metrics.DurationMinutes, metrics.CompletionPercentage, metrics.QuestionCount, metrics.CorrectQuestions,
             metrics.Attempts, metrics.LearningPercentage, metrics.CompletedSections, metrics.TotalSelectedSections,
             session.PauseIntervals.Count, behaviorWindow?.FocusScore, behaviorWindow?.FocusState,
-            behaviorWindow?.FocusTrend, behaviorWindow?.UnderstandingScore, behaviorWindow?.UnderstandingTrend,
+            behaviorWindow?.FocusTrend, behaviorWindows.Select(window => ToFocusQualityPoint(window, student)).ToArray(),
+            behaviorWindow?.UnderstandingScore, behaviorWindow?.UnderstandingTrend,
             summary, highlights);
     }
+
+    private ReportSessionFocusQualityPointResponse ToFocusQualityPoint(
+        StudySessionBehaviorWindow window,
+        Student student) =>
+        new(
+            window.WindowIndex,
+            studentLocalTime!.ConvertFromUtc(window.WindowStartUtc, student),
+            studentLocalTime!.ConvertFromUtc(window.WindowEndUtc, student),
+            window.FocusScore);
 
     private static string CreateSummary(ReportSessionMetrics metrics, StudySessionBehaviorWindow? window)
     {

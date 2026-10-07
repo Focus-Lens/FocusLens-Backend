@@ -23,6 +23,13 @@ public sealed class ReportsApiTests
         StudySession active = CreateActiveSession(student, math, start.AddDays(-3));
         StudySession draft = StudySession.Create(student.Id, StudySessionMode.Digital).Value;
         StudySessionQuestion question = CreateQuestion(paused.Id);
+        StudySessionBehaviorWindow behaviorWindow = StudySessionBehaviorWindow.Create(
+            paused.Id,
+            1,
+            start,
+            start.AddMinutes(15),
+            false).Value;
+        Assert.True(behaviorWindow.RecordAnalysis(82, "Focused", "Improving", null, null, null, null, false).IsSuccess);
         StudySessionQuestionAnswer[] answers =
         [
             CreateAnswer(question.Id, "B", false, 1),
@@ -36,6 +43,7 @@ public sealed class ReportsApiTests
             db.StudySessions.AddRange(paused, completed, cancelled, active, draft);
             db.StudySessionQuestions.Add(question);
             db.StudySessionQuestionAnswers.AddRange(answers);
+            db.StudySessionBehaviorWindows.Add(behaviorWindow);
             return Task.CompletedTask;
         });
 
@@ -53,9 +61,56 @@ public sealed class ReportsApiTests
         Assert.Equal(1, pausedItem.GetProperty("correctQuestions").GetInt32());
         Assert.Equal(3, pausedItem.GetProperty("attempts").GetInt32());
         Assert.Equal(100, pausedItem.GetProperty("learningPercentage").GetInt32());
+        Assert.Equal(82, pausedItem.GetProperty("focusScore").GetInt32());
+        Assert.Equal("Focused", pausedItem.GetProperty("focusState").GetString());
+        Assert.Equal("Improving", pausedItem.GetProperty("focusTrend").GetString());
 
         HttpResponseMessage activeDetail = await client.GetAsync($"/api/reports/sessions/{active.Id}");
         Assert.Equal(HttpStatusCode.NotFound, activeDetail.StatusCode);
+    }
+
+    [Fact]
+    public async Task ReportSessionDetail_ReturnsFocusQualityTimelineFromPersistedWindows()
+    {
+        await using CustomWebApplicationFactory factory = new();
+        Guid userId = Guid.NewGuid();
+        Student student = CreateStudent(userId, out StudentSubject math, out _);
+        student.SetTimeZoneId("Africa/Cairo");
+        DateTimeOffset start = new(2026, 9, 8, 23, 30, 0, TimeSpan.Zero);
+        StudySession session = CreateHistoricalSession(student, math, start, StudySessionStatus.Completed);
+
+        StudySessionBehaviorWindow[] windows =
+        [
+            CreateBehaviorWindow(session.Id, 1, start, start.AddMinutes(7), 45),
+            CreateBehaviorWindow(session.Id, 2, start.AddMinutes(7), start.AddMinutes(14), 68),
+            CreateBehaviorWindow(session.Id, 3, start.AddMinutes(14), start.AddMinutes(21), 82)
+        ];
+
+        await factory.SeedAsync(db =>
+        {
+            db.Students.Add(student);
+            db.StudySessions.Add(session);
+            db.StudySessionBehaviorWindows.AddRange(windows);
+            return Task.CompletedTask;
+        });
+
+        using HttpClient client = CreateClient(factory, userId, "Student");
+        HttpResponseMessage response = await client.GetAsync($"/api/reports/sessions/{session.Id}");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        using JsonDocument document = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        JsonElement points = document.RootElement.GetProperty("focusQuality");
+
+        Assert.Equal(3, points.GetArrayLength());
+        Assert.Equal(1, points[0].GetProperty("windowIndex").GetInt32());
+        Assert.Equal(45, points[0].GetProperty("focusScore").GetInt32());
+        Assert.Equal(
+            new DateTimeOffset(2026, 9, 9, 2, 30, 0, TimeSpan.FromHours(3)),
+            points[0].GetProperty("windowStartLocal").GetDateTimeOffset());
+        Assert.Equal(
+            new DateTimeOffset(2026, 9, 9, 2, 37, 0, TimeSpan.FromHours(3)),
+            points[0].GetProperty("windowEndLocal").GetDateTimeOffset());
+        Assert.Equal(82, points[2].GetProperty("focusScore").GetInt32());
     }
 
     [Fact]
@@ -97,6 +152,49 @@ public sealed class ReportsApiTests
     }
 
     [Fact]
+    public async Task ReportSessionDateFilters_UseStudentLocalCalendarDate()
+    {
+        await using CustomWebApplicationFactory factory = new();
+        Guid userId = Guid.NewGuid();
+        Student student = CreateStudent(userId, out StudentSubject math, out _);
+        student.SetTimeZoneId("Africa/Cairo");
+
+        StudySession boundarySession = CreateHistoricalSession(
+            student,
+            math,
+            new DateTimeOffset(2026, 9, 1, 23, 30, 0, TimeSpan.Zero),
+            StudySessionStatus.Completed);
+
+        await factory.SeedAsync(db =>
+        {
+            db.Students.Add(student);
+            db.StudySessions.Add(boundarySession);
+            return Task.CompletedTask;
+        });
+
+        using HttpClient client = CreateClient(factory, userId, "Student");
+
+        HttpResponseMessage localDay = await client.GetAsync(
+            "/api/reports/sessions?dateFrom=2026-09-02&dateTo=2026-09-02");
+
+        Assert.Equal(HttpStatusCode.OK, localDay.StatusCode);
+        using JsonDocument localDayDocument = JsonDocument.Parse(
+            await localDay.Content.ReadAsStringAsync());
+        Assert.Equal(1, localDayDocument.RootElement.GetProperty("totalCount").GetInt32());
+        Assert.Equal(
+            boundarySession.Id,
+            localDayDocument.RootElement.GetProperty("items")[0].GetProperty("sessionId").GetGuid());
+
+        HttpResponseMessage utcDay = await client.GetAsync(
+            "/api/reports/sessions?dateFrom=2026-09-01&dateTo=2026-09-01");
+
+        Assert.Equal(HttpStatusCode.OK, utcDay.StatusCode);
+        using JsonDocument utcDayDocument = JsonDocument.Parse(
+            await utcDay.Content.ReadAsStringAsync());
+        Assert.Equal(0, utcDayDocument.RootElement.GetProperty("totalCount").GetInt32());
+    }
+
+    [Fact]
     public async Task ParentReports_RequireAnActiveRelationship_AndStudentCannotRequestAnotherStudent()
     {
         await using CustomWebApplicationFactory factory = new();
@@ -104,6 +202,9 @@ public sealed class ReportsApiTests
         Student child = CreateStudent(childUserId, out StudentSubject math, out _);
         StudySession childSession = CreateHistoricalSession(child, math,
             new DateTimeOffset(2026, 9, 8, 10, 0, 0, TimeSpan.Zero), StudySessionStatus.Completed);
+        StudySessionBehaviorWindow childWindow = CreateBehaviorWindow(
+            childSession.Id, 1, childSession.StartedAtUtc!.Value,
+            childSession.StartedAtUtc.Value.AddMinutes(7), 82);
         Guid otherUserId = Guid.NewGuid();
         Student other = CreateStudent(otherUserId, out _, out _);
         Guid parentUserId = Guid.NewGuid();
@@ -117,12 +218,20 @@ public sealed class ReportsApiTests
             db.Parents.Add(parent);
             db.ParentStudentRelationships.Add(relationship);
             db.StudySessions.Add(childSession);
+            db.StudySessionBehaviorWindows.Add(childWindow);
             return Task.CompletedTask;
         });
 
         using HttpClient parentClient = CreateClient(factory, parentUserId, "Parent");
         Assert.Equal(HttpStatusCode.OK,
             (await parentClient.GetAsync($"/api/reports/sessions?studentId={child.Id}")).StatusCode);
+        using JsonDocument parentDetail = JsonDocument.Parse(
+            await (await parentClient.GetAsync(
+                $"/api/reports/sessions/{childSession.Id}?studentId={child.Id}"))
+                .Content.ReadAsStringAsync());
+        Assert.Equal(1, parentDetail.RootElement.GetProperty("focusQuality").GetArrayLength());
+        Assert.Equal(82, parentDetail.RootElement.GetProperty("focusQuality")[0]
+            .GetProperty("focusScore").GetInt32());
         Assert.Equal(HttpStatusCode.NotFound,
             (await parentClient.GetAsync($"/api/reports/sessions?studentId={other.Id}")).StatusCode);
 
@@ -170,6 +279,20 @@ public sealed class ReportsApiTests
         Assert.True(session.MarkReady().IsSuccess);
         Assert.True(session.Start(startedAt).IsSuccess);
         return session;
+    }
+
+    private static StudySessionBehaviorWindow CreateBehaviorWindow(
+        Guid sessionId,
+        int windowIndex,
+        DateTimeOffset windowStart,
+        DateTimeOffset windowEnd,
+        int focusScore)
+    {
+        StudySessionBehaviorWindow window = StudySessionBehaviorWindow.Create(
+            sessionId, windowIndex, windowStart, windowEnd, false).Value;
+        Assert.True(window.RecordAnalysis(
+            focusScore, "NORMAL_FOCUSED", "STABLE", null, null, "CONTINUE", "CONTINUE", false).IsSuccess);
+        return window;
     }
 
     private static StudySessionQuestion CreateQuestion(Guid sessionId) =>
