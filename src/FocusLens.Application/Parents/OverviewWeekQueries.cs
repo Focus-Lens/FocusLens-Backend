@@ -45,11 +45,14 @@ public sealed class ParentOverviewWeekHandler(
     {
         Result<ParentDashboardContext> context = await Context(request.StudentId);
         if (context.IsError) return context.Errors;
-        Result<ParentOverviewWeekResponse> current = await OverviewWeekResolver.ResolveAsync(context.Value, LocalTime(), weekRepository, unitOfWork);
+        Result<StudentWeek> current = await OverviewWeekResolver.ResolveActualCurrentWeekAsync(context.Value, LocalTime(), weekRepository, unitOfWork);
         if (current.IsError) return current.Errors;
         StudentWeek[] weeks = (await weekRepository.GetAllAsync(week => week.StudentId == request.StudentId)).ToArray();
         return new ParentOverviewWeeksResponse(weeks.OrderBy(week => week.StartsOn)
-            .Select(week => new ParentOverviewWeekResponse(week.StartsOn, week.EndsOn, week.StartsOn == current.Value.StartsOn))
+            .Select(week => new ParentOverviewWeekResponse(
+                week.StartsOn,
+                week.EndsOn,
+                week.StartsOn == current.Value.StartsOn && week.EndsOn == current.Value.EndsOn))
             .ToArray());
     }
 
