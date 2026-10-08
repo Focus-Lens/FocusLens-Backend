@@ -16,6 +16,7 @@ public sealed class GetParentDashboardSessionsQueryHandler(
     IBaseRepository<ParentStudentRelationship> relationshipRepository,
     IBaseRepository<Student> studentRepository,
     IBaseRepository<StudySession> studySessionRepository,
+    IBaseRepository<StudySessionBehaviorWindow> behaviorWindowRepository,
     IBaseRepository<StudentWeek> weekRepository,
     ICurrentUser currentUser,
     TimeProvider timeProvider,
@@ -81,11 +82,19 @@ public sealed class GetParentDashboardSessionsQueryHandler(
         IReadOnlyDictionary<Guid, string?> subjectNamesById =
             ParentDashboardHelpers.GetSubjectNamesById(contextResult.Value.Student);
 
-        ParentDashboardStudySessionResponse[] pageSessions = ParentDashboardHelpers
+        StudySession[] paginatedSessions = ParentDashboardHelpers
             .OrderSessions(matchingSessions)
             .Skip((request.Page - 1) * request.PageSize)
             .Take(request.PageSize)
-            .Select(session => ParentDashboardHelpers.ToSessionResponse(session, subjectNamesById, utcNow))
+            .ToArray();
+
+        IReadOnlyDictionary<Guid, StudySessionBehaviorWindow> latestWindows = await GetLatestWindowsAsync(paginatedSessions);
+        ParentDashboardStudySessionResponse[] pageSessions = paginatedSessions
+            .Select(session => ParentDashboardHelpers.ToSessionResponse(
+                session,
+                subjectNamesById,
+                utcNow,
+                latestWindows.GetValueOrDefault(session.Id)))
             .ToArray();
 
         return new ParentDashboardSessionHistoryResponse(
@@ -98,5 +107,21 @@ public sealed class GetParentDashboardSessionsQueryHandler(
         {
             Week = new ParentDashboardWeekResponse(week.Value.StartsOn, week.Value.EndsOn, week.Value.IsCurrentWeek)
         };
+    }
+
+    private async Task<IReadOnlyDictionary<Guid, StudySessionBehaviorWindow>> GetLatestWindowsAsync(
+        IReadOnlyCollection<StudySession> sessions)
+    {
+        Guid[] sessionIds = sessions.Select(session => session.Id).ToArray();
+        if (sessionIds.Length == 0)
+        {
+            return new Dictionary<Guid, StudySessionBehaviorWindow>();
+        }
+
+        return (await behaviorWindowRepository.GetAllAsync(item => sessionIds.Contains(item.StudySessionId)))
+            .GroupBy(item => item.StudySessionId)
+            .ToDictionary(group => group.Key, group => group
+                .OrderByDescending(item => item.WindowIndex)
+                .First());
     }
 }

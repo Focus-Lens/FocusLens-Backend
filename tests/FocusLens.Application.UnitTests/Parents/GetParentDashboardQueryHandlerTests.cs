@@ -115,7 +115,8 @@ public sealed class GetParentDashboardQueryHandlerTests
 
     private static GetParentDashboardSessionsQueryHandler SessionsHandler(TestContext context, InMemoryRepository<StudentWeek> weeks, IEnumerable<StudySession> sessions) => new(
         new InMemoryRepository<Parent>(context.Parent), new InMemoryRepository<ParentStudentRelationship>(context.Relationship),
-        new InMemoryRepository<Student>(context.Student), new InMemoryRepository<StudySession>(sessions.ToArray()), weeks,
+        new InMemoryRepository<Student>(context.Student), new InMemoryRepository<StudySession>(sessions.ToArray()),
+        new InMemoryRepository<StudySessionBehaviorWindow>(), weeks,
         new FakeCurrentUser(context.Parent.UserId), new FixedTimeProvider(Now));
 
     private static TestContext CreateContext()
