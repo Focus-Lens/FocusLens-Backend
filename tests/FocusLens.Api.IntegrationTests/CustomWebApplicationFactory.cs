@@ -1,6 +1,7 @@
 using FocusLens.API;
 using FocusLens.API.Infrastructure;
 using FocusLens.Application.Common.Interfaces;
+using FocusLens.Contracts.BehavioralIntelligence;
 using FocusLens.Infrastructure.Authentication;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Http;
@@ -54,6 +55,10 @@ public sealed class CustomWebApplicationFactory
                         warnings.Ignore(InMemoryEventId.TransactionIgnoredWarning)));
             services.AddScoped<IEmailSender, LoggingEmailSender>();
 
+            // Keep API integration tests deterministic and independent of a live Python service.
+            services.RemoveAll<IBehavioralIntelligenceClient>();
+            services.AddSingleton<IBehavioralIntelligenceClient, TestBehavioralIntelligenceClient>();
+
             services.PostConfigure<JwtBearerOptions>(
                 JwtBearerDefaults.AuthenticationScheme,
                 options =>
@@ -83,5 +88,49 @@ public sealed class CustomWebApplicationFactory
     private sealed class FixedTimeProvider(DateTimeOffset utcNow) : TimeProvider
     {
         public override DateTimeOffset GetUtcNow() => utcNow;
+    }
+
+    private sealed class TestBehavioralIntelligenceClient : IBehavioralIntelligenceClient
+    {
+        public Task<BehaviorWindowResponse> AnalyzeWindowAsync(
+            BehaviorWindowRequest request,
+            CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            BehaviorSectionResult[] sections = request.Sections
+                .Select(section => new BehaviorSectionResult(
+                    section.SectionId,
+                    section.ConceptId,
+                    "NORMAL_FOCUSED",
+                    0.9,
+                    75,
+                    "CONTINUE",
+                    new Dictionary<string, object?>(),
+                    section.MicroChallenges.Count > 0))
+                .ToArray();
+
+            BehaviorWindowResponse response = new(
+                request.SessionId,
+                request.WindowIndex,
+                75,
+                100,
+                "STABLE",
+                "NORMAL_FOCUSED",
+                "CONTINUE",
+                "CONTINUE",
+                false,
+                "STABLE",
+                request.IsFinal,
+                sections.Length,
+                sections)
+            {
+                WindowActiveTimeSeconds = Math.Max(
+                    0,
+                    request.Sections.Sum(section => section.TimeSpentSeconds))
+            };
+
+            return Task.FromResult(response);
+        }
     }
 }

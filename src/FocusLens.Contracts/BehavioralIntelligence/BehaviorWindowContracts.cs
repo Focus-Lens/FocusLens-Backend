@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace FocusLens.Contracts.BehavioralIntelligence;
 
 public sealed record BehaviorWindowRequest(
@@ -16,15 +18,15 @@ public sealed record BehaviorSection(
     long SectionStartTime,
     long SectionEndTime,
     double TimeSpentSeconds,
-    double ScrollSpeedAvgPxPerSec,
-    int ScrollDirectionChanges,
+    double? ScrollSpeedAvgPxPerSec,
+    int? ScrollDirectionChanges,
     double ContentProgressionPct,
     int SectionRevisitCount,
-    int InteractionCount,
+    int? InteractionCount,
     IReadOnlyCollection<BehaviorMicroChallenge> MicroChallenges,
-    int BackgroundCount,
-    double TotalBackgroundSeconds,
-    int TabHiddenCount);
+    int? BackgroundCount,
+    double? TotalBackgroundSeconds,
+    int? TabHiddenCount);
 
 public sealed record BehaviorMicroChallenge(
     string QuestionId,
@@ -33,7 +35,7 @@ public sealed record BehaviorMicroChallenge(
 
 public sealed record BehaviorWindowHistoryItem(
     int WindowIndex,
-    int FocusScore,
+    int? FocusScore,
     string State,
     string DominantAction,
     int? UnderstandingScore);
@@ -51,14 +53,17 @@ public sealed record BehaviorWindowResponse(
     string Trend,
     bool IsFinal,
     int SectionsAnalyzed,
-    IReadOnlyCollection<BehaviorSectionResult> Sections);
+    IReadOnlyCollection<BehaviorSectionResult> Sections)
+{
+    public double? WindowActiveTimeSeconds { get; init; }
+}
 
 public sealed record BehaviorSectionResult(
     string SectionId,
     string ConceptId,
     string State,
     double Confidence,
-    int FocusScore,
-    string RecommendedAction,
+    [property: JsonPropertyName("focusScore")] int FocusScore,
+    [property: JsonPropertyName("recommendedAction")] string RecommendedAction,
     IReadOnlyDictionary<string, object?> FeaturesUsed,
     bool McqDataAvailable);

@@ -30,7 +30,10 @@ public sealed class GetStudySessionBehaviorWindowsQueryHandler(
             .Select(item => new BehaviorWindowResultResponse(
                 item.WindowIndex, item.WindowStartUtc, item.WindowEndUtc, item.IsFinal,
                 item.FocusScore, item.FocusState, item.FocusTrend, item.UnderstandingScore,
-                item.UnderstandingTrend, item.RawAction, item.RecommendedAction, item.ActionEmitted))
+                item.UnderstandingTrend, item.RawAction, item.RecommendedAction, item.ActionEmitted)
+            {
+                WindowActiveTimeSeconds = item.WindowActiveTimeSeconds
+            })
             .ToArray();
     }
 }

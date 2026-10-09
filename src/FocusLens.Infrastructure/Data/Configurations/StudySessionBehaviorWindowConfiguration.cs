@@ -15,6 +15,7 @@ public sealed class StudySessionBehaviorWindowConfiguration
         builder.Property(item => item.WindowIndex).IsRequired();
         builder.Property(item => item.WindowStartUtc).IsRequired();
         builder.Property(item => item.WindowEndUtc).IsRequired();
+        builder.Property(item => item.WindowActiveTimeSeconds).HasColumnType("float");
         builder.Property(item => item.FocusState).HasMaxLength(50);
         builder.Property(item => item.FocusTrend).HasMaxLength(20);
         builder.Property(item => item.UnderstandingTrend).HasMaxLength(20);

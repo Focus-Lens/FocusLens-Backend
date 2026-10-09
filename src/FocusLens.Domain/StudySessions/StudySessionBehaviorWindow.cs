@@ -27,6 +27,7 @@ public sealed class StudySessionBehaviorWindow : AuditableEntity
     public DateTimeOffset WindowStartUtc { get; private set; }
     public DateTimeOffset WindowEndUtc { get; private set; }
     public bool IsFinal { get; private set; }
+    public double? WindowActiveTimeSeconds { get; private set; }
     public int? FocusScore { get; private set; }
     public string? FocusState { get; private set; }
     public string? FocusTrend { get; private set; }
@@ -64,14 +65,24 @@ public sealed class StudySessionBehaviorWindow : AuditableEntity
         string? understandingTrend,
         string? rawAction,
         string? recommendedAction,
-        bool actionEmitted)
+        bool actionEmitted,
+        double? windowActiveTimeSeconds = null)
     {
         if (focusScore is < 0 or > 100 || understandingScore is < 0 or > 100)
         {
             return Error.Validation("StudySessionBehaviorWindows.ScoreInvalid", "Behavior analysis score is invalid.");
         }
 
+        if (windowActiveTimeSeconds is double activeSeconds &&
+            (!double.IsFinite(activeSeconds) || activeSeconds < 0))
+        {
+            return Error.Validation(
+                "StudySessionBehaviorWindows.ActiveTimeInvalid",
+                "Behavior window active time must be a finite, non-negative number.");
+        }
+
         FocusScore = focusScore;
+        WindowActiveTimeSeconds = windowActiveTimeSeconds;
         FocusState = Normalize(focusState);
         FocusTrend = Normalize(focusTrend);
         UnderstandingScore = understandingScore;

@@ -139,18 +139,22 @@ public sealed class BehaviorWindowBuilder
             ConceptId: ResolveConceptId(sectionId, questions),
             SectionStartTime: start.ToUnixTimeMilliseconds(),
             SectionEndTime: end.ToUnixTimeMilliseconds(),
-            TimeSpentSeconds: CalculateActiveDuration(orderedSectionEvents),
-            ScrollSpeedAvgPxPerSec: AverageOrZero(sectionEvents.Select(item => item.ScrollSpeedAvgPxPerSec)),
-            ScrollDirectionChanges: Sum(sectionEvents.Select(item => item.ScrollDirectionChanges)),
+            TimeSpentSeconds: CalculateObservedEventSpanSeconds(orderedSectionEvents),
+            ScrollSpeedAvgPxPerSec: AverageOrNull(sectionEvents.Select(item => item.ScrollSpeedAvgPxPerSec)),
+            ScrollDirectionChanges: SumOrNull(sectionEvents.Select(item => item.ScrollDirectionChanges)),
+            // AI1 currently requires content_progression_pct to be numeric. Until both APIs
+            // support null for this field, zero is the compatibility fallback when unobserved.
             ContentProgressionPct: LatestOrZero(sectionEvents
                 .Where(item => item.ContentProgressionPct.HasValue)
                 .Select(item => item.ContentProgressionPct!.Value)),
             SectionRevisitCount: CalculateRevisitCount(sectionId, allEvents),
-            InteractionCount: Sum(sectionEvents.Select(item => item.InteractionCount)),
+            InteractionCount: SumOrNull(sectionEvents.Select(item => item.InteractionCount)),
             MicroChallenges: BuildMicroChallenges(sectionEvents, allEvents, answers),
-            BackgroundCount: Sum(sectionEvents.Select(item => item.BackgroundCount)),
-            TotalBackgroundSeconds: SumDouble(sectionEvents.Select(item => item.BackgroundDurationSeconds)),
-            TabHiddenCount: CountEvents(sectionEvents, StudySessionBehaviorEventType.TabHidden));
+            BackgroundCount: SumOrNull(sectionEvents.Select(item => item.BackgroundCount)),
+            TotalBackgroundSeconds: SumDoubleOrNull(sectionEvents.Select(item => item.BackgroundDurationSeconds)),
+            TabHiddenCount: HasTabVisibilityTelemetry(allEvents)
+                ? CountEvents(sectionEvents, StudySessionBehaviorEventType.TabHidden)
+                : null);
     }
 
     private static string ResolveConceptId(Guid sectionId, IReadOnlyCollection<StudySessionQuestion> questions)
@@ -237,7 +241,10 @@ public sealed class BehaviorWindowBuilder
         return revisits;
     }
 
-    private static double CalculateActiveDuration(IReadOnlyCollection<StudySessionBehaviorEvent> events)
+    // This is an event-observed span, not a true foreground/engagement timer. The current
+    // behavior-event contract carries no active-time delta, so the backend cannot distinguish
+    // an idle gap between events from active reading. Exact active time requires client telemetry.
+    private static double CalculateObservedEventSpanSeconds(IReadOnlyCollection<StudySessionBehaviorEvent> events)
     {
         if (events.Count < 2)
         {
@@ -247,14 +254,22 @@ public sealed class BehaviorWindowBuilder
         return Math.Max(0, (events.Max(item => item.OccurredAtUtc) - events.Min(item => item.OccurredAtUtc)).TotalSeconds);
     }
 
-    private static int Sum(IEnumerable<int?> values) => values.Sum(value => value ?? 0);
-
-    private static double SumDouble(IEnumerable<double?> values) => values.Sum(value => value ?? 0);
-
-    private static double AverageOrZero(IEnumerable<double?> values)
+    private static int? SumOrNull(IEnumerable<int?> values)
     {
-        double[] data = values.Where(value => value.HasValue).Select(value => value!.Value).ToArray();
-        return data.Length == 0 ? 0 : data.Average();
+        int[] observed = values.Where(value => value.HasValue).Select(value => value!.Value).ToArray();
+        return observed.Length == 0 ? null : observed.Sum();
+    }
+
+    private static double? SumDoubleOrNull(IEnumerable<double?> values)
+    {
+        double[] observed = values.Where(value => value.HasValue).Select(value => value!.Value).ToArray();
+        return observed.Length == 0 ? null : observed.Sum();
+    }
+
+    private static double? AverageOrNull(IEnumerable<double?> values)
+    {
+        double[] observed = values.Where(value => value.HasValue).Select(value => value!.Value).ToArray();
+        return observed.Length == 0 ? null : observed.Average();
     }
 
     private static double LatestOrZero(IEnumerable<double> values)
@@ -262,6 +277,9 @@ public sealed class BehaviorWindowBuilder
         double[] data = values.ToArray();
         return data.Length == 0 ? 0 : data[^1];
     }
+
+    private static bool HasTabVisibilityTelemetry(IEnumerable<StudySessionBehaviorEvent> events) =>
+        events.Any(item => item.EventType is StudySessionBehaviorEventType.TabHidden or StudySessionBehaviorEventType.TabVisible);
 
     private static int CountEvents(IEnumerable<StudySessionBehaviorEvent> events, StudySessionBehaviorEventType eventType) =>
         events.Count(item => item.EventType == eventType);

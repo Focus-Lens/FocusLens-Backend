@@ -186,11 +186,14 @@ public sealed class BehavioralIntelligenceApiTests
         string responseBody = await response.Content.ReadAsStringAsync();
         Assert.Contains("windowFocusScore", responseBody);
         Assert.Contains("windowUnderstandingScore", responseBody);
+        Assert.Contains("windowActiveTimeSeconds", responseBody);
 
         HttpResponseMessage historyResponse = await client.GetAsync(
             $"/api/study-sessions/{session.Id}/behavior-windows");
         Assert.Equal(HttpStatusCode.OK, historyResponse.StatusCode);
-        Assert.Contains("windowIndex", await historyResponse.Content.ReadAsStringAsync());
+        string historyBody = await historyResponse.Content.ReadAsStringAsync();
+        Assert.Contains("windowIndex", historyBody);
+        Assert.Contains("windowActiveTimeSeconds", historyBody);
 
         using IServiceScope scope = factory.Services.CreateScope();
         ApplicationDbContext db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
@@ -202,6 +205,8 @@ public sealed class BehavioralIntelligenceApiTests
         Assert.Equal(now.AddMinutes(-5), persisted.WindowStartUtc);
         Assert.Equal(now, persisted.WindowEndUtc);
         Assert.NotNull(persisted.FocusScore);
+        Assert.NotNull(persisted.WindowActiveTimeSeconds);
+        Assert.True(persisted.WindowActiveTimeSeconds is >= 0);
         Assert.Equal(100, persisted.UnderstandingScore);
         Assert.NotNull(persisted.RecommendedAction);
     }

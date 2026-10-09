@@ -63,10 +63,54 @@ public sealed class ReportsApiTests
         Assert.Equal(100, pausedItem.GetProperty("learningPercentage").GetInt32());
         Assert.Equal(82, pausedItem.GetProperty("focusScore").GetInt32());
         Assert.Equal("Focused", pausedItem.GetProperty("focusState").GetString());
-        Assert.Equal("Improving", pausedItem.GetProperty("focusTrend").GetString());
+        Assert.Equal("STABLE", pausedItem.GetProperty("focusTrend").GetString());
 
         HttpResponseMessage activeDetail = await client.GetAsync($"/api/reports/sessions/{active.Id}");
         Assert.Equal(HttpStatusCode.NotFound, activeDetail.StatusCode);
+    }
+
+    [Fact]
+    public async Task ReportSessionDetail_DerivesSessionFocusMetricsFromActiveTimeWeightedWindows()
+    {
+        await using CustomWebApplicationFactory factory = new();
+        Guid userId = Guid.NewGuid();
+        Student student = CreateStudent(userId, out StudentSubject math, out _);
+        DateTimeOffset start = new(2026, 9, 8, 10, 0, 0, TimeSpan.Zero);
+        StudySession session = CreateHistoricalSession(student, math, start, StudySessionStatus.Completed);
+        StudySessionBehaviorWindow[] windows =
+        [
+            CreateBehaviorWindow(session.Id, 1, start, start.AddMinutes(5), 40, "SKIMMING", 60),
+            CreateBehaviorWindow(session.Id, 2, start.AddMinutes(5), start.AddMinutes(10), 80, "NORMAL_FOCUSED", 180)
+        ];
+
+        await factory.SeedAsync(db =>
+        {
+            db.Students.Add(student);
+            db.StudySessions.Add(session);
+            db.StudySessionBehaviorWindows.AddRange(windows);
+            return Task.CompletedTask;
+        });
+
+        using HttpClient client = CreateClient(factory, userId, "Student");
+        HttpResponseMessage response = await client.GetAsync($"/api/reports/sessions/{session.Id}");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        using JsonDocument document = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        JsonElement root = document.RootElement;
+        Assert.Equal(70, root.GetProperty("focusScore").GetInt32());
+        Assert.Equal("NORMAL_FOCUSED", root.GetProperty("focusState").GetString());
+        Assert.Equal("IMPROVING", root.GetProperty("focusTrend").GetString());
+        Assert.Equal(40, root.GetProperty("focusQuality")[0].GetProperty("focusScore").GetInt32());
+        Assert.Equal(80, root.GetProperty("focusQuality")[1].GetProperty("focusScore").GetInt32());
+
+        HttpResponseMessage listResponse = await client.GetAsync("/api/reports/sessions");
+        Assert.Equal(HttpStatusCode.OK, listResponse.StatusCode);
+        using JsonDocument listDocument = JsonDocument.Parse(await listResponse.Content.ReadAsStringAsync());
+        JsonElement listItem = listDocument.RootElement.GetProperty("items").EnumerateArray()
+            .Single(item => item.GetProperty("sessionId").GetGuid() == session.Id);
+        Assert.Equal(70, listItem.GetProperty("focusScore").GetInt32());
+        Assert.Equal("NORMAL_FOCUSED", listItem.GetProperty("focusState").GetString());
+        Assert.Equal("IMPROVING", listItem.GetProperty("focusTrend").GetString());
     }
 
     [Fact]
@@ -286,12 +330,15 @@ public sealed class ReportsApiTests
         int windowIndex,
         DateTimeOffset windowStart,
         DateTimeOffset windowEnd,
-        int focusScore)
+        int focusScore,
+        string focusState = "NORMAL_FOCUSED",
+        double? activeTimeSeconds = null)
     {
         StudySessionBehaviorWindow window = StudySessionBehaviorWindow.Create(
             sessionId, windowIndex, windowStart, windowEnd, false).Value;
         Assert.True(window.RecordAnalysis(
-            focusScore, "NORMAL_FOCUSED", "STABLE", null, null, "CONTINUE", "CONTINUE", false).IsSuccess);
+            focusScore, focusState, "STABLE", null, null, "CONTINUE", "CONTINUE", false,
+            activeTimeSeconds).IsSuccess);
         return window;
     }
 

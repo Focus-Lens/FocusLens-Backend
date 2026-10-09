@@ -1156,6 +1156,9 @@ namespace FocusLens.Infrastructure.Data.Migrations
                     b.Property<bool>("IsFinal")
                         .HasColumnType("bit");
 
+                    b.Property<double?>("WindowActiveTimeSeconds")
+                        .HasColumnType("float");
+
                     b.Property<string>("LastModifiedBy")
                         .HasColumnType("nvarchar(max)");
 

@@ -49,6 +49,7 @@ Use environment variables, user secrets, or an untracked local configuration fil
     "EmailVerificationCodeLifetimeMinutes": 10
   },
   "GoogleAuth": { "ClientId": "<google-oauth-client-id>" },
+  "BehavioralIntelligence": { "BaseUrl": "http://localhost:8000/" },
   "MailSettings": {
     "Mail": "no-reply@example.com",
     "DisplayName": "FocusLens",
@@ -64,7 +65,11 @@ For example:
 ```bash
 dotnet user-secrets set "ConnectionStrings:DefaultConnection" "<connection-string>" --project src/FocusLens.Api
 dotnet user-secrets set "Jwt:Secret" "<at-least-32-character-secret>" --project src/FocusLens.Api
+dotnet user-secrets set "BehavioralIntelligence:BaseUrl" "http://localhost:8000/" --project src/FocusLens.Api
+dotnet user-secrets set "AI2_SERVICE_KEY" "<same-service-key-configured-in-Python-AI1>" --project src/FocusLens.Api
 ```
+
+The Python behavioral-analysis service (AI 1) requires the `X-Service-Key` header. Set `AI2_SERVICE_KEY` to the same value configured in AI 1. Use user secrets for local Development and an environment variable or secret manager for tests and deployments. Do not commit the key. Window-level active time is persisted per behavior window; Reports derives session focus quality from active-time-weighted scores, the dominant state from active-time weights (with AI 1's severity order as a tie-breaker), and the trend from the latest up-to-three non-null window scores (±8 points). Sessions with any historical windows missing the active-time field retain the previous latest-window display rather than mixing weighted and unweighted records. The Parent Overview query remains a separate integration task and should use `SessionFocusMetricsCalculator` after loading all windows for each session.
 
 ### Database and run
 

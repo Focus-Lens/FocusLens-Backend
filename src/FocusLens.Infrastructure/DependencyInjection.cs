@@ -88,6 +88,15 @@ public static class DependencyInjection
                     serviceProvider.GetRequiredService<IOptions<BehavioralIntelligenceOptions>>().Value;
 
                 client.BaseAddress = new Uri(options.BaseUrl, UriKind.Absolute);
+
+                string serviceKey = configuration["AI2_SERVICE_KEY"] ?? string.Empty;
+                if (string.IsNullOrWhiteSpace(serviceKey))
+                {
+                    throw new InvalidOperationException(
+                        "AI2_SERVICE_KEY must be configured to call the Python Behavioral Intelligence service.");
+                }
+
+                client.DefaultRequestHeaders.Add("X-Service-Key", serviceKey);
             });
 
         services.AddScoped<IStudyMaterialFileStore, LocalStudyMaterialFileStore>();

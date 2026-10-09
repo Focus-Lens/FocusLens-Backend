@@ -158,6 +158,74 @@ public sealed class BehaviorWindowBuilderTests
     }
 
     [Fact]
+    public void Build_LeavesTabHiddenCountNull_WhenVisibilityTelemetryWasNotReported()
+    {
+        Guid sessionId = Guid.NewGuid();
+        Guid sectionId = Guid.NewGuid();
+        DateTimeOffset start = new(2026, 9, 14, 10, 0, 0, TimeSpan.Zero);
+        StudySessionBehaviorEvent[] events =
+        [
+            CreateEvent(sessionId, sectionId, null, StudySessionBehaviorEventType.Scroll, start),
+            CreateEvent(sessionId, sectionId, null, StudySessionBehaviorEventType.Interaction, start.AddSeconds(10), interactionCount: 1)
+        ];
+
+        BehaviorWindowRequest request = new BehaviorWindowBuilder().Build(
+            Guid.NewGuid(), sessionId, 1, start, start.AddSeconds(20), false,
+            events, [], [], []);
+
+        BehaviorSection section = Assert.Single(request.Sections);
+        Assert.Null(section.TabHiddenCount);
+        Assert.Null(section.ScrollSpeedAvgPxPerSec);
+        Assert.Null(section.ScrollDirectionChanges);
+        Assert.Null(section.BackgroundCount);
+        Assert.Null(section.TotalBackgroundSeconds);
+        Assert.Equal(1, section.InteractionCount);
+    }
+
+    [Fact]
+    public void Build_PreservesMeasuredZeroForOptionalTelemetry()
+    {
+        Guid sessionId = Guid.NewGuid();
+        Guid sectionId = Guid.NewGuid();
+        DateTimeOffset start = new(2026, 9, 14, 10, 0, 0, TimeSpan.Zero);
+        StudySessionBehaviorEvent[] events =
+        [
+            CreateEvent(sessionId, sectionId, null, StudySessionBehaviorEventType.Scroll, start,
+                scrollSpeed: 0, directionChanges: 0, progression: 0, interactionCount: 0,
+                backgroundCount: 0, backgroundSeconds: 0)
+        ];
+
+        BehaviorWindowRequest request = new BehaviorWindowBuilder().Build(
+            Guid.NewGuid(), sessionId, 1, start, start.AddSeconds(1), false, events, [], [], []);
+
+        BehaviorSection section = Assert.Single(request.Sections);
+        Assert.Equal(0, section.ScrollSpeedAvgPxPerSec);
+        Assert.Equal(0, section.ScrollDirectionChanges);
+        Assert.Equal(0, section.InteractionCount);
+        Assert.Equal(0, section.BackgroundCount);
+        Assert.Equal(0, section.TotalBackgroundSeconds);
+    }
+
+    [Fact]
+    public void BuildReturnsZeroTabHiddenCount_WhenVisibilityTelemetryIsPresentButTabWasNotHidden()
+    {
+        Guid sessionId = Guid.NewGuid();
+        Guid sectionId = Guid.NewGuid();
+        DateTimeOffset start = new(2026, 9, 14, 10, 0, 0, TimeSpan.Zero);
+        StudySessionBehaviorEvent[] events =
+        [
+            CreateEvent(sessionId, sectionId, null, StudySessionBehaviorEventType.TabVisible, start),
+            CreateEvent(sessionId, sectionId, null, StudySessionBehaviorEventType.Scroll, start.AddSeconds(10))
+        ];
+
+        BehaviorWindowRequest request = new BehaviorWindowBuilder().Build(
+            Guid.NewGuid(), sessionId, 1, start, start.AddSeconds(20), false,
+            events, [], [], []);
+
+        Assert.Equal(0, Assert.Single(request.Sections).TabHiddenCount);
+    }
+
+    [Fact]
     public void Build_ExcludesEventAtWindowEnd()
     {
         Guid sessionId = Guid.NewGuid();

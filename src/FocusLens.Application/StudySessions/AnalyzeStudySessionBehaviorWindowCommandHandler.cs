@@ -136,7 +136,8 @@ public sealed class AnalyzeStudySessionBehaviorWindowCommandHandler(
         Result<Success> analysisResult = windowResult.Value.RecordAnalysis(
             aiResponse.WindowFocusScore, aiResponse.WindowState, aiResponse.Trend,
             aiResponse.WindowUnderstandingScore, aiResponse.UnderstandingTrend,
-            aiResponse.RawAction, aiResponse.RecommendedAction, aiResponse.ActionEmitted);
+            aiResponse.RawAction, aiResponse.RecommendedAction, aiResponse.ActionEmitted,
+            aiResponse.WindowActiveTimeSeconds);
         if (analysisResult.IsError)
             return analysisResult.TopError;
 
@@ -154,14 +155,17 @@ public sealed class AnalyzeStudySessionBehaviorWindowCommandHandler(
     };
 
     private static BehaviorWindowHistoryItem ToHistory(StudySessionBehaviorWindow item) => new(
-        item.WindowIndex, item.FocusScore ?? 0, item.FocusState ?? "NORMAL_FOCUSED",
-        item.RecommendedAction ?? item.RawAction ?? "CONTINUE", item.UnderstandingScore);
+        item.WindowIndex, item.FocusScore, item.FocusState ?? "NORMAL_FOCUSED",
+        item.RawAction ?? "CONTINUE", item.UnderstandingScore);
 
     private static Result<BehaviorWindowResponse> ToResponse(StudySessionBehaviorWindow item) => new BehaviorWindowResponse(
         item.StudySessionId.ToString(), item.WindowIndex, item.FocusScore, item.UnderstandingScore,
         item.UnderstandingTrend, item.FocusState ?? "NORMAL_FOCUSED", item.RecommendedAction ?? "CONTINUE",
         item.RawAction ?? "CONTINUE", item.ActionEmitted ?? false, item.FocusTrend ?? "STABLE",
-        item.IsFinal, 0, []);
+        item.IsFinal, 0, [])
+        {
+            WindowActiveTimeSeconds = item.WindowActiveTimeSeconds
+        };
 
     private static bool IsValidResponse(BehaviorWindowResponse response, Guid sessionId,
         BehaviorWindowTimelineItem window) =>
@@ -169,6 +173,8 @@ public sealed class AnalyzeStudySessionBehaviorWindowCommandHandler(
         response.WindowIndex == window.WindowIndex && response.IsFinal == window.IsFinal &&
         response.WindowFocusScore is not < 0 or > 100 &&
         response.WindowUnderstandingScore is not < 0 or > 100 &&
+        response.WindowActiveTimeSeconds is double activeSeconds &&
+        double.IsFinite(activeSeconds) && activeSeconds >= 0 &&
         !string.IsNullOrWhiteSpace(response.WindowState) && !string.IsNullOrWhiteSpace(response.Trend) &&
         !string.IsNullOrWhiteSpace(response.RawAction) && !string.IsNullOrWhiteSpace(response.RecommendedAction);
 }

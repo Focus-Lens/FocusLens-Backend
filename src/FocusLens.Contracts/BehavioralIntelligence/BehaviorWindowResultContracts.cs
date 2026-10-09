@@ -12,4 +12,7 @@ public sealed record BehaviorWindowResultResponse(
     string? UnderstandingTrend,
     string? RawAction,
     string? RecommendedAction,
-    bool? ActionEmitted);
+    bool? ActionEmitted)
+{
+    public double? WindowActiveTimeSeconds { get; init; }
+}
