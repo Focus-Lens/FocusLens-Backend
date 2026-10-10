@@ -1,3 +1,4 @@
+using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
 using FocusLens.Application.Common.Interfaces;
@@ -21,7 +22,7 @@ public sealed class FocusLensAiClient(HttpClient httpClient) : IFocusLensAiClien
 
         ByteArrayContent fileContent = new(content);
         fileContent.Headers.ContentType =
-            new System.Net.Http.Headers.MediaTypeHeaderValue(contentType);
+            new MediaTypeHeaderValue(contentType);
 
         form.Add(fileContent, "file", fileName);
 
@@ -131,7 +132,7 @@ public sealed class FocusLensAiClient(HttpClient httpClient) : IFocusLensAiClien
         T? result = JsonSerializer.Deserialize<T>(body, JsonOptions);
 
         return result
-            ?? throw new InvalidOperationException(
-                $"FocusLens AI returned an empty or invalid response for {typeof(T).Name}.");
+               ?? throw new InvalidOperationException(
+                   $"FocusLens AI returned an empty or invalid response for {typeof(T).Name}.");
     }
 }

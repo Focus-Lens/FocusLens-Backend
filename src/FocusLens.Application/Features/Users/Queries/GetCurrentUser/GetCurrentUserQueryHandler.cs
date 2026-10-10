@@ -1,11 +1,11 @@
 using FocusLens.Application.Common.Errors;
 using FocusLens.Application.Common.Interfaces;
 using FocusLens.Application.Features.Users.Dtos;
+using FocusLens.Domain;
+using FocusLens.Domain.Common.Constants;
 using FocusLens.Domain.Common.Interfaces;
 using FocusLens.Domain.Common.Results;
 using FocusLens.Domain.Identity;
-using FocusLens.Domain;
-using FocusLens.Domain.Common.Constants;
 using FocusLens.Domain.Interfaces;
 using MediatR;
 

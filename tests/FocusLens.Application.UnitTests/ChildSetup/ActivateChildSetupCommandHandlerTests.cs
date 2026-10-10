@@ -71,7 +71,7 @@ public sealed class ActivateChildSetupCommandHandlerTests
             Email = "youssef@example.com",
             UserName = "youssef@example.com",
             FirstName = "Youssef",
-            LastName = "Student",
+            LastName = "Student"
         };
 
         student.SetPrivateProperty("User", user);
@@ -116,7 +116,7 @@ public sealed class ActivateChildSetupCommandHandlerTests
             Email = "youssef@example.com",
             UserName = "youssef@example.com",
             FirstName = "Youssef",
-            LastName = "Student",
+            LastName = "Student"
         };
 
         student.SetPrivateProperty("User", user);
@@ -166,7 +166,7 @@ public sealed class ActivateChildSetupCommandHandlerTests
             Email = "youssef@example.com",
             UserName = "youssef@example.com",
             FirstName = "Old",
-            LastName = "Name",
+            LastName = "Name"
         };
 
         student.SetPrivateProperty("User", user);
@@ -224,7 +224,7 @@ public sealed class ActivateChildSetupCommandHandlerTests
             Email = "youssef@example.com",
             UserName = "youssef@example.com",
             FirstName = "Old",
-            LastName = "Name",
+            LastName = "Name"
         };
 
         student.SetPrivateProperty("User", user);
@@ -276,7 +276,7 @@ public sealed class ActivateChildSetupCommandHandlerTests
             Email = "youssef@example.com",
             UserName = "youssef@example.com",
             FirstName = "Old",
-            LastName = "Name",
+            LastName = "Name"
         };
 
         student.SetPrivateProperty("User", user);
@@ -329,7 +329,7 @@ public sealed class ActivateChildSetupCommandHandlerTests
                     Email = "youssef@example.com",
                     UserName = "youssef@example.com",
                     FirstName = "Youssef",
-                    LastName = "Mahmoud",
+                    LastName = "Mahmoud"
                 }
             ),
             new FakeUnitOfWork()
@@ -342,6 +342,59 @@ public sealed class ActivateChildSetupCommandHandlerTests
 
         Assert.False(result.IsSuccess);
         Assert.Equal("ChildSetup.NotReadyForActivation", result.TopError.Code);
+    }
+
+    [Fact]
+    public async Task Activate_WithClaimedDraftWithStudyTimeGoal_TransfersGoalToStudent()
+    {
+        Guid studentUserId = Guid.NewGuid();
+        Guid parentUserId = Guid.NewGuid();
+
+        Student student = new(studentUserId);
+        Parent parent = new(parentUserId);
+
+        ChildSetupDraft draft = new(parent.Id);
+        draft.SetName("Youssef", "Mahmoud");
+        draft.MarkInvited();
+        draft.MarkClaimed(student.Id);
+        draft.SetStudyTimeGoal(
+            StudyTimeGoal
+                .Create(
+                    DomainStudyTimeGoalPeriod.Daily,
+                    60,
+                    [DayOfWeek.Monday],
+                    new DateOnly(2026, 9, 21))
+                .Value);
+
+        ApplicationUser user = new()
+        {
+            Id = studentUserId,
+            Email = "youssef@example.com",
+            UserName = "youssef@example.com",
+            FirstName = "Old",
+            LastName = "Name"
+        };
+
+        student.SetPrivateProperty("User", user);
+
+        ActivateChildSetupCommandHandler handler = new(
+            new InMemoryRepository<Student>(student),
+            new InMemoryRepository<ChildSetupDraft>(draft),
+            new InMemoryRepository<ParentStudentRelationship>(),
+            new FakeCurrentUser(studentUserId),
+            new TestIdentityService(user),
+            new FakeUnitOfWork());
+
+        Result<StudentDetailsResponse> result = await handler.Handle(
+            new ActivateChildSetupCommand(),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.NotNull(student.StudyTimeGoal);
+        Assert.Equal(60, student.StudyTimeGoal.TargetMinutes);
+        Assert.Equal(
+            DomainStudyTimeGoalPeriod.Daily,
+            student.StudyTimeGoal.Period);
     }
 
     private sealed class TestIdentityService(ApplicationUser user) : IIdentityService
@@ -397,58 +450,4 @@ public sealed class ActivateChildSetupCommandHandlerTests
             string displayName
         ) => Task.FromResult(IdentityResultSummary.Success);
     }
-    
-    [Fact]
-    public async Task Activate_WithClaimedDraftWithStudyTimeGoal_TransfersGoalToStudent()
-    {
-        Guid studentUserId = Guid.NewGuid();
-        Guid parentUserId = Guid.NewGuid();
-
-        Student student = new(studentUserId);
-        Parent parent = new(parentUserId);
-
-        ChildSetupDraft draft = new(parent.Id);
-        draft.SetName("Youssef", "Mahmoud");
-        draft.MarkInvited();
-        draft.MarkClaimed(student.Id);
-        draft.SetStudyTimeGoal(
-            StudyTimeGoal
-                .Create(
-                    DomainStudyTimeGoalPeriod.Daily,
-                    60,
-                    [DayOfWeek.Monday],
-                    new DateOnly(2026, 9, 21))
-                .Value);
-
-        ApplicationUser user = new()
-        {
-            Id = studentUserId,
-            Email = "youssef@example.com",
-            UserName = "youssef@example.com",
-            FirstName = "Old",
-            LastName = "Name",
-        };
-
-        student.SetPrivateProperty("User", user);
-
-        ActivateChildSetupCommandHandler handler = new(
-            new InMemoryRepository<Student>(student),
-            new InMemoryRepository<ChildSetupDraft>(draft),
-            new InMemoryRepository<ParentStudentRelationship>(),
-            new FakeCurrentUser(studentUserId),
-            new TestIdentityService(user),
-            new FakeUnitOfWork());
-
-        Result<StudentDetailsResponse> result = await handler.Handle(
-            new ActivateChildSetupCommand(),
-            CancellationToken.None);
-
-        Assert.True(result.IsSuccess);
-        Assert.NotNull(student.StudyTimeGoal);
-        Assert.Equal(60, student.StudyTimeGoal.TargetMinutes);
-        Assert.Equal(
-            Domain.Students.StudyTimeGoalPeriod.Daily,
-            student.StudyTimeGoal.Period);
-    }
-
 }

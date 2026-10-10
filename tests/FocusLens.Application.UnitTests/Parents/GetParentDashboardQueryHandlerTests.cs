@@ -18,11 +18,13 @@ public sealed class GetParentDashboardQueryHandlerTests
     {
         TestContext context = CreateContext();
         StudentWeek currentWeek = new(context.Student.Id, new DateOnly(2026, 9, 19));
-        StudySession completed = Completed(context.Student.Id, new DateTimeOffset(2026, 9, 19, 9, 0, 0, TimeSpan.Zero), 30);
+        StudySession completed =
+            Completed(context.Student.Id, new DateTimeOffset(2026, 9, 19, 9, 0, 0, TimeSpan.Zero), 30);
         StudySession active = Active(context.Student.Id, new DateTimeOffset(2026, 9, 20, 10, 0, 0, TimeSpan.Zero), 45);
         GetParentDashboardQueryHandler handler = DashboardHandler(context, [currentWeek], [completed, active]);
 
-        Result<ParentDashboardResponse> result = await handler.Handle(new(context.Student.Id), CancellationToken.None);
+        Result<ParentDashboardResponse> result =
+            await handler.Handle(new GetParentDashboardQuery(context.Student.Id), CancellationToken.None);
 
         Assert.True(result.IsSuccess);
         Assert.Equal(currentWeek.StartsOn, result.Value.Week.StartsOn);
@@ -36,7 +38,8 @@ public sealed class GetParentDashboardQueryHandlerTests
         Assert.Equal("1 hour 15 minutes", result.Value.WeeklyStudyPulse.StudyMinutesTrend);
         Assert.Equal("45 minutes", result.Value.WeeklyStudyPulse.PeakDay!.StudyMinutes);
         Assert.Contains(result.Value.WeeklyStudyPulse.Days, day => day.StudyMinutes == "30 minutes");
-        Assert.Contains(result.Value.FocusPattern.Days.SelectMany(day => day.Sessions), session => session.StudyMinutes == "45 minutes");
+        Assert.Contains(result.Value.FocusPattern.Days.SelectMany(day => day.Sessions),
+            session => session.StudyMinutes == "45 minutes");
         Assert.Null(typeof(ParentDashboardResponse).GetProperty("RecentStudySessions"));
         Assert.Null(typeof(ParentDashboardWeeklyStudyPulseResponse).GetProperty("StudySessionsCount"));
     }
@@ -48,14 +51,17 @@ public sealed class GetParentDashboardQueryHandlerTests
         StudentWeek historical = new(context.Student.Id, new DateOnly(2026, 9, 12));
         StudentWeek current = new(context.Student.Id, new DateOnly(2026, 9, 19));
         context.Relationship.SetSelectedOverviewWeekStart(historical.StartsOn);
-        StudySession oldSession = Completed(context.Student.Id, new DateTimeOffset(2026, 9, 12, 9, 0, 0, TimeSpan.Zero), 40);
-        StudySession currentSession = Completed(context.Student.Id, new DateTimeOffset(2026, 9, 19, 9, 0, 0, TimeSpan.Zero), 30);
+        StudySession oldSession =
+            Completed(context.Student.Id, new DateTimeOffset(2026, 9, 12, 9, 0, 0, TimeSpan.Zero), 40);
+        StudySession currentSession =
+            Completed(context.Student.Id, new DateTimeOffset(2026, 9, 19, 9, 0, 0, TimeSpan.Zero), 30);
         InMemoryRepository<StudentWeek> weeks = new(historical, current);
 
         Result<ParentDashboardResponse> dashboard = await DashboardHandler(context, weeks, [oldSession, currentSession])
-            .Handle(new(context.Student.Id), CancellationToken.None);
-        Result<ParentDashboardSessionHistoryResponse> sessions = await SessionsHandler(context, weeks, [oldSession, currentSession])
-            .Handle(new(context.Student.Id, null, null), CancellationToken.None);
+            .Handle(new GetParentDashboardQuery(context.Student.Id), CancellationToken.None);
+        Result<ParentDashboardSessionHistoryResponse> sessions =
+            await SessionsHandler(context, weeks, [oldSession, currentSession])
+                .Handle(new GetParentDashboardSessionsQuery(context.Student.Id, null, null), CancellationToken.None);
 
         Assert.True(dashboard.IsSuccess);
         Assert.Equal(historical.StartsOn, dashboard.Value.Week.StartsOn);
@@ -75,7 +81,7 @@ public sealed class GetParentDashboardQueryHandlerTests
         StudentWeek current = new(context.Student.Id, new DateOnly(2026, 9, 19));
 
         Result<ParentDashboardResponse> result = await DashboardHandler(context, [current], [])
-            .Handle(new(context.Student.Id), CancellationToken.None);
+            .Handle(new GetParentDashboardQuery(context.Student.Id), CancellationToken.None);
 
         Assert.True(result.IsSuccess);
         Assert.Equal(0, result.Value.WeeklyStudyPulse.TotalSessions);
@@ -94,7 +100,7 @@ public sealed class GetParentDashboardQueryHandlerTests
             new DateTimeOffset(2026, 9, 19, 20, 30, 0, TimeSpan.Zero), 60);
 
         Result<ParentDashboardResponse> result = await DashboardHandler(context, [currentWeek], [session])
-            .Handle(new(context.Student.Id), CancellationToken.None);
+            .Handle(new GetParentDashboardQuery(context.Student.Id), CancellationToken.None);
 
         Assert.True(result.IsSuccess);
         Assert.Equal("1 hour", result.Value.WeeklyStudyPulse.TotalStudyMinutes);
@@ -104,17 +110,23 @@ public sealed class GetParentDashboardQueryHandlerTests
             day => day.Date == new DateOnly(2026, 9, 20) && day.StudyMinutes == "30 minutes");
     }
 
-    private static GetParentDashboardQueryHandler DashboardHandler(TestContext context, IEnumerable<StudentWeek> weeks, IEnumerable<StudySession> sessions) =>
+    private static GetParentDashboardQueryHandler DashboardHandler(TestContext context, IEnumerable<StudentWeek> weeks,
+        IEnumerable<StudySession> sessions) =>
         DashboardHandler(context, new InMemoryRepository<StudentWeek>(weeks.ToArray()), sessions);
 
-    private static GetParentDashboardQueryHandler DashboardHandler(TestContext context, InMemoryRepository<StudentWeek> weeks, IEnumerable<StudySession> sessions) => new(
-        new InMemoryRepository<Parent>(context.Parent), new InMemoryRepository<ParentStudentRelationship>(context.Relationship),
+    private static GetParentDashboardQueryHandler DashboardHandler(TestContext context,
+        InMemoryRepository<StudentWeek> weeks, IEnumerable<StudySession> sessions) => new(
+        new InMemoryRepository<Parent>(context.Parent),
+        new InMemoryRepository<ParentStudentRelationship>(context.Relationship),
         new InMemoryRepository<Student>(context.Student), new InMemoryRepository<StudyGoalProposal>(),
-        new InMemoryRepository<StudySession>(sessions.ToArray()), new InMemoryRepository<StudySessionBehaviorWindow>(), weeks,
+        new InMemoryRepository<StudySession>(sessions.ToArray()), new InMemoryRepository<StudySessionBehaviorWindow>(),
+        weeks,
         new FakeCurrentUser(context.Parent.UserId), new FixedTimeProvider(Now));
 
-    private static GetParentDashboardSessionsQueryHandler SessionsHandler(TestContext context, InMemoryRepository<StudentWeek> weeks, IEnumerable<StudySession> sessions) => new(
-        new InMemoryRepository<Parent>(context.Parent), new InMemoryRepository<ParentStudentRelationship>(context.Relationship),
+    private static GetParentDashboardSessionsQueryHandler SessionsHandler(TestContext context,
+        InMemoryRepository<StudentWeek> weeks, IEnumerable<StudySession> sessions) => new(
+        new InMemoryRepository<Parent>(context.Parent),
+        new InMemoryRepository<ParentStudentRelationship>(context.Relationship),
         new InMemoryRepository<Student>(context.Student), new InMemoryRepository<StudySession>(sessions.ToArray()),
         new InMemoryRepository<StudySessionBehaviorWindow>(), weeks,
         new FakeCurrentUser(context.Parent.UserId), new FixedTimeProvider(Now));
@@ -128,7 +140,7 @@ public sealed class GetParentDashboardQueryHandlerTests
         student.SetParentSharingPreferences(true, true);
         ParentStudentRelationship relationship = new(parent.Id, student.Id);
         relationship.Accept();
-        return new(parent, student, relationship);
+        return new TestContext(parent, student, relationship);
     }
 
     private static StudySession Completed(Guid studentId, DateTimeOffset started, int minutes)
@@ -150,7 +162,8 @@ public sealed class GetParentDashboardQueryHandlerTests
     private static StudySession ReadySession(Guid studentId, int minutes)
     {
         StudySession session = StudySession.Create(studentId, StudySessionMode.Digital).Value;
-        StudyMaterial material = StudyMaterial.Create(studentId, "book.pdf", 1, 1, $"materials/{Guid.NewGuid()}/book.pdf", StudyMaterialSource.Upload).Value;
+        StudyMaterial material = StudyMaterial.Create(studentId, "book.pdf", 1, 1,
+            $"materials/{Guid.NewGuid()}/book.pdf", StudyMaterialSource.Upload).Value;
         Assert.True(session.SetSubjectId(Guid.NewGuid()).IsSuccess);
         Assert.True(session.SetDuration(minutes).IsSuccess);
         Assert.True(session.SetStudyMaterial(material).IsSuccess);
@@ -161,5 +174,9 @@ public sealed class GetParentDashboardQueryHandlerTests
     }
 
     private sealed record TestContext(Parent Parent, Student Student, ParentStudentRelationship Relationship);
-    private sealed class FixedTimeProvider(DateTimeOffset now) : TimeProvider { public override DateTimeOffset GetUtcNow() => now; }
+
+    private sealed class FixedTimeProvider(DateTimeOffset now) : TimeProvider
+    {
+        public override DateTimeOffset GetUtcNow() => now;
+    }
 }

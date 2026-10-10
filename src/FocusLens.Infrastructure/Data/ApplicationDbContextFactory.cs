@@ -1,6 +1,6 @@
-using Microsoft.Extensions.Configuration;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Design;
+using Microsoft.Extensions.Configuration;
 
 namespace FocusLens.Infrastructure.Data;
 
@@ -13,7 +13,7 @@ public sealed class ApplicationDbContextFactory
 
         IConfiguration configuration = new ConfigurationBuilder()
             .SetBasePath(Path.GetDirectoryName(appSettingsPath)!)
-            .AddJsonFile("appsettings.json", optional: false)
+            .AddJsonFile("appsettings.json", false)
             .AddUserSecrets("e0087eb7-5390-4b2a-bd51-8b66652060d2")
             .Build();
 

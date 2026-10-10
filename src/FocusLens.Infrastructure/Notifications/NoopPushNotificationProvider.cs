@@ -10,8 +10,6 @@ public sealed class NoopPushNotificationProvider : IPushNotificationProvider
     public Task<PushNotificationSendResult> SendAsync(
         UserDeviceToken token,
         Notification notification,
-        CancellationToken cancellationToken)
-    {
-        return Task.FromResult(PushNotificationSendResult.Failed("Push provider is not configured."));
-    }
+        CancellationToken cancellationToken) =>
+        Task.FromResult(PushNotificationSendResult.Failed("Push provider is not configured."));
 }

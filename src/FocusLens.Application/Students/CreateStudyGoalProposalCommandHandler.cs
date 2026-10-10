@@ -1,4 +1,5 @@
 using FocusLens.Application.Common.Interfaces;
+using FocusLens.Application.Common.Services;
 using FocusLens.Application.Parents;
 using FocusLens.Contracts.Students;
 using FocusLens.Domain;
@@ -68,11 +69,10 @@ public sealed class CreateStudyGoalProposalCommandHandler(
         }
 
         ParentStudentRelationship? relationship =
-            await relationshipRepository.FirstOrDefaultAsync(
-                relationship =>
-                    relationship.ParentId == parent.Id
-                    && relationship.StudentId == request.StudentId
-                    && relationship.Status == RelationshipStatus.Active
+            await relationshipRepository.FirstOrDefaultAsync(relationship =>
+                relationship.ParentId == parent.Id
+                && relationship.StudentId == request.StudentId
+                && relationship.Status == RelationshipStatus.Active
             );
 
         if (relationship is null)
@@ -99,10 +99,9 @@ public sealed class CreateStudyGoalProposalCommandHandler(
         }
 
         StudyGoalProposal? pendingProposal =
-            await proposalRepository.FirstOrDefaultAsync(
-                proposal =>
-                    proposal.StudentId == request.StudentId
-                    && proposal.Status == StudyGoalProposalStatus.Pending
+            await proposalRepository.FirstOrDefaultAsync(proposal =>
+                proposal.StudentId == request.StudentId
+                && proposal.Status == StudyGoalProposalStatus.Pending
             );
 
         if (pendingProposal is not null)
@@ -135,18 +134,17 @@ public sealed class CreateStudyGoalProposalCommandHandler(
                 MidpointRounding.AwayFromZero
             );
 
-        studentLocalTime ??= new FocusLens.Application.Common.Services.StudentLocalTime(timeProvider);
+        studentLocalTime ??= new StudentLocalTime(timeProvider);
         DateOnly today = studentLocalTime.GetToday(student);
 
         DateOnly startsOn =
             ParentWeekdayOrder.GetWeekStart(today, weekStartsOn);
 
         StudyGoalProposal? acceptedProposal =
-            await proposalRepository.FirstOrDefaultAsync(
-                proposal =>
-                    proposal.StudentId == request.StudentId
-                    && proposal.Status == StudyGoalProposalStatus.Accepted
-                    && proposal.Goal.StartDate == startsOn
+            await proposalRepository.FirstOrDefaultAsync(proposal =>
+                proposal.StudentId == request.StudentId
+                && proposal.Status == StudyGoalProposalStatus.Accepted
+                && proposal.Goal.StartDate == startsOn
             );
 
         if (acceptedProposal is not null)

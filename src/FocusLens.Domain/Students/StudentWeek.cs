@@ -8,7 +8,11 @@ public sealed class StudentWeek : AuditableEntity
 
     public StudentWeek(Guid studentId, DateOnly startsOn) : base(Guid.CreateVersion7())
     {
-        if (studentId == Guid.Empty) throw new ArgumentException("Student ID is required.", nameof(studentId));
+        if (studentId == Guid.Empty)
+        {
+            throw new ArgumentException("Student ID is required.", nameof(studentId));
+        }
+
         StudentId = studentId;
         StartsOn = startsOn;
         EndsOn = startsOn.AddDays(6);

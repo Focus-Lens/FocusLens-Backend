@@ -14,10 +14,32 @@ public sealed class StudentProfileImageCommandHandler(
     ICurrentUser currentUser,
     IUnitOfWork unitOfWork)
     : IRequestHandler<UpdateStudentProfileImageCommand, Result<StudentDetailsResponse>>,
-      IRequestHandler<RemoveStudentProfileImageCommand, Result<StudentDetailsResponse>>
+        IRequestHandler<RemoveStudentProfileImageCommand, Result<StudentDetailsResponse>>
 {
     private static readonly HashSet<string> AllowedExtensions =
         [".jpg", ".jpeg", ".png", ".webp"];
+
+    public async Task<Result<StudentDetailsResponse>> Handle(
+        RemoveStudentProfileImageCommand request,
+        CancellationToken cancellationToken)
+    {
+        Result<Student> studentResult = await GetStudentAsync();
+        if (studentResult.IsError)
+        {
+            return studentResult.Errors;
+        }
+
+        string? previousReference = studentResult.Value.ProfileImageStorageReference;
+        studentResult.Value.SetProfileImageStorageReference(null);
+        await unitOfWork.SaveChangesAsync();
+
+        if (previousReference is not null)
+        {
+            await fileStore.DeleteAsync(previousReference, cancellationToken);
+        }
+
+        return studentResult.Value.ToDetailsResponse();
+    }
 
     public async Task<Result<StudentDetailsResponse>> Handle(
         UpdateStudentProfileImageCommand request,
@@ -53,28 +75,6 @@ public sealed class StudentProfileImageCommandHandler(
             cancellationToken);
 
         studentResult.Value.SetProfileImageStorageReference(reference);
-        await unitOfWork.SaveChangesAsync();
-
-        if (previousReference is not null)
-        {
-            await fileStore.DeleteAsync(previousReference, cancellationToken);
-        }
-
-        return studentResult.Value.ToDetailsResponse();
-    }
-
-    public async Task<Result<StudentDetailsResponse>> Handle(
-        RemoveStudentProfileImageCommand request,
-        CancellationToken cancellationToken)
-    {
-        Result<Student> studentResult = await GetStudentAsync();
-        if (studentResult.IsError)
-        {
-            return studentResult.Errors;
-        }
-
-        string? previousReference = studentResult.Value.ProfileImageStorageReference;
-        studentResult.Value.SetProfileImageStorageReference(null);
         await unitOfWork.SaveChangesAsync();
 
         if (previousReference is not null)

@@ -143,10 +143,10 @@ public sealed class StudySessionQuestion : Entity
         }
 
         string[] optionValues = options?
-            .Where(option => !string.IsNullOrWhiteSpace(option))
-            .Select(option => option.Trim())
-            .ToArray()
-            ?? [];
+                                    .Where(option => !string.IsNullOrWhiteSpace(option))
+                                    .Select(option => option.Trim())
+                                    .ToArray()
+                                ?? [];
 
         if (optionValues.Length != 4)
         {

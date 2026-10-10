@@ -15,7 +15,7 @@ public sealed class ChildSetupInvitationConfiguration
                 table.HasCheckConstraint(
                     "CK_ChildSetupInvitations_Type_TargetEmail",
                     "([Type] = 'Email' AND [TargetEmailNormalized] IS NOT NULL) "
-                        + "OR ([Type] = 'Link' AND [TargetEmailNormalized] IS NULL)"
+                    + "OR ([Type] = 'Link' AND [TargetEmailNormalized] IS NULL)"
                 )
         );
 
@@ -58,9 +58,7 @@ public sealed class ChildSetupInvitationConfiguration
 
         builder.HasIndex(invitation => new
         {
-            invitation.ChildSetupDraftId,
-            invitation.TargetEmailNormalized,
-            invitation.Status,
+            invitation.ChildSetupDraftId, invitation.TargetEmailNormalized, invitation.Status
         });
 
         builder

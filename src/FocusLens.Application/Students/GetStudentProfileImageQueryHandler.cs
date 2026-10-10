@@ -14,10 +14,7 @@ public sealed class GetStudentProfileImageQueryHandler(
 {
     private static readonly Dictionary<string, string> ContentTypes = new(StringComparer.OrdinalIgnoreCase)
     {
-        [".jpg"] = "image/jpeg",
-        [".jpeg"] = "image/jpeg",
-        [".png"] = "image/png",
-        [".webp"] = "image/webp"
+        [".jpg"] = "image/jpeg", [".jpeg"] = "image/jpeg", [".png"] = "image/png", [".webp"] = "image/webp"
     };
 
     public async Task<Result<StudentProfileImageFile>> Handle(
@@ -31,8 +28,7 @@ public sealed class GetStudentProfileImageQueryHandler(
                 "The current user could not be identified.");
         }
 
-        Student? student = await studentRepository.FirstOrDefaultAsync(
-            item => item.UserId == userId);
+        Student? student = await studentRepository.FirstOrDefaultAsync(item => item.UserId == userId);
 
         if (student is null)
         {

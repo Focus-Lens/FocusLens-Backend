@@ -162,13 +162,40 @@ public class Student : AuditableEntity
     {
         List<string> missingFields = [];
 
-        if (string.IsNullOrWhiteSpace(PreferredName)) missingFields.Add("preferredName");
-        if (DateOfBirth is null) missingFields.Add("dateOfBirth");
-        if (Goal is null) missingFields.Add("goal");
-        if (Grade is null) missingFields.Add("grade");
-        if (Grade is StudentGrade.Other && string.IsNullOrWhiteSpace(CustomGrade)) missingFields.Add("customGrade");
-        if (Subjects.Count == 0) missingFields.Add("subjects");
-        if (StudyTimeGoal is null) missingFields.Add("studyTimeGoal");
+        if (string.IsNullOrWhiteSpace(PreferredName))
+        {
+            missingFields.Add("preferredName");
+        }
+
+        if (DateOfBirth is null)
+        {
+            missingFields.Add("dateOfBirth");
+        }
+
+        if (Goal is null)
+        {
+            missingFields.Add("goal");
+        }
+
+        if (Grade is null)
+        {
+            missingFields.Add("grade");
+        }
+
+        if (Grade is StudentGrade.Other && string.IsNullOrWhiteSpace(CustomGrade))
+        {
+            missingFields.Add("customGrade");
+        }
+
+        if (Subjects.Count == 0)
+        {
+            missingFields.Add("subjects");
+        }
+
+        if (StudyTimeGoal is null)
+        {
+            missingFields.Add("studyTimeGoal");
+        }
 
         return missingFields;
     }

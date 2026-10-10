@@ -1,6 +1,8 @@
+using FocusLens.Application.Features.Users.Dtos;
 using FocusLens.Application.Features.Users.Queries.GetCurrentUserAccountStatus;
 using FocusLens.Application.UnitTests.Access;
 using FocusLens.Domain.Common.Interfaces;
+using FocusLens.Domain.Common.Results;
 using FocusLens.Domain.Identity;
 using FocusLens.Domain.Interfaces;
 
@@ -11,17 +13,12 @@ public sealed class GetCurrentUserAccountStatusQueryHandlerTests
     [Fact]
     public async Task Handle_WithCurrentParent_ReturnsCommonAccountStatusOnly()
     {
-        ApplicationUser user = new()
-        {
-            EmailConfirmed = true,
-            FirstName = "Mona",
-            LastName = "Hassan"
-        };
+        ApplicationUser user = new() { EmailConfirmed = true, FirstName = "Mona", LastName = "Hassan" };
         GetCurrentUserAccountStatusQueryHandler handler = new(
             new FakeCurrentUser(user.Id),
             new TestIdentityService(user));
 
-        var result = await handler.Handle(
+        Result<UserAccountStatusDto> result = await handler.Handle(
             new GetCurrentUserAccountStatusQuery(),
             CancellationToken.None);
 
@@ -34,17 +31,13 @@ public sealed class GetCurrentUserAccountStatusQueryHandlerTests
     [Fact]
     public async Task Handle_WithStudentUser_ReturnsIdentityStatus()
     {
-        ApplicationUser user = new()
-        {
-            EmailConfirmed = false,
-            IsDisabled = true
-        };
+        ApplicationUser user = new() { EmailConfirmed = false, IsDisabled = true };
 
         GetCurrentUserAccountStatusQueryHandler handler = new(
             new FakeCurrentUser(user.Id),
             new TestIdentityService(user));
 
-        var result = await handler.Handle(
+        Result<UserAccountStatusDto> result = await handler.Handle(
             new GetCurrentUserAccountStatusQuery(),
             CancellationToken.None);
 

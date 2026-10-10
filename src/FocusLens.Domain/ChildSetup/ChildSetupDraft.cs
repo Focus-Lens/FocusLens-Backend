@@ -85,19 +85,16 @@ public sealed class ChildSetupDraft : AuditableEntity
 
     public void SetStudyTimeGoal(StudyTimeGoal? studyTimeGoal) => StudyTimeGoal = studyTimeGoal;
 
-    public void SetProfileSetupMode(ChildSetupProfileMode mode)
-    {
-        ProfileSetupMode = mode;
-    }
+    public void SetProfileSetupMode(ChildSetupProfileMode mode) => ProfileSetupMode = mode;
 
     public bool IsProfileComplete()
     {
         return !string.IsNullOrWhiteSpace(FirstName)
-            && !string.IsNullOrWhiteSpace(LastName)
-            && Grade is not null
-            && (Grade != StudentGrade.Other || !string.IsNullOrWhiteSpace(CustomGrade))
-            && Subjects.Count > 0
-            && StudyTimeGoal is not null;
+               && !string.IsNullOrWhiteSpace(LastName)
+               && Grade is not null
+               && (Grade != StudentGrade.Other || !string.IsNullOrWhiteSpace(CustomGrade))
+               && Subjects.Count > 0
+               && StudyTimeGoal is not null;
     }
 
     public void SetProfileImageStorageReference(string? storageReference) =>

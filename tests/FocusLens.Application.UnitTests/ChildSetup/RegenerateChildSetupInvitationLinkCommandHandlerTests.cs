@@ -256,8 +256,5 @@ public sealed class RegenerateChildSetupInvitationLinkCommandHandlerTests
         return draft;
     }
 
-    private static string Hash(string token)
-    {
-        return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(token)));
-    }
+    private static string Hash(string token) => Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(token)));
 }

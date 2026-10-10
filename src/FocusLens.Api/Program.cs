@@ -24,8 +24,7 @@ public class Program
         builder.Services.AddApplication().AddInfrastructure(builder.Configuration);
 
         // Serilog
-        builder.Host.UseSerilog(
-            (context, configuration) => configuration.ReadFrom.Configuration(context.Configuration)
+        builder.Host.UseSerilog((context, configuration) => configuration.ReadFrom.Configuration(context.Configuration)
         );
         builder.Services.AddHttpClient();
 
@@ -105,7 +104,7 @@ public class Program
         {
             if (
                 segments[index]
-                    .Equals("child-setup-invitations", StringComparison.OrdinalIgnoreCase)
+                .Equals("child-setup-invitations", StringComparison.OrdinalIgnoreCase)
             )
             {
                 segments[index + 1] = "[redacted]";

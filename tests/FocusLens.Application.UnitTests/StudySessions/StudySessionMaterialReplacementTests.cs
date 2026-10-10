@@ -284,12 +284,12 @@ public sealed class StudySessionMaterialReplacementTests
             CancellationToken cancellationToken) =>
             Task.FromResult("derived/new.pdf");
 
-       public Task DeleteAsync(string storageReference, CancellationToken cancellationToken)
-{
-    // Cleanup must still work when the request token has been canceled.
-    DeletedReferences.Add(storageReference);
-    return Task.CompletedTask;
-}
+        public Task DeleteAsync(string storageReference, CancellationToken cancellationToken)
+        {
+            // Cleanup must still work when the request token has been canceled.
+            DeletedReferences.Add(storageReference);
+            return Task.CompletedTask;
+        }
     }
 
     private sealed class RecordingImageFileStore : IStudySessionImageFileStore

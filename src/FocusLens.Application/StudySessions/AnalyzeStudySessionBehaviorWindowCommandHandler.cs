@@ -29,17 +29,23 @@ public sealed class AnalyzeStudySessionBehaviorWindowCommandHandler(
         CancellationToken cancellationToken)
     {
         if (currentUser.UserId is not Guid userId || userId == Guid.Empty)
+        {
             return Error.NotFound("StudySessions.NotFound", "Study session was not found.");
+        }
 
         Student? student = await studentRepository.FirstOrDefaultAsync(item => item.UserId == userId);
         if (student is null)
+        {
             return Error.NotFound("StudySessions.NotFound", "Study session was not found.");
+        }
 
         StudySession? session = await sessionRepository.FirstOrDefaultAsync(
             item => item.Id == request.SessionId && item.StudentId == student.Id,
             item => item.PauseIntervals);
         if (session?.StartedAtUtc is null)
+        {
             return Error.NotFound("StudySessions.NotFound", "Study session was not found.");
+        }
 
         bool sessionEnded = session.Status is StudySessionStatus.Completed or StudySessionStatus.Cancelled;
         if (request.IsFinal != sessionEnded)
@@ -63,11 +69,12 @@ public sealed class AnalyzeStudySessionBehaviorWindowCommandHandler(
         }
         catch (ArgumentException)
         {
-            return Error.Failure("StudySessionBehaviorWindows.TimelineInvalid", "The persisted pause timeline is invalid.");
+            return Error.Failure("StudySessionBehaviorWindows.TimelineInvalid",
+                "The persisted pause timeline is invalid.");
         }
 
-        StudySessionBehaviorWindow[] persistedWindows = (await windowRepository.GetAllAsync(
-                item => item.StudySessionId == session.Id))
+        StudySessionBehaviorWindow[] persistedWindows =
+            (await windowRepository.GetAllAsync(item => item.StudySessionId == session.Id))
             .OrderBy(item => item.WindowIndex)
             .ToArray();
         BehaviorWindowTimelineItem? nextWindow = timeline.FirstOrDefault(item =>
@@ -89,20 +96,21 @@ public sealed class AnalyzeStudySessionBehaviorWindowCommandHandler(
                 : "A complete behavior window must be analyzed before final analysis.");
         }
 
-        StudySessionBehaviorEvent[] events = (await behaviorEventRepository.GetAllAsync(
-                item => item.StudySessionId == session.Id && item.OccurredAtUtc <= nextWindow.WindowEndUtc))
+        StudySessionBehaviorEvent[] events =
+            (await behaviorEventRepository.GetAllAsync(item =>
+                item.StudySessionId == session.Id && item.OccurredAtUtc <= nextWindow.WindowEndUtc))
             .OrderBy(item => item.OccurredAtUtc)
             .ToArray();
-        StudySessionQuestion[] questions = (await questionRepository.GetAllAsync(
-                item => item.StudySessionId == session.Id))
+        StudySessionQuestion[] questions =
+            (await questionRepository.GetAllAsync(item => item.StudySessionId == session.Id))
             .OrderBy(item => item.Order)
             .ToArray();
         Guid[] questionIds = questions.Select(item => item.Id).ToArray();
         StudySessionQuestionAnswer[] answers = questionIds.Length == 0
             ? []
             : (await answerRepository.GetAllAsync(item => questionIds.Contains(item.StudySessionQuestionId)))
-                .OrderBy(item => item.AnsweredAtUtc)
-                .ToArray();
+            .OrderBy(item => item.AnsweredAtUtc)
+            .ToArray();
 
         BehaviorWindowHistoryItem[] history = persistedWindows
             .Where(item => item.WindowIndex < nextWindow.WindowIndex)
@@ -124,14 +132,18 @@ public sealed class AnalyzeStudySessionBehaviorWindowCommandHandler(
         }
 
         if (!IsValidResponse(aiResponse, session.Id, nextWindow))
+        {
             return Error.Failure("StudySessionBehaviorWindows.AnalysisInvalid",
                 "Behavioral Intelligence returned an invalid analysis response.");
+        }
 
         Result<StudySessionBehaviorWindow> windowResult = StudySessionBehaviorWindow.Create(
             session.Id, nextWindow.WindowIndex, nextWindow.WindowStartUtc,
             nextWindow.WindowEndUtc, nextWindow.IsFinal);
         if (windowResult.IsError)
+        {
             return windowResult.TopError;
+        }
 
         Result<Success> analysisResult = windowResult.Value.RecordAnalysis(
             aiResponse.WindowFocusScore, aiResponse.WindowState, aiResponse.Trend,
@@ -139,7 +151,9 @@ public sealed class AnalyzeStudySessionBehaviorWindowCommandHandler(
             aiResponse.RawAction, aiResponse.RecommendedAction, aiResponse.ActionEmitted,
             aiResponse.WindowActiveTimeSeconds);
         if (analysisResult.IsError)
+        {
             return analysisResult.TopError;
+        }
 
         windowRepository.Add(windowResult.Value);
         await unitOfWork.SaveChangesAsync();
@@ -158,14 +172,12 @@ public sealed class AnalyzeStudySessionBehaviorWindowCommandHandler(
         item.WindowIndex, item.FocusScore, item.FocusState ?? "NORMAL_FOCUSED",
         item.RawAction ?? "CONTINUE", item.UnderstandingScore);
 
-    private static Result<BehaviorWindowResponse> ToResponse(StudySessionBehaviorWindow item) => new BehaviorWindowResponse(
-        item.StudySessionId.ToString(), item.WindowIndex, item.FocusScore, item.UnderstandingScore,
-        item.UnderstandingTrend, item.FocusState ?? "NORMAL_FOCUSED", item.RecommendedAction ?? "CONTINUE",
-        item.RawAction ?? "CONTINUE", item.ActionEmitted ?? false, item.FocusTrend ?? "STABLE",
-        item.IsFinal, 0, [])
-        {
-            WindowActiveTimeSeconds = item.WindowActiveTimeSeconds
-        };
+    private static Result<BehaviorWindowResponse> ToResponse(StudySessionBehaviorWindow item) =>
+        new BehaviorWindowResponse(
+            item.StudySessionId.ToString(), item.WindowIndex, item.FocusScore, item.UnderstandingScore,
+            item.UnderstandingTrend, item.FocusState ?? "NORMAL_FOCUSED", item.RecommendedAction ?? "CONTINUE",
+            item.RawAction ?? "CONTINUE", item.ActionEmitted ?? false, item.FocusTrend ?? "STABLE",
+            item.IsFinal, 0, []) { WindowActiveTimeSeconds = item.WindowActiveTimeSeconds };
 
     private static bool IsValidResponse(BehaviorWindowResponse response, Guid sessionId,
         BehaviorWindowTimelineItem window) =>

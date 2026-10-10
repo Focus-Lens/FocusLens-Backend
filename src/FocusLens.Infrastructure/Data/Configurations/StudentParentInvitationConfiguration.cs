@@ -15,7 +15,7 @@ public sealed class StudentParentInvitationConfiguration
                 table.HasCheckConstraint(
                     "CK_StudentParentInvitations_Type_TargetEmail",
                     "([Type] = 'Email' AND [TargetEmailNormalized] IS NOT NULL) "
-                        + "OR ([Type] = 'Link' AND [TargetEmailNormalized] IS NULL)"
+                    + "OR ([Type] = 'Link' AND [TargetEmailNormalized] IS NULL)"
                 )
         );
 

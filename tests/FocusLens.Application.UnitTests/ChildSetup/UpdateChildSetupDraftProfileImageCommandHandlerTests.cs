@@ -90,7 +90,7 @@ public sealed class UpdateChildSetupDraftProfileImageCommandHandlerTests
             new UpdateChildSetupDraftProfileImageCommand(
                 draft.Id,
                 "profile.png",
-                10 * 1024 * 1024 + 1,
+                (10 * 1024 * 1024) + 1,
                 _ => Task.FromResult<Stream>(new MemoryStream([1]))),
             CancellationToken.None);
 

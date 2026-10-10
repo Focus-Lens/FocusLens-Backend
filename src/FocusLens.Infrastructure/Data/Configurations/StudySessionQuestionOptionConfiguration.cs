@@ -16,11 +16,7 @@ public sealed class StudySessionQuestionOptionConfiguration
         builder.Property(option => option.Text).HasMaxLength(1000).IsRequired();
         builder.Property(option => option.Order).IsRequired();
 
-        builder.HasIndex(option => new
-            {
-                option.StudySessionQuestionId,
-                option.Order
-            })
+        builder.HasIndex(option => new { option.StudySessionQuestionId, option.Order })
             .IsUnique();
 
         builder.HasOne<StudySessionQuestion>()

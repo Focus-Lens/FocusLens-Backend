@@ -94,8 +94,10 @@ public sealed class NotificationsTests
         await SeedNotificationsAsync(factory, currentUserId, otherUserId, first, second, other);
 
         using HttpClient client = CreateAuthenticatedClient(factory, currentUserId);
-        Assert.Equal(HttpStatusCode.NoContent, (await client.PostAsync("/api/notifications/read-all", null)).StatusCode);
-        Assert.Equal(HttpStatusCode.NoContent, (await client.PostAsync("/api/notifications/read-all", null)).StatusCode);
+        Assert.Equal(HttpStatusCode.NoContent,
+            (await client.PostAsync("/api/notifications/read-all", null)).StatusCode);
+        Assert.Equal(HttpStatusCode.NoContent,
+            (await client.PostAsync("/api/notifications/read-all", null)).StatusCode);
 
         using IServiceScope scope = factory.Services.CreateScope();
         ApplicationDbContext db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();

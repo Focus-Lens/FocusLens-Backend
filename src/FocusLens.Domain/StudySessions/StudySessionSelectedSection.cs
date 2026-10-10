@@ -38,6 +38,11 @@ public sealed class StudySessionSelectedSection : Entity
 
     public DateTimeOffset? CompletedAtUtc { get; private set; }
 
+    public bool IsChallengeAvailable =>
+        StartedAtUtc is not null &&
+        CompletedAtUtc is null &&
+        ChallengeAvailableAtUtc is not null;
+
     public Result<Success> Start(DateTimeOffset startedAtUtc)
     {
         if (StartedAtUtc is not null)
@@ -61,7 +66,8 @@ public sealed class StudySessionSelectedSection : Entity
 
         if (CompletedAtUtc is not null)
         {
-            return Error.Conflict("StudySessionSelectedSections.AlreadyCompleted", "This study section has already been completed.");
+            return Error.Conflict("StudySessionSelectedSections.AlreadyCompleted",
+                "This study section has already been completed.");
         }
 
         if (ChallengeAvailableAtUtc is not null)
@@ -93,11 +99,6 @@ public sealed class StudySessionSelectedSection : Entity
 
         return Result.Success;
     }
-
-    public bool IsChallengeAvailable =>
-        StartedAtUtc is not null &&
-        CompletedAtUtc is null &&
-        ChallengeAvailableAtUtc is not null;
 
     public bool IsChallengeAvailableAt(DateTimeOffset utcNow) =>
         IsChallengeAvailable &&

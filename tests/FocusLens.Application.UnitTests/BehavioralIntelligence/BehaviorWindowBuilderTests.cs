@@ -2,7 +2,6 @@ using FocusLens.Application.BehavioralIntelligence;
 using FocusLens.Contracts.BehavioralIntelligence;
 using FocusLens.Domain.StudySessions;
 
-
 namespace FocusLens.Application.UnitTests.BehavioralIntelligence;
 
 public sealed class BehaviorWindowBuilderTests
@@ -20,19 +19,20 @@ public sealed class BehaviorWindowBuilderTests
 
         StudySessionBehaviorEvent[] events =
         [
-            CreateEvent(sessionId, sectionA, null, StudySessionBehaviorEventType.Scroll, start, scrollSpeed: 100, directionChanges: 2, progression: 40),
-            CreateEvent(sessionId, sectionB, null, StudySessionBehaviorEventType.Scroll, middle, scrollSpeed: 200, directionChanges: 1, progression: 60),
-            CreateEvent(sessionId, sectionA, null, StudySessionBehaviorEventType.Interaction, end, interactionCount: 2, progression: 80)
+            CreateEvent(sessionId, sectionA, null, StudySessionBehaviorEventType.Scroll, start, 100, 2, 40),
+            CreateEvent(sessionId, sectionB, null, StudySessionBehaviorEventType.Scroll, middle, 200, 1, 60),
+            CreateEvent(sessionId, sectionA, null, StudySessionBehaviorEventType.Interaction, end, interactionCount: 2,
+                progression: 80)
         ];
 
-        var builder = new BehaviorWindowBuilder();
+        BehaviorWindowBuilder builder = new();
         BehaviorWindowRequest result = builder.Build(
             studentId,
             sessionId,
-            windowIndex: 1,
+            1,
             start,
             end.AddTicks(1),
-            isFinal: false,
+            false,
             events,
             Array.Empty<StudySessionQuestion>(),
             Array.Empty<StudySessionQuestionAnswer>(),
@@ -77,25 +77,26 @@ public sealed class BehaviorWindowBuilderTests
         StudySessionQuestionAnswer answer = StudySessionQuestionAnswer.Create(
             question.Id,
             "4",
-            isCorrect: true,
-            learningSignal: null,
-            attemptNumber: 1,
+            true,
+            null,
+            1,
             answeredAt).Value;
 
         StudySessionBehaviorEvent[] events =
         [
-            CreateEvent(sessionId, sectionId, question.Id, StudySessionBehaviorEventType.QuestionShown, questionShownAt),
+            CreateEvent(sessionId, sectionId, question.Id, StudySessionBehaviorEventType.QuestionShown,
+                questionShownAt),
             CreateEvent(sessionId, sectionId, question.Id, StudySessionBehaviorEventType.QuestionAnswered, answeredAt)
         ];
 
-        var builder = new BehaviorWindowBuilder();
+        BehaviorWindowBuilder builder = new();
         BehaviorWindowRequest result = builder.Build(
             Guid.NewGuid(),
             sessionId,
             0,
             questionShownAt,
             answeredAt.AddSeconds(1),
-            isFinal: true,
+            true,
             events,
             [question],
             [answer],
@@ -123,7 +124,7 @@ public sealed class BehaviorWindowBuilderTests
                 null,
                 StudySessionBehaviorEventType.Scroll,
                 start.AddSeconds(10),
-                scrollSpeed: 180,
+                180,
                 progression: 40),
 
             CreateEvent(
@@ -136,7 +137,7 @@ public sealed class BehaviorWindowBuilderTests
                 backgroundSeconds: 8)
         ];
 
-        var builder = new BehaviorWindowBuilder();
+        BehaviorWindowBuilder builder = new();
 
         BehaviorWindowRequest result = builder.Build(
             Guid.NewGuid(),
@@ -144,7 +145,7 @@ public sealed class BehaviorWindowBuilderTests
             1,
             start,
             start.AddSeconds(30),
-            isFinal: false,
+            false,
             events,
             Array.Empty<StudySessionQuestion>(),
             Array.Empty<StudySessionQuestionAnswer>(),
@@ -166,7 +167,8 @@ public sealed class BehaviorWindowBuilderTests
         StudySessionBehaviorEvent[] events =
         [
             CreateEvent(sessionId, sectionId, null, StudySessionBehaviorEventType.Scroll, start),
-            CreateEvent(sessionId, sectionId, null, StudySessionBehaviorEventType.Interaction, start.AddSeconds(10), interactionCount: 1)
+            CreateEvent(sessionId, sectionId, null, StudySessionBehaviorEventType.Interaction, start.AddSeconds(10),
+                interactionCount: 1)
         ];
 
         BehaviorWindowRequest request = new BehaviorWindowBuilder().Build(
@@ -191,8 +193,8 @@ public sealed class BehaviorWindowBuilderTests
         StudySessionBehaviorEvent[] events =
         [
             CreateEvent(sessionId, sectionId, null, StudySessionBehaviorEventType.Scroll, start,
-                scrollSpeed: 0, directionChanges: 0, progression: 0, interactionCount: 0,
-                backgroundCount: 0, backgroundSeconds: 0)
+                0, 0, 0, 0,
+                0, 0)
         ];
 
         BehaviorWindowRequest request = new BehaviorWindowBuilder().Build(
@@ -235,18 +237,18 @@ public sealed class BehaviorWindowBuilderTests
 
         StudySessionBehaviorEvent[] events =
         [
-            CreateEvent(sessionId, sectionId, null, StudySessionBehaviorEventType.Scroll, start.AddMinutes(1), scrollSpeed: 100),
-            CreateEvent(sessionId, sectionId, null, StudySessionBehaviorEventType.Scroll, end, scrollSpeed: 500)
+            CreateEvent(sessionId, sectionId, null, StudySessionBehaviorEventType.Scroll, start.AddMinutes(1), 100),
+            CreateEvent(sessionId, sectionId, null, StudySessionBehaviorEventType.Scroll, end, 500)
         ];
 
-        var builder = new BehaviorWindowBuilder();
+        BehaviorWindowBuilder builder = new();
         BehaviorWindowRequest result = builder.Build(
             Guid.NewGuid(),
             sessionId,
             0,
             start,
             end,
-            isFinal: false,
+            false,
             events,
             Array.Empty<StudySessionQuestion>(),
             Array.Empty<StudySessionQuestionAnswer>(),

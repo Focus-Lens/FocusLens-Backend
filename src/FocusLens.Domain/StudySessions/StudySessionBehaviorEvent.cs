@@ -73,7 +73,8 @@ public sealed class StudySessionBehaviorEvent : AuditableEntity
             contentProgressionPct is < 0 or > 100 || interactionCount < 0 ||
             backgroundCount < 0 || backgroundDurationSeconds < 0)
         {
-            return Error.Validation("StudySessionBehaviorEvents.TelemetryInvalid", "Behavior telemetry values are invalid.");
+            return Error.Validation("StudySessionBehaviorEvents.TelemetryInvalid",
+                "Behavior telemetry values are invalid.");
         }
 
         return new StudySessionBehaviorEvent(

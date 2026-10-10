@@ -68,8 +68,8 @@ public sealed class GetMyClaimedChildSetupQueryHandler(
                     subject.CustomName))
                 .ToList(),
             draft.Goal is null
-                  ? null
-                  : StudentEnumMapper.ToContract(draft.Goal.Value),
+                ? null
+                : StudentEnumMapper.ToContract(draft.Goal.Value),
             draft.StudyTimeGoal is null
                 ? null
                 : new StudyTimeGoalResponse(

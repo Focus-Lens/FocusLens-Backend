@@ -27,8 +27,7 @@ public sealed class NotificationWriter(
                 NotificationCategory.ParentConnectionConfirmed)
         {
             StudentNotificationPreferences? preferences =
-                await preferencesRepository.FirstOrDefaultAsync(
-                    item => item.StudentUserId == recipientUserId);
+                await preferencesRepository.FirstOrDefaultAsync(item => item.StudentUserId == recipientUserId);
 
             if (preferences is not null &&
                 category == NotificationCategory.StudyReminder &&
@@ -45,9 +44,9 @@ public sealed class NotificationWriter(
             }
 
             if (preferences is not null &&
-                category is (NotificationCategory.ParentActivity or
+                category is NotificationCategory.ParentActivity or
                     NotificationCategory.StudyGoalProposal or
-                    NotificationCategory.ParentConnectionConfirmed) &&
+                    NotificationCategory.ParentConnectionConfirmed &&
                 !preferences.ParentActivityEnabled)
             {
                 return;
@@ -56,8 +55,8 @@ public sealed class NotificationWriter(
 
         if (dedupeKey is not null)
         {
-            Notification? existing = await notificationRepository.FirstOrDefaultAsync(
-                notification => notification.DedupeKey == dedupeKey);
+            Notification? existing =
+                await notificationRepository.FirstOrDefaultAsync(notification => notification.DedupeKey == dedupeKey);
             if (existing is not null)
             {
                 return;

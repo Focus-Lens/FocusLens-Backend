@@ -4,8 +4,8 @@ using FocusLens.Domain;
 namespace FocusLens.Application.Common.Services;
 
 /// <summary>
-/// The sole conversion boundary for student calendar calculations. Timestamps stay UTC;
-/// legacy students without a configured zone intentionally use UTC until their device updates it.
+///     The sole conversion boundary for student calendar calculations. Timestamps stay UTC;
+///     legacy students without a configured zone intentionally use UTC until their device updates it.
 /// </summary>
 public sealed class StudentLocalTime(TimeProvider timeProvider) : IStudentLocalTime
 {
@@ -21,15 +21,27 @@ public sealed class StudentLocalTime(TimeProvider timeProvider) : IStudentLocalT
 
     public bool IsValidTimeZoneId(string? timeZoneId)
     {
-        if (string.IsNullOrWhiteSpace(timeZoneId)) return false;
-        try { _ = TimeZoneInfo.FindSystemTimeZoneById(timeZoneId.Trim()); return true; }
+        if (string.IsNullOrWhiteSpace(timeZoneId))
+        {
+            return false;
+        }
+
+        try
+        {
+            _ = TimeZoneInfo.FindSystemTimeZoneById(timeZoneId.Trim());
+            return true;
+        }
         catch (TimeZoneNotFoundException) { return false; }
         catch (InvalidTimeZoneException) { return false; }
     }
 
     private static TimeZoneInfo ResolveTimeZone(string? timeZoneId)
     {
-        if (string.IsNullOrWhiteSpace(timeZoneId)) return TimeZoneInfo.Utc;
+        if (string.IsNullOrWhiteSpace(timeZoneId))
+        {
+            return TimeZoneInfo.Utc;
+        }
+
         return TimeZoneInfo.FindSystemTimeZoneById(timeZoneId);
     }
 }

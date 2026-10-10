@@ -3,7 +3,6 @@ using FocusLens.Domain;
 using FocusLens.Domain.Access;
 using FocusLens.Domain.Common.Interfaces;
 using FocusLens.Domain.StudySessions;
-using FocusLens.Domain.Students;
 using MediatR;
 using ICurrentUser = FocusLens.Application.Common.Interfaces.ICurrentUser;
 
@@ -45,8 +44,8 @@ public sealed class BehavioralProgressQueryHandler(
         StudySessionBehaviorWindow[] windows = sessionIds.Length == 0
             ? []
             : (await windowRepository.GetAllAsync(item => sessionIds.Contains(item.StudySessionId)))
-                .OrderBy(item => item.WindowEndUtc)
-                .ToArray();
+            .OrderBy(item => item.WindowEndUtc)
+            .ToArray();
 
         DateOnly earliest = windows.Length == 0
             ? today
@@ -97,7 +96,8 @@ public sealed class BehavioralProgressQueryHandler(
     {
         int[] scores = daily.Select(selector).Where(score => score.HasValue).Select(score => score!.Value).ToArray();
         int? latest = scores.Length == 0 ? null : scores[^1];
-        const string calculation = "Each day is the average of persisted AI2 analysis windows for that calendar day (UTC).";
+        const string calculation =
+            "Each day is the average of persisted AI2 analysis windows for that calendar day (UTC).";
         string interpretation = metric == "focus"
             ? "Higher values indicate more sustained study focus in analyzed windows."
             : "Higher values indicate stronger performance on analyzed learning signals.";
@@ -122,8 +122,8 @@ public sealed class BehavioralProgressQueryHandler(
     }
 
     private static bool IsValidRange(string range) => range.Equals("Week", StringComparison.OrdinalIgnoreCase) ||
-        range.Equals("Month", StringComparison.OrdinalIgnoreCase) ||
-        range.Equals("AllTime", StringComparison.OrdinalIgnoreCase);
+                                                      range.Equals("Month", StringComparison.OrdinalIgnoreCase) ||
+                                                      range.Equals("AllTime", StringComparison.OrdinalIgnoreCase);
 
     private static DateRange ResolveRange(string range, DateOnly today, DateOnly earliest) =>
         range.ToLowerInvariant() switch
@@ -136,16 +136,29 @@ public sealed class BehavioralProgressQueryHandler(
     private async Task<Student?> GetAuthorizedStudentAsync(Guid? requestedStudentId)
     {
         if (currentUser.UserId is not Guid userId || userId == Guid.Empty)
+        {
             return null;
+        }
+
         Student? ownStudent = await studentRepository.FirstOrDefaultAsync(student => student.UserId == userId);
         if (ownStudent is not null)
+        {
             return requestedStudentId is null || requestedStudentId == ownStudent.Id ? ownStudent : null;
+        }
+
         if (requestedStudentId is not Guid studentId || studentId == Guid.Empty)
+        {
             return null;
+        }
+
         Parent? parent = await parentRepository.FirstOrDefaultAsync(parent => parent.UserId == userId);
         if (parent is null || await relationshipRepository.FirstOrDefaultAsync(item =>
-                item.ParentId == parent.Id && item.StudentId == studentId && item.Status == RelationshipStatus.Active) is null)
+                item.ParentId == parent.Id && item.StudentId == studentId &&
+                item.Status == RelationshipStatus.Active) is null)
+        {
             return null;
+        }
+
         return await studentRepository.FirstOrDefaultAsync(student => student.Id == studentId);
     }
 

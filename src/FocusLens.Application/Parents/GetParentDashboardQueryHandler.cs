@@ -1,5 +1,8 @@
 using System.Globalization;
 using FocusLens.Application.Common.Interfaces;
+using FocusLens.Application.Common.Services;
+using FocusLens.Application.Common.Utilities;
+using FocusLens.Application.Progress;
 using FocusLens.Contracts;
 using FocusLens.Domain;
 using FocusLens.Domain.Access;
@@ -7,8 +10,6 @@ using FocusLens.Domain.Common.Interfaces;
 using FocusLens.Domain.Common.Results;
 using FocusLens.Domain.Students;
 using FocusLens.Domain.StudySessions;
-using FocusLens.Application.Progress;
-using FocusLens.Application.Common.Utilities;
 using MediatR;
 using ICurrentUser = FocusLens.Application.Common.Interfaces.ICurrentUser;
 
@@ -32,7 +33,7 @@ public sealed class GetParentDashboardQueryHandler(
         GetParentDashboardQuery request,
         CancellationToken cancellationToken)
     {
-        studentLocalTime ??= new FocusLens.Application.Common.Services.StudentLocalTime(timeProvider);
+        studentLocalTime ??= new StudentLocalTime(timeProvider);
         // Goal reads live in the dedicated Study Goals query.
         _ = studyGoalProposalRepository;
 
@@ -50,17 +51,23 @@ public sealed class GetParentDashboardQueryHandler(
 
         Student student = contextResult.Value.Student;
         bool shareTrends = student.ShareSubjectTrendsWithParents;
-        Result<ParentOverviewWeekResponse> resolvedWeek = await OverviewWeekResolver.ResolveAsync(contextResult.Value, studentLocalTime, weekRepository, unitOfWork);
-        if (resolvedWeek.IsError) return resolvedWeek.Errors;
+        Result<ParentOverviewWeekResponse> resolvedWeek =
+            await OverviewWeekResolver.ResolveAsync(contextResult.Value, studentLocalTime, weekRepository, unitOfWork);
+        if (resolvedWeek.IsError)
+        {
+            return resolvedWeek.Errors;
+        }
+
         DateTimeOffset utcNow = timeProvider.GetUtcNow();
         DateOnly weekStart = resolvedWeek.Value.StartsOn;
         DateOnly weekEnd = resolvedWeek.Value.EndsOn;
         StudySession[] startedSessions = (await studySessionRepository.GetAllAsync(session =>
-                session.StudentId == student.Id &&
-                session.StartedAtUtc != null,
+                    session.StudentId == student.Id &&
+                    session.StartedAtUtc != null,
                 session => session.PauseIntervals))
             .ToArray();
-        ParentDashboardWeeklyStudyPulseResponse weeklyPulse = await CreateWeeklyPulse(startedSessions, utcNow, weekStart, weekEnd, student, studentLocalTime);
+        ParentDashboardWeeklyStudyPulseResponse weeklyPulse =
+            await CreateWeeklyPulse(startedSessions, utcNow, weekStart, weekEnd, student, studentLocalTime);
         ParentDashboardFocusPatternResponse focusPattern = CreateFocusPattern(
             startedSessions,
             utcNow,
@@ -69,7 +76,20 @@ public sealed class GetParentDashboardQueryHandler(
         return new ParentDashboardResponse(
             student.Id,
             new ParentDashboardWeekResponse(weekStart, weekEnd, resolvedWeek.Value.IsCurrentWeek),
-            shareTrends ? weeklyPulse : weeklyPulse with { TotalStudyMinutes = FormatMinutes(0), PreviousWeekStudyMinutes = FormatMinutes(0), StudyMinutesTrend = FormatMinutes(0), PeakDay = null, TotalSessions = 0, CompletedSessions = 0, ActiveStudyDays = 0, FocusQuality = new(null), Days = weeklyPulse.Days.Select(day => day with { StudyMinutes = FormatMinutes(0) }).ToArray() },
+            shareTrends
+                ? weeklyPulse
+                : weeklyPulse with
+                {
+                    TotalStudyMinutes = FormatMinutes(0),
+                    PreviousWeekStudyMinutes = FormatMinutes(0),
+                    StudyMinutesTrend = FormatMinutes(0),
+                    PeakDay = null,
+                    TotalSessions = 0,
+                    CompletedSessions = 0,
+                    ActiveStudyDays = 0,
+                    FocusQuality = new ParentDashboardFocusQualityResponse(null),
+                    Days = weeklyPulse.Days.Select(day => day with { StudyMinutes = FormatMinutes(0) }).ToArray()
+                },
             focusPattern);
     }
 
@@ -101,10 +121,13 @@ public sealed class GetParentDashboardQueryHandler(
         int previousPeriodActualStudyMinutes = ParentDashboardHelpers.GetActualStudyMinutesForDates(
             sessions, previousStartsOn, previousEndsOn, utcNow, student, studentLocalTime);
 
-        StudySession[] selectedSessions = sessions.Where(session => IsInWeek(session, startsOn, endsOn, student, studentLocalTime)).ToArray();
+        StudySession[] selectedSessions = sessions
+            .Where(session => IsInWeek(session, startsOn, endsOn, student, studentLocalTime)).ToArray();
         Guid[] selectedSessionIds = selectedSessions.Select(session => session.Id).ToArray();
-        StudySessionBehaviorWindow[] windows = selectedSessionIds.Length == 0 ? [] :
-            (await behaviorWindowRepository.GetAllAsync(window => selectedSessionIds.Contains(window.StudySessionId))).ToArray();
+        StudySessionBehaviorWindow[] windows = selectedSessionIds.Length == 0
+            ? []
+            : (await behaviorWindowRepository.GetAllAsync(window => selectedSessionIds.Contains(window.StudySessionId)))
+            .ToArray();
         string? focusTrend = FocusQualityTrendCalculator.Calculate(windows, startsOn, endsOn,
             window => studentLocalTime.GetLocalDate(window.WindowEndUtc, student));
         ParentDashboardWeeklyStudyPulseDayResponse[] days = dailyMinutes
@@ -122,15 +145,21 @@ public sealed class GetParentDashboardQueryHandler(
             FormatMinutes(previousPeriodActualStudyMinutes),
             FormatMinutes(actualStudyMinutes - previousPeriodActualStudyMinutes),
             days,
-            peakDay is null ? null : new ParentDashboardWeeklyStudyPulseDayResponse(
-                peakDay.Value.Date, peakDay.Value.Day, FormatMinutes(peakDay.Value.StudyMinutes)),
+            peakDay is null
+                ? null
+                : new ParentDashboardWeeklyStudyPulseDayResponse(
+                    peakDay.Value.Date, peakDay.Value.Day, FormatMinutes(peakDay.Value.StudyMinutes)),
             selectedSessions.Length,
             selectedSessions.Count(session => session.Status == StudySessionStatus.Completed),
-            selectedSessions.Select(session => studentLocalTime.GetLocalDate(session.StartedAtUtc!.Value, student)).Distinct().Count(),
+            selectedSessions.Select(session => studentLocalTime.GetLocalDate(session.StartedAtUtc!.Value, student))
+                .Distinct().Count(),
             new ParentDashboardFocusQualityResponse(focusTrend));
     }
-    private static bool IsInWeek(StudySession session, DateOnly startsOn, DateOnly endsOn, Student student, IStudentLocalTime studentLocalTime) =>
-        studentLocalTime.GetLocalDate(session.StartedAtUtc!.Value, student) is DateOnly date && date >= startsOn && date <= endsOn;
+
+    private static bool IsInWeek(StudySession session, DateOnly startsOn, DateOnly endsOn, Student student,
+        IStudentLocalTime studentLocalTime) =>
+        studentLocalTime.GetLocalDate(session.StartedAtUtc!.Value, student) is DateOnly date && date >= startsOn &&
+        date <= endsOn;
 
     private static ParentDashboardFocusPatternResponse CreateFocusPattern(
         IReadOnlyCollection<StudySession> sessions,
@@ -141,7 +170,8 @@ public sealed class GetParentDashboardQueryHandler(
         IStudentLocalTime studentLocalTime)
     {
         StudySession[] selectedSessions = includeStudyTiming
-            ? sessions.Where(session => IsInWeek(session, weekStart, weekStart.AddDays(ParentDashboardHelpers.PulseDays - 1), student, studentLocalTime)).ToArray()
+            ? sessions.Where(session => IsInWeek(session, weekStart,
+                weekStart.AddDays(ParentDashboardHelpers.PulseDays - 1), student, studentLocalTime)).ToArray()
             : [];
 
         ParentDashboardFocusPatternDayResponse[] days = Enumerable
@@ -186,5 +216,4 @@ public sealed class GetParentDashboardQueryHandler(
             .ToString("h tt", CultureInfo.InvariantCulture);
 
     private static string FormatMinutes(int minutes) => DurationDisplayFormatter.FormatMinutes(minutes);
-
 }

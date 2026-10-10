@@ -1,5 +1,7 @@
 using System.Globalization;
 using System.Text;
+using FocusLens.Application.Common.Interfaces;
+using FocusLens.Application.Common.Utilities;
 using FocusLens.Contracts;
 using FocusLens.Domain;
 using FocusLens.Domain.Access;
@@ -7,8 +9,6 @@ using FocusLens.Domain.Common.Interfaces;
 using FocusLens.Domain.Common.Results;
 using FocusLens.Domain.Students;
 using FocusLens.Domain.StudySessions;
-using FocusLens.Application.Common.Interfaces;
-using FocusLens.Application.Common.Utilities;
 using ICurrentUser = FocusLens.Application.Common.Interfaces.ICurrentUser;
 using DomainStudentSubjectType = FocusLens.Domain.Students.StudentSubjectType;
 
@@ -118,7 +118,7 @@ internal static class ParentDashboardHelpers
                 .Where(status => !string.IsNullOrWhiteSpace(status))
                 .Select(status =>
                 {
-                    bool parsed = Enum.TryParse(status, ignoreCase: false, out StudySessionStatus value) &&
+                    bool parsed = Enum.TryParse(status, false, out StudySessionStatus value) &&
                                   Enum.IsDefined(value);
 
                     if (!parsed)
@@ -249,18 +249,23 @@ internal static class ParentDashboardHelpers
         return (int)Math.Ceiling(actualStudyTime.TotalMinutes);
     }
 
-    /// <summary>Allocates active study time to the student's business-calendar days.
-    /// A calendar day is a hard 1,440-minute capacity, even for corrupted legacy data.</summary>
+    /// <summary>
+    ///     Allocates active study time to the student's business-calendar days.
+    ///     A calendar day is a hard 1,440-minute capacity, even for corrupted legacy data.
+    /// </summary>
     public static IReadOnlyDictionary<DateOnly, int> GetActualStudyMinutesByLocalDate(
         IEnumerable<StudySession> sessions, Student student, IStudentLocalTime studentLocalTime,
         DateTimeOffset utcNow)
     {
-        var secondsByDate = new Dictionary<DateOnly, double>();
+        Dictionary<DateOnly, double> secondsByDate = new();
         foreach (StudySession session in sessions.Where(x => x.StartedAtUtc is not null))
         {
             DateTimeOffset start = session.StartedAtUtc!.Value;
             DateTimeOffset end = GetEffectiveEnd(session, utcNow);
-            if (end <= start) continue;
+            if (end <= start)
+            {
+                continue;
+            }
 
             foreach ((DateTimeOffset from, DateTimeOffset to) in GetActiveIntervals(session, start, end))
             {
@@ -292,7 +297,7 @@ internal static class ParentDashboardHelpers
         IEnumerable<ParentDashboardStudySessionResponse> sessions,
         DateTimeOffset utcNow)
     {
-        var builder = new StringBuilder();
+        StringBuilder builder = new();
         AppendCsvRow(
             builder,
             [
@@ -341,17 +346,20 @@ internal static class ParentDashboardHelpers
         IReadOnlyDictionary<Guid, string?> subjectNamesById,
         DateTimeOffset utcNow)
     {
-        var builder = new StringBuilder();
+        StringBuilder builder = new();
         AppendCsvRow(builder,
-        ["StartedAtUtc", "Status", "Mode", "SelectedSubjectId", "SubjectName",
+        [
+            "StartedAtUtc", "Status", "Mode", "SelectedSubjectId", "SubjectName",
             "ActualStudyMinutes", "PlannedFocusDurationMinutes", "CompletedAtUtc",
-            "CancelledAtUtc", "LastActivityAtUtc"]);
+            "CancelledAtUtc", "LastActivityAtUtc"
+        ]);
 
         foreach (StudySession session in sessions)
         {
             string? subjectName = session.SelectedSubjectId is Guid subjectId &&
                                   subjectNamesById.TryGetValue(subjectId, out string? name)
-                ? name : null;
+                ? name
+                : null;
             AppendCsvRow(builder,
             [
                 FormatDateTimeOffset(session.StartedAtUtc), session.Status.ToString(),
@@ -402,25 +410,47 @@ internal static class ParentDashboardHelpers
         {
             DateTimeOffset pauseStart = pause.StartedAtUtc < start ? start : pause.StartedAtUtc;
             DateTimeOffset pauseEnd = (pause.EndedAtUtc ?? end) > end ? end : pause.EndedAtUtc ?? end;
-            if (pauseStart > cursor) yield return (cursor, pauseStart);
-            if (pauseEnd > cursor) cursor = pauseEnd;
+            if (pauseStart > cursor)
+            {
+                yield return (cursor, pauseStart);
+            }
+
+            if (pauseEnd > cursor)
+            {
+                cursor = pauseEnd;
+            }
         }
-        if (cursor < end) yield return (cursor, end);
+
+        if (cursor < end)
+        {
+            yield return (cursor, end);
+        }
     }
 
     private static DateTimeOffset FindNextLocalDateBoundary(DateTimeOffset from, DateTimeOffset end,
         DateOnly currentDate, Student student, IStudentLocalTime studentLocalTime)
     {
-        if (studentLocalTime.GetLocalDate(end, student) == currentDate) return end;
+        if (studentLocalTime.GetLocalDate(end, student) == currentDate)
+        {
+            return end;
+        }
+
         long low = from.UtcTicks;
         long high = end.UtcTicks;
         while (high - low > TimeSpan.TicksPerSecond)
         {
-            long middle = low + (high - low) / 2;
+            long middle = low + ((high - low) / 2);
             DateTimeOffset probe = new(middle, TimeSpan.Zero);
-            if (studentLocalTime.GetLocalDate(probe, student) == currentDate) low = middle;
-            else high = middle;
+            if (studentLocalTime.GetLocalDate(probe, student) == currentDate)
+            {
+                low = middle;
+            }
+            else
+            {
+                high = middle;
+            }
         }
+
         return new DateTimeOffset(high, TimeSpan.Zero);
     }
 

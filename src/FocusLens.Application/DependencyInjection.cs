@@ -1,9 +1,11 @@
 using FluentValidation;
+using FocusLens.Application.BehavioralIntelligence;
 using FocusLens.Application.Common.Behaviours;
 using FocusLens.Application.Common.Interfaces;
-using FocusLens.Application.StudySessions;
-using FocusLens.Application.Notifications;
 using FocusLens.Application.Common.Services;
+using FocusLens.Application.Notifications;
+using FocusLens.Application.Reports;
+using FocusLens.Application.StudySessions;
 using MediatR;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -18,9 +20,9 @@ public static class DependencyInjection
 
         services.AddValidatorsFromAssembly(typeof(DependencyInjection).Assembly);
 
-        services.AddScoped<Reports.ReportSessionMetricsCalculator>();
-        services.AddScoped<BehavioralIntelligence.BehaviorWindowBuilder>();
-        services.AddScoped<BehavioralIntelligence.BehaviorWindowTimelineCalculator>();
+        services.AddScoped<ReportSessionMetricsCalculator>();
+        services.AddScoped<BehaviorWindowBuilder>();
+        services.AddScoped<BehaviorWindowTimelineCalculator>();
 
         services.AddTransient(typeof(IPipelineBehavior<,>), typeof(UnhandledExceptionBehavior<,>));
         services.AddTransient(typeof(IPipelineBehavior<,>), typeof(ValidationBehavior<,>));

@@ -170,9 +170,7 @@ public class StudentInvitationApiTests
         {
             db.Users.Add(new ApplicationUser
             {
-                Id = studentUserId,
-                Email = "student@example.com",
-                UserName = "student@example.com"
+                Id = studentUserId, Email = "student@example.com", UserName = "student@example.com"
             });
             db.Students.Add(student);
             return Task.CompletedTask;
@@ -219,15 +217,11 @@ public class StudentInvitationApiTests
             db.Users.AddRange(
                 new ApplicationUser
                 {
-                    Id = parentUserId,
-                    Email = "parent@example.com",
-                    UserName = "parent@example.com"
+                    Id = parentUserId, Email = "parent@example.com", UserName = "parent@example.com"
                 },
                 new ApplicationUser
                 {
-                    Id = studentUserId,
-                    Email = "student@example.com",
-                    UserName = "student@example.com"
+                    Id = studentUserId, Email = "student@example.com", UserName = "student@example.com"
                 });
 
             db.Parents.Add(parent);

@@ -1,11 +1,12 @@
 using FocusLens.Application.BehavioralIntelligence;
 using FocusLens.Application.Common.Interfaces;
+using FocusLens.Application.Common.Services;
 using FocusLens.Contracts.Reports;
 using FocusLens.Domain;
 using FocusLens.Domain.Access;
 using FocusLens.Domain.Common.Interfaces;
-using FocusLens.Domain.StudySessions;
 using FocusLens.Domain.Students;
+using FocusLens.Domain.StudySessions;
 using MediatR;
 using ICurrentUser = FocusLens.Application.Common.Interfaces.ICurrentUser;
 
@@ -22,60 +23,8 @@ public sealed class ReportQueryHandler(
     TimeProvider timeProvider,
     IStudentLocalTime? studentLocalTime = null)
     : IRequestHandler<GetReportSessionsQuery, ReportSessionListResponse?>,
-      IRequestHandler<GetReportSessionDetailQuery, ReportSessionDetailResponse?>
+        IRequestHandler<GetReportSessionDetailQuery, ReportSessionDetailResponse?>
 {
-    public async Task<ReportSessionListResponse?> Handle(
-        GetReportSessionsQuery request,
-        CancellationToken cancellationToken)
-    {
-        studentLocalTime ??= new Common.Services.StudentLocalTime(timeProvider);
-
-        Student? student = await GetAuthorizedStudentAsync(request.StudentId);
-        if (student is null || (request.DateFrom is not null && request.DateTo is not null && request.DateFrom > request.DateTo))
-        {
-            return null;
-        }
-
-        StudySessionStatus? status = ParseStatus(request.Status);
-        if (request.Status is not null && status is null)
-        {
-            return null;
-        }
-
-        List<StudySession> sessions = (await sessionRepository.GetAllAsync(
-                session => session.StudentId == student.Id &&
-                           session.StartedAtUtc != null &&
-                           session.Status != StudySessionStatus.Active &&
-                           session.Status != StudySessionStatus.Draft &&
-                           session.Status != StudySessionStatus.Ready,
-                session => session.Material!,
-                session => session.Selection!.SelectedSections,
-                session => session.CompletedSections,
-                session => session.PauseIntervals))
-            .Where(session => MatchesFilters(session, request, status, student))
-            .OrderByDescending(session => session.StartedAtUtc)
-            .ToList();
-
-        IReadOnlyDictionary<Guid, ReportSessionMetrics> metrics = await metricsCalculator.CalculateAsync(sessions);
-        IReadOnlyDictionary<Guid, StudySessionBehaviorWindow[]> windowsBySession = await GetWindowsBySessionAsync(sessions);
-        int page = Math.Max(1, request.Page);
-        int pageSize = Math.Clamp(request.PageSize, 1, 100);
-
-        return new ReportSessionListResponse(
-            sessions.Skip((page - 1) * pageSize)
-                .Take(pageSize)
-                .Select(session =>
-                {
-                    StudySessionBehaviorWindow[] sessionWindows = windowsBySession.GetValueOrDefault(session.Id) ?? [];
-                    SessionFocusMetrics focusMetrics = SessionFocusMetricsCalculator.Calculate(sessionWindows);
-                    return ToListItem(session, metrics[session.Id], student, focusMetrics, sessionWindows.LastOrDefault());
-                })
-                .ToArray(),
-            page,
-            pageSize,
-            sessions.Count);
-    }
-
     public async Task<ReportSessionDetailResponse?> Handle(
         GetReportSessionDetailQuery request,
         CancellationToken cancellationToken)
@@ -108,16 +57,71 @@ public sealed class ReportQueryHandler(
             return null;
         }
 
-        studentLocalTime ??= new Common.Services.StudentLocalTime(timeProvider);
+        studentLocalTime ??= new StudentLocalTime(timeProvider);
 
         ReportSessionMetrics metrics = (await metricsCalculator.CalculateAsync([session]))[session.Id];
-        StudySessionBehaviorWindow[] behaviorWindows = (await behaviorWindowRepository.GetAllAsync(
-                item => item.StudySessionId == session.Id))
+        StudySessionBehaviorWindow[] behaviorWindows =
+            (await behaviorWindowRepository.GetAllAsync(item => item.StudySessionId == session.Id))
             .OrderBy(item => item.WindowIndex)
             .ToArray();
         StudySessionBehaviorWindow? latestWindow = behaviorWindows.LastOrDefault();
         SessionFocusMetrics focusMetrics = SessionFocusMetricsCalculator.Calculate(behaviorWindows);
         return ToDetail(session, metrics, student, focusMetrics, latestWindow, behaviorWindows);
+    }
+
+    public async Task<ReportSessionListResponse?> Handle(
+        GetReportSessionsQuery request,
+        CancellationToken cancellationToken)
+    {
+        studentLocalTime ??= new StudentLocalTime(timeProvider);
+
+        Student? student = await GetAuthorizedStudentAsync(request.StudentId);
+        if (student is null || (request.DateFrom is not null && request.DateTo is not null &&
+                                request.DateFrom > request.DateTo))
+        {
+            return null;
+        }
+
+        StudySessionStatus? status = ParseStatus(request.Status);
+        if (request.Status is not null && status is null)
+        {
+            return null;
+        }
+
+        List<StudySession> sessions = (await sessionRepository.GetAllAsync(
+                session => session.StudentId == student.Id &&
+                           session.StartedAtUtc != null &&
+                           session.Status != StudySessionStatus.Active &&
+                           session.Status != StudySessionStatus.Draft &&
+                           session.Status != StudySessionStatus.Ready,
+                session => session.Material!,
+                session => session.Selection!.SelectedSections,
+                session => session.CompletedSections,
+                session => session.PauseIntervals))
+            .Where(session => MatchesFilters(session, request, status, student))
+            .OrderByDescending(session => session.StartedAtUtc)
+            .ToList();
+
+        IReadOnlyDictionary<Guid, ReportSessionMetrics> metrics = await metricsCalculator.CalculateAsync(sessions);
+        IReadOnlyDictionary<Guid, StudySessionBehaviorWindow[]> windowsBySession =
+            await GetWindowsBySessionAsync(sessions);
+        int page = Math.Max(1, request.Page);
+        int pageSize = Math.Clamp(request.PageSize, 1, 100);
+
+        return new ReportSessionListResponse(
+            sessions.Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .Select(session =>
+                {
+                    StudySessionBehaviorWindow[] sessionWindows = windowsBySession.GetValueOrDefault(session.Id) ?? [];
+                    SessionFocusMetrics focusMetrics = SessionFocusMetricsCalculator.Calculate(sessionWindows);
+                    return ToListItem(session, metrics[session.Id], student, focusMetrics,
+                        sessionWindows.LastOrDefault());
+                })
+                .ToArray(),
+            page,
+            pageSize,
+            sessions.Count);
     }
 
     private async Task<Student?> GetAuthorizedStudentAsync(Guid? requestedStudentId)
@@ -183,7 +187,7 @@ public sealed class ReportQueryHandler(
     private static StudySessionStatus? ParseStatus(string? value) =>
         string.IsNullOrWhiteSpace(value)
             ? null
-            : Enum.TryParse<StudySessionStatus>(value, true, out StudySessionStatus parsed) &&
+            : Enum.TryParse(value, true, out StudySessionStatus parsed) &&
               parsed is StudySessionStatus.Paused or StudySessionStatus.Completed or StudySessionStatus.Cancelled
                 ? parsed
                 : null;
@@ -248,7 +252,8 @@ public sealed class ReportQueryHandler(
     {
         if (focusMetrics.FocusState is not null)
         {
-            return $"The session's dominant focus state was {focusMetrics.FocusState.Replace('_', ' ').ToLowerInvariant()}.";
+            return
+                $"The session's dominant focus state was {focusMetrics.FocusState.Replace('_', ' ').ToLowerInvariant()}.";
         }
 
         return metrics.TotalSelectedSections == 0
@@ -262,7 +267,8 @@ public sealed class ReportQueryHandler(
         SessionFocusMetrics focusMetrics,
         StudySessionBehaviorWindow? latestWindow)
     {
-        List<string> highlights = [$"{metrics.DurationMinutes} min focused study time", $"{session.PauseIntervals.Count} pauses"];
+        List<string> highlights =
+            [$"{metrics.DurationMinutes} min focused study time", $"{session.PauseIntervals.Count} pauses"];
         if (focusMetrics.FocusScore is int focus)
         {
             highlights.Add($"Focus score {focus}%");

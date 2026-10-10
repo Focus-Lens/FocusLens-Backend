@@ -1,11 +1,12 @@
-using FocusLens.Application.Reports;
 using FocusLens.Application.Common.Interfaces;
+using FocusLens.Application.Common.Services;
+using FocusLens.Application.Reports;
 using FocusLens.Contracts.Progress;
 using FocusLens.Domain;
 using FocusLens.Domain.Access;
 using FocusLens.Domain.Common.Interfaces;
-using FocusLens.Domain.StudySessions;
 using FocusLens.Domain.Students;
+using FocusLens.Domain.StudySessions;
 using MediatR;
 using ICurrentUser = FocusLens.Application.Common.Interfaces.ICurrentUser;
 
@@ -33,7 +34,7 @@ public sealed class ProgressQueryHandler(
             return null;
         }
 
-        studentLocalTime ??= new FocusLens.Application.Common.Services.StudentLocalTime(timeProvider);
+        studentLocalTime ??= new StudentLocalTime(timeProvider);
         DateRange? range = ResolveRange(request, student);
         if (range is null)
         {
@@ -127,7 +128,8 @@ public sealed class ProgressQueryHandler(
         {
             "last7days" => new DateRange(today.AddDays(-6), today),
             "last30days" => new DateRange(today.AddDays(-29), today),
-            "custom" when request.DateFrom is not null && request.DateTo is not null && request.DateFrom <= request.DateTo =>
+            "custom" when request.DateFrom is not null && request.DateTo is not null &&
+                          request.DateFrom <= request.DateTo =>
                 new DateRange(request.DateFrom.Value, request.DateTo.Value),
             _ => null
         };
@@ -181,9 +183,11 @@ public sealed class ProgressQueryHandler(
     private static string GetSubjectName(Student student, Guid? subjectId)
     {
         StudentSubject? subject = student.Subjects.FirstOrDefault(item => item.Id == subjectId);
-        return subject is null ? "Unknown subject" : subject.Type == StudentSubjectType.Other
-            ? subject.CustomName ?? "Other"
-            : subject.Type.ToString();
+        return subject is null
+            ? "Unknown subject"
+            : subject.Type == StudentSubjectType.Other
+                ? subject.CustomName ?? "Other"
+                : subject.Type.ToString();
     }
 
     private sealed record DateRange(DateOnly DateFrom, DateOnly DateTo);

@@ -341,7 +341,7 @@ public class StudySessionTests
             StudyMaterialSource.Upload).Value;
     }
 
-[Fact]
+    [Fact]
     public void PauseResume_RecordsAndClosesOnePauseInterval()
     {
         StudySession session = CreateReadyDigitalSession();
@@ -361,7 +361,7 @@ public class StudySessionTests
         Assert.DoesNotContain(session.PauseIntervals, item => item.EndedAtUtc is null);
     }
 
-[Theory]
+    [Theory]
     [InlineData(true)]
     [InlineData(false)]
     public void EndingOrCompletingWhilePaused_ClosesTheOpenPauseInterval(bool complete)
@@ -381,7 +381,7 @@ public class StudySessionTests
         Assert.DoesNotContain(session.PauseIntervals, item => item.EndedAtUtc is null);
     }
 
-[Fact]
+    [Fact]
     public void MultiplePauseCycles_CreateOneClosedIntervalPerCycle()
     {
         StudySession session = CreateReadyDigitalSession();

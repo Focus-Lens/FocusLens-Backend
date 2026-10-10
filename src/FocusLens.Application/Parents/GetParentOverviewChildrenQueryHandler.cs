@@ -80,9 +80,9 @@ public sealed class GetParentOverviewChildrenQueryHandler(
             }
         }
 
-        IEnumerable<ChildSetupDraft> setupDrafts = await childSetupDraftRepository.GetAllAsync(
-            draft => draft.ParentId == parent.Id &&
-                     draft.Status != ChildSetupStatus.Activated);
+        IEnumerable<ChildSetupDraft> setupDrafts = await childSetupDraftRepository.GetAllAsync(draft =>
+            draft.ParentId == parent.Id &&
+            draft.Status != ChildSetupStatus.Activated);
 
         ChildSetupDraft[] setupDraftList = setupDrafts
             .Where(draft => !draft.ClaimedByStudentId.HasValue ||

@@ -13,9 +13,6 @@ internal static class ParentWeekdayOrder
             .ToArray();
     }
 
-    public static DateOnly GetWeekStart(DateOnly date, DayOfWeek weekStartsOn)
-    {
-        return WeekStartCalculator.GetWeekStart(date, weekStartsOn);
-    }
-
+    public static DateOnly GetWeekStart(DateOnly date, DayOfWeek weekStartsOn) =>
+        WeekStartCalculator.GetWeekStart(date, weekStartsOn);
 }

@@ -6,8 +6,8 @@ using FocusLens.Contracts.ChildSetup;
 using FocusLens.Domain;
 using FocusLens.Domain.ChildSetup;
 using FocusLens.Domain.Common.Results;
+using FocusLens.Domain.Identity;
 using FocusLens.Domain.Students;
-
 using DomainStudyTimeGoalPeriod = FocusLens.Domain.Students.StudyTimeGoalPeriod;
 
 namespace FocusLens.Application.UnitTests.ChildSetup;
@@ -246,11 +246,7 @@ public sealed class CreateChildSetupInvitationCommandHandlerTests
         Parent parent = new(parentUserId);
         parent.SetPrivateProperty(
             "User",
-            new FocusLens.Domain.Identity.ApplicationUser
-            {
-                FirstName = "Karim",
-                LastName = "Mahmoud"
-            });
+            new ApplicationUser { FirstName = "Karim", LastName = "Mahmoud" });
         ChildSetupDraft draft = CreateCompleteDraft(parent.Id);
 
         InMemoryRepository<ChildSetupInvitation> invitations = new();
@@ -310,11 +306,7 @@ public sealed class CreateChildSetupInvitationCommandHandlerTests
         Parent parent = new(userId);
         parent.SetPrivateProperty(
             "User",
-            new FocusLens.Domain.Identity.ApplicationUser
-            {
-                FirstName = "Karim",
-                LastName = "Mahmoud"
-            });
+            new ApplicationUser { FirstName = "Karim", LastName = "Mahmoud" });
         parent.SetWeekStartsOn(DayOfWeek.Monday);
         return parent;
     }

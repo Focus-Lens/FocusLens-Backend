@@ -1,5 +1,6 @@
 using FocusLens.Application.Parents;
 using FocusLens.Application.UnitTests.Access;
+using FocusLens.Contracts;
 using FocusLens.Domain;
 using FocusLens.Domain.Access;
 using FocusLens.Domain.ChildSetup;
@@ -22,11 +23,7 @@ public sealed class GetParentOverviewChildrenQueryHandlerTests
         Student activeStudent = new(Guid.NewGuid());
         activeStudent.SetPrivateProperty(
             "User",
-            new ApplicationUser
-            {
-                FirstName = "Active",
-                LastName = "Student"
-            });
+            new ApplicationUser { FirstName = "Active", LastName = "Student" });
 
         ParentStudentRelationship activeRelationship =
             new(parent.Id, activeStudent.Id);
@@ -56,7 +53,7 @@ public sealed class GetParentOverviewChildrenQueryHandlerTests
             new FakeCurrentUser(parentUserId),
             new FixedTimeProvider(Now));
 
-        var result = await handler.Handle(
+        IReadOnlyList<ParentOverviewChildResponse> result = await handler.Handle(
             new GetParentOverviewChildrenQuery(),
             CancellationToken.None);
 
@@ -99,11 +96,7 @@ public sealed class GetParentOverviewChildrenQueryHandlerTests
         Student student = new(Guid.NewGuid());
         student.SetPrivateProperty(
             "User",
-            new ApplicationUser
-            {
-                FirstName = "Linked",
-                LastName = "Student"
-            });
+            new ApplicationUser { FirstName = "Linked", LastName = "Student" });
 
         ParentStudentRelationship activeRelationship =
             new(parent.Id, student.Id);
@@ -123,7 +116,7 @@ public sealed class GetParentOverviewChildrenQueryHandlerTests
             new FakeCurrentUser(parentUserId),
             new FixedTimeProvider(Now));
 
-        var result = await handler.Handle(
+        IReadOnlyList<ParentOverviewChildResponse> result = await handler.Handle(
             new GetParentOverviewChildrenQuery(),
             CancellationToken.None);
 
@@ -148,7 +141,7 @@ public sealed class GetParentOverviewChildrenQueryHandlerTests
             new FakeCurrentUser(parentUserId),
             new FixedTimeProvider(Now));
 
-        var result = await handler.Handle(
+        IReadOnlyList<ParentOverviewChildResponse> result = await handler.Handle(
             new GetParentOverviewChildrenQuery(),
             CancellationToken.None);
 
@@ -190,18 +183,20 @@ public sealed class GetParentOverviewChildrenQueryHandlerTests
             new FakeCurrentUser(parentUserId),
             new FixedTimeProvider(Now));
 
-        var result = await handler.Handle(
+        IReadOnlyList<ParentOverviewChildResponse> result = await handler.Handle(
             new GetParentOverviewChildrenQuery(),
             CancellationToken.None);
 
         Assert.Equal(2, result.Count);
 
-        var validChild = Assert.Single(result, child => child.ChildSetupDraftId == validDraft.Id);
+        ParentOverviewChildResponse validChild =
+            Assert.Single(result, child => child.ChildSetupDraftId == validDraft.Id);
         Assert.Equal(validInvitation.Id, validChild.ChildSetupInvitationId);
         Assert.Equal("Pending", validChild.ChildSetupInvitationStatus);
         Assert.Equal(validInvitation.ExpiresAtUtc, validChild.ChildSetupInvitationExpiresAtUtc);
 
-        var expiredChild = Assert.Single(result, child => child.ChildSetupDraftId == expiredDraft.Id);
+        ParentOverviewChildResponse expiredChild =
+            Assert.Single(result, child => child.ChildSetupDraftId == expiredDraft.Id);
         Assert.Null(expiredChild.ChildSetupInvitationId);
         Assert.Null(expiredChild.ChildSetupInvitationStatus);
         Assert.Null(expiredChild.ChildSetupInvitationExpiresAtUtc);

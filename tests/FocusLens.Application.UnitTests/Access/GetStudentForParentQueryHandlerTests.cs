@@ -10,6 +10,7 @@ using ContractStudentSubjectType = FocusLens.Contracts.Students.StudentSubjectTy
 using StudentGoal = FocusLens.Domain.Students.StudentGoal;
 using StudentGrade = FocusLens.Domain.Students.StudentGrade;
 using StudentSubjectType = FocusLens.Domain.Students.StudentSubjectType;
+using StudyTimeGoalPeriod = FocusLens.Domain.Students.StudyTimeGoalPeriod;
 
 namespace FocusLens.Application.UnitTests.Access;
 
@@ -44,7 +45,8 @@ public class GetStudentForParentQueryHandlerTests
             ]);
         student.SetPreferredName("Youssef");
         student.SetDateOfBirth(new DateOnly(2010, 5, 12));
-        student.SetStudyTimeGoal(StudyTimeGoal.Create(FocusLens.Domain.Students.StudyTimeGoalPeriod.Daily, 60, [DayOfWeek.Monday], new DateOnly(2026, 1, 1)).Value);
+        student.SetStudyTimeGoal(StudyTimeGoal
+            .Create(StudyTimeGoalPeriod.Daily, 60, [DayOfWeek.Monday], new DateOnly(2026, 1, 1)).Value);
 
         ParentStudentRelationship relationship =
             new(parent.Id, student.Id);

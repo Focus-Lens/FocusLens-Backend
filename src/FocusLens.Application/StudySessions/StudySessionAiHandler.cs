@@ -23,7 +23,7 @@ public sealed class StudySessionAiHandler(
     IUnitOfWork unitOfWork,
     TimeProvider timeProvider)
     : IRequestHandler<AnalyzeStudySessionContentCommand, Result<StudySessionContentAnalysisResponse>>,
-      IRequestHandler<SelectStudySessionAiSectionsCommand, Result<StudySessionResponse>>
+        IRequestHandler<SelectStudySessionAiSectionsCommand, Result<StudySessionResponse>>
 {
     public async Task<Result<StudySessionContentAnalysisResponse>> Handle(
         AnalyzeStudySessionContentCommand request,
@@ -139,11 +139,11 @@ public sealed class StudySessionAiHandler(
         }
 
         string[] requestedIds = request.Request.SectionIds?
-            .Where(id => !string.IsNullOrWhiteSpace(id))
-            .Select(id => id.Trim())
-            .Distinct(StringComparer.Ordinal)
-            .ToArray()
-            ?? [];
+                                    .Where(id => !string.IsNullOrWhiteSpace(id))
+                                    .Select(id => id.Trim())
+                                    .Distinct(StringComparer.Ordinal)
+                                    .ToArray()
+                                ?? [];
 
         if (requestedIds.Length == 0)
         {
@@ -155,10 +155,7 @@ public sealed class StudySessionAiHandler(
         AiContentAnalysisResult? analysis =
             JsonSerializer.Deserialize<AiContentAnalysisResult>(
                 analysisJson,
-                new JsonSerializerOptions
-                {
-                    PropertyNameCaseInsensitive = true
-                });
+                new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
 
         if (analysis is null || analysis.Sections.Count == 0)
         {
@@ -352,8 +349,7 @@ public sealed class StudySessionAiHandler(
         }
 
         Student? student =
-            await studentRepository.FirstOrDefaultAsync(
-                item => item.UserId == userId);
+            await studentRepository.FirstOrDefaultAsync(item => item.UserId == userId);
 
         if (student is null)
         {

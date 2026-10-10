@@ -152,9 +152,8 @@ public sealed class AcceptInvitationCommandHandler(
         }
 
         ParentStudentRelationship? existingRelationship =
-            await relationshipRepository.FirstOrDefaultAsync(
-                item => item.ParentId == parent.Id &&
-                        item.StudentId == invitation.StudentId);
+            await relationshipRepository.FirstOrDefaultAsync(item => item.ParentId == parent.Id &&
+                                                                     item.StudentId == invitation.StudentId);
 
         if (existingRelationship is not null &&
             existingRelationship.Status != RelationshipStatus.Revoked)

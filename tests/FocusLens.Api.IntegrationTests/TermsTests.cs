@@ -1,3 +1,4 @@
+using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
 using FocusLens.Domain;
@@ -110,7 +111,7 @@ public class TermsTests
 
         HttpResponseMessage response = await client.GetAsync("/api/terms?audience=Unknown");
 
-        Assert.Equal(System.Net.HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
 
     [Fact]
@@ -121,7 +122,7 @@ public class TermsTests
 
         HttpResponseMessage response = await client.GetAsync("/api/privacy?audience=Unknown");
 
-        Assert.Equal(System.Net.HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
 
     private static LegalDocument CreatePublishedTerms(

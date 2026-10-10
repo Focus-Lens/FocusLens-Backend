@@ -116,7 +116,7 @@ public class StudyTimeGoalTests
     [Fact]
     public void Create_WithMissingStartDate_ReturnsError()
     {
-        var result = StudyTimeGoal.Create(
+        Result<StudyTimeGoal> result = StudyTimeGoal.Create(
             StudyTimeGoalPeriod.Daily,
             60,
             [DayOfWeek.Monday],
@@ -142,7 +142,7 @@ public class StudyTimeGoalTests
     [Fact]
     public void Create_WithWeeklyGoalAndOneStartDay_CreatesGoal()
     {
-        var result = StudyTimeGoal.Create(
+        Result<StudyTimeGoal> result = StudyTimeGoal.Create(
             StudyTimeGoalPeriod.Weekly,
             480,
             [DayOfWeek.Saturday],

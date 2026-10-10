@@ -26,6 +26,7 @@ public sealed class LegalDocumentConfiguration : IEntityTypeConfiguration<LegalD
         builder.HasIndex(document => new { document.Audience, document.Type, document.Version })
             .IsUnique();
 
-        builder.HasIndex(document => new { document.Audience, document.Type, document.IsPublished, document.PublishedOnUtc });
+        builder.HasIndex(document =>
+            new { document.Audience, document.Type, document.IsPublished, document.PublishedOnUtc });
     }
 }

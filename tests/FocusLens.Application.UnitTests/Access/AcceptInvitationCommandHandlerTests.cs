@@ -271,5 +271,4 @@ public class AcceptInvitationCommandHandlerTests
         Assert.Equal(ParentInvitationStatus.Accepted, invitation.Status);
         Assert.Single(await relationships.GetAllAsync());
     }
-
 }

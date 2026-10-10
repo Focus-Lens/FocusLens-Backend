@@ -8,8 +8,16 @@ public static class DurationDisplayFormatter
         long hours = absoluteMinutes / 60;
         long remainder = absoluteMinutes % 60;
         string prefix = minutes < 0 ? "-" : string.Empty;
-        if (hours == 0) return $"{prefix}{remainder} {Unit(remainder, "minute")}";
-        if (remainder == 0) return $"{prefix}{hours} {Unit(hours, "hour")}";
+        if (hours == 0)
+        {
+            return $"{prefix}{remainder} {Unit(remainder, "minute")}";
+        }
+
+        if (remainder == 0)
+        {
+            return $"{prefix}{hours} {Unit(hours, "hour")}";
+        }
+
         return $"{prefix}{hours} {Unit(hours, "hour")} {remainder} {Unit(remainder, "minute")}";
     }
 

@@ -1,5 +1,5 @@
-using FocusLens.Domain.Common.Interfaces;
 using FocusLens.Domain;
+using FocusLens.Domain.Common.Interfaces;
 using FocusLens.Domain.Identity;
 
 namespace FocusLens.Application.Features.Identity.Dtos;
@@ -30,8 +30,10 @@ internal static class IdentityMappings
             roles,
             tokenPair.ToResponse(),
             accountCreated,
-            OnboardingStatus: student is null
+            student is null
                 ? null
-                : student.IsOnboardingCompleted ? "completed" : "incomplete");
+                : student.IsOnboardingCompleted
+                    ? "completed"
+                    : "incomplete");
     }
 }

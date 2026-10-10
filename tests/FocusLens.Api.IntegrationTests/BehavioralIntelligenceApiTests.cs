@@ -34,8 +34,8 @@ public sealed class BehavioralIntelligenceApiTests
             DateTimeOffset end = now.AddDays(index - 2);
             StudySessionBehaviorWindow window = StudySessionBehaviorWindow.Create(
                 session.Id, 1, end.AddMinutes(-5), end, false).Value;
-            Assert.True(window.RecordAnalysis(60 + index * 10, "NORMAL_FOCUSED", "STABLE",
-                70 + index * 5, "STABLE", "CONTINUE", "CONTINUE", false).IsSuccess);
+            Assert.True(window.RecordAnalysis(60 + (index * 10), "NORMAL_FOCUSED", "STABLE",
+                70 + (index * 5), "STABLE", "CONTINUE", "CONTINUE", false).IsSuccess);
             return window;
         }).ToArray();
         await factory.SeedAsync(db =>
@@ -108,9 +108,9 @@ public sealed class BehavioralIntelligenceApiTests
         StudySessionQuestionAnswer answer = StudySessionQuestionAnswer.Create(
             question.Id,
             "4",
-            isCorrect: true,
-            learningSignal: null,
-            attemptNumber: 1,
+            true,
+            null,
+            1,
             answeredAt).Value;
 
         StudySessionBehaviorEvent scrollEvent = CreateEvent(
@@ -119,9 +119,9 @@ public sealed class BehavioralIntelligenceApiTests
             null,
             StudySessionBehaviorEventType.Scroll,
             now.AddMinutes(-4),
-            scrollSpeed: 180,
-            directionChanges: 2,
-            progression: 50);
+            180,
+            2,
+            50);
 
         StudySessionBehaviorEvent shownEvent = CreateEvent(
             session.Id,
@@ -167,8 +167,8 @@ public sealed class BehavioralIntelligenceApiTests
             TestJwtTokenFactory.Create(userId, "Student"));
 
         string body = """
-{ "isFinal": false }
-""";
+                      { "isFinal": false }
+                      """;
 
         HttpResponseMessage response = await client.PostAsync(
             $"/api/study-sessions/{session.Id}/behavior-windows/analyze",
@@ -252,7 +252,7 @@ public sealed class BehavioralIntelligenceApiTests
 
         HttpResponseMessage response = await client.PostAsync(
             $"/api/study-sessions/{session.Id}/end",
-            content: null);
+            null);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
@@ -325,8 +325,8 @@ public sealed class BehavioralIntelligenceApiTests
             directionChanges,
             progression,
             interactionCount,
-            backgroundCount: null,
-            backgroundDurationSeconds: null).Value;
+            null,
+            null).Value;
     }
 
     private static StudySession CreateFinishedSession(

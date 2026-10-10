@@ -1,5 +1,5 @@
-using FocusLens.Domain.Identity;
 using FocusLens.Domain;
+using FocusLens.Domain.Identity;
 
 namespace FocusLens.Application.Features.Users.Dtos;
 

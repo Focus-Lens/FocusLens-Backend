@@ -257,5 +257,4 @@ public class DeclineInvitationCommandHandlerTests
         Assert.Equal(ParentInvitationStatus.Declined, invitation.Status);
         Assert.Equal(1, unitOfWork.SaveChangesCalls);
     }
-
 }

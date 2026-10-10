@@ -13,6 +13,25 @@ public sealed class NotificationQueryHandler(
     : IRequestHandler<GetMyNotificationsQuery, NotificationsResponse>,
         IRequestHandler<GetMyStudentNotificationPreferencesQuery, StudentNotificationPreferencesResponse>
 {
+    private static readonly NotificationCategory[] AlertCategories =
+    [
+        NotificationCategory.FocusPatternChanged,
+        NotificationCategory.SessionSummaryReady,
+        NotificationCategory.SubjectProgressReportReady,
+        NotificationCategory.ParentConnectionConfirmed,
+        NotificationCategory.StudyReminder,
+        NotificationCategory.StudyTip,
+        NotificationCategory.WeeklyProgressUpdate,
+        NotificationCategory.StudyGoalProposal,
+        NotificationCategory.ParentActivity
+    ];
+
+    private static readonly NotificationCategory[] SystemCategories =
+    [
+        NotificationCategory.PrivacyInformationUpdated,
+        NotificationCategory.System
+    ];
+
     public async Task<NotificationsResponse> Handle(
         GetMyNotificationsQuery request,
         CancellationToken cancellationToken)
@@ -37,9 +56,9 @@ public sealed class NotificationQueryHandler(
 
         return new NotificationsResponse(
             notifications
-            .OrderByDescending(notification => notification.CreatedAtUtc)
-            .Select(notification => notification.ToResponse())
-            .ToList(),
+                .OrderByDescending(notification => notification.CreatedAtUtc)
+                .Select(notification => notification.ToResponse())
+                .ToList(),
             unreadCount);
     }
 
@@ -52,31 +71,12 @@ public sealed class NotificationQueryHandler(
             return DefaultStudentPreferences();
         }
 
-        StudentNotificationPreferences? preferences = await preferencesRepository.FirstOrDefaultAsync(
-            preferences => preferences.StudentUserId == userId);
+        StudentNotificationPreferences? preferences =
+            await preferencesRepository.FirstOrDefaultAsync(preferences => preferences.StudentUserId == userId);
 
         return (preferences ?? new StudentNotificationPreferences(userId)).ToResponse();
     }
 
     private static StudentNotificationPreferencesResponse DefaultStudentPreferences() =>
         new(true, true, true, StudentReminderTime.EightAm.ToString());
-
-    private static readonly NotificationCategory[] AlertCategories =
-    [
-        NotificationCategory.FocusPatternChanged,
-        NotificationCategory.SessionSummaryReady,
-        NotificationCategory.SubjectProgressReportReady,
-        NotificationCategory.ParentConnectionConfirmed,
-        NotificationCategory.StudyReminder,
-        NotificationCategory.StudyTip,
-        NotificationCategory.WeeklyProgressUpdate,
-        NotificationCategory.StudyGoalProposal,
-        NotificationCategory.ParentActivity
-    ];
-
-    private static readonly NotificationCategory[] SystemCategories =
-    [
-        NotificationCategory.PrivacyInformationUpdated,
-        NotificationCategory.System
-    ];
 }

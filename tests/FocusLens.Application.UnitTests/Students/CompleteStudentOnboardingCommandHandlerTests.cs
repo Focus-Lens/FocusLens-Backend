@@ -12,6 +12,7 @@ using ContractStudentGoal = FocusLens.Contracts.Students.StudentGoal;
 using ContractStudentGrade = FocusLens.Contracts.Students.StudentGrade;
 using ContractStudentSubjectType = FocusLens.Contracts.Students.StudentSubjectType;
 using StudentGoal = FocusLens.Domain.Students.StudentGoal;
+using StudyTimeGoalPeriod = FocusLens.Domain.Students.StudyTimeGoalPeriod;
 
 namespace FocusLens.Application.UnitTests.Students;
 
@@ -24,7 +25,7 @@ public class CompleteStudentOnboardingCommandHandlerTests
 
         CompleteStudentOnboardingResponse result = (await CreateHandler(student).Handle(
             new CompleteStudentOnboardingCommand(
-                new CompleteStudentOnboardingRequest("  كريم  ", null, null, null, null, null)),
+                new CompleteStudentOnboardingRequest("  كريم  ", null, null, null, null)),
             CancellationToken.None)).Value;
 
         Assert.False(student.IsOnboardingCompleted);
@@ -81,7 +82,7 @@ public class CompleteStudentOnboardingCommandHandlerTests
         Assert.Equal("كريم", student.PreferredName);
         Assert.Equal(new DateOnly(2010, 5, 12), student.DateOfBirth);
         Assert.Equal(
-            Domain.Students.StudentGoal.FocusBetter,
+            StudentGoal.FocusBetter,
             student.Goal);
         Assert.NotNull(student.StudyTimeGoal);
         Assert.Equal(student.UserId, result.UserId);
@@ -108,7 +109,7 @@ public class CompleteStudentOnboardingCommandHandlerTests
 
         Assert.False(result.IsError);
         Assert.NotNull(student.StudyTimeGoal);
-        Assert.Equal(Domain.Students.StudyTimeGoalPeriod.Weekly, student.StudyTimeGoal!.Period);
+        Assert.Equal(StudyTimeGoalPeriod.Weekly, student.StudyTimeGoal!.Period);
         Assert.Equal(300, student.StudyTimeGoal.TargetMinutes);
         Assert.Equal([DayOfWeek.Saturday], student.StudyTimeGoal.Days);
         Assert.Equal(new DateOnly(2026, 9, 12), student.StudyTimeGoal.StartDate);
@@ -250,5 +251,4 @@ public class CompleteStudentOnboardingCommandHandlerTests
             string providerKey, string displayName) =>
             Task.FromResult(IdentityResultSummary.Success);
     }
-
 }

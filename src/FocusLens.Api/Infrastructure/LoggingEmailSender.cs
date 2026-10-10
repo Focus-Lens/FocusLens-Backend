@@ -75,7 +75,8 @@ public sealed class LoggingEmailSender : IEmailSender
         return Task.CompletedTask;
     }
 
-    public Task SendChildSetupInvitationAsync(string childEmail, string parentName, string invitationUrl, CancellationToken cancellationToken = default)
+    public Task SendChildSetupInvitationAsync(string childEmail, string parentName, string invitationUrl,
+        CancellationToken cancellationToken = default)
     {
         _logger.LogInformation("Child setup invitation sent to {ChildEmail}", childEmail);
 

@@ -63,7 +63,9 @@ public sealed record BehaviorSectionResult(
     string ConceptId,
     string State,
     double Confidence,
-    [property: JsonPropertyName("focusScore")] int FocusScore,
-    [property: JsonPropertyName("recommendedAction")] string RecommendedAction,
+    [property: JsonPropertyName("focusScore")]
+    int FocusScore,
+    [property: JsonPropertyName("recommendedAction")]
+    string RecommendedAction,
     IReadOnlyDictionary<string, object?> FeaturesUsed,
     bool McqDataAvailable);

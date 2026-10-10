@@ -19,25 +19,25 @@ public sealed class StudySessionBehaviorEventsApiTests
         (Guid userId, StudySession session) = await SeedStartedSessionAsync(factory);
         using HttpClient client = CreateStudentClient(factory, userId);
         string body = $$"""
-        {
-          "events": [
-            {
-              "eventType": "Scroll",
-              "occurredAtUtc": "{{session.StartedAtUtc!.Value.AddSeconds(1):O}}",
-              "scrollSpeedAvgPxPerSec": 240,
-              "scrollDirectionChanges": 2,
-              "contentProgressionPct": 45,
-              "interactionCount": 1
-            },
-            {
-              "eventType": "AppBackground",
-              "occurredAtUtc": "{{session.StartedAtUtc!.Value.AddSeconds(2):O}}",
-              "backgroundCount": 1,
-              "backgroundDurationSeconds": 5
-            }
-          ]
-        }
-        """;
+                        {
+                          "events": [
+                            {
+                              "eventType": "Scroll",
+                              "occurredAtUtc": "{{session.StartedAtUtc!.Value.AddSeconds(1):O}}",
+                              "scrollSpeedAvgPxPerSec": 240,
+                              "scrollDirectionChanges": 2,
+                              "contentProgressionPct": 45,
+                              "interactionCount": 1
+                            },
+                            {
+                              "eventType": "AppBackground",
+                              "occurredAtUtc": "{{session.StartedAtUtc!.Value.AddSeconds(2):O}}",
+                              "backgroundCount": 1,
+                              "backgroundDurationSeconds": 5
+                            }
+                          ]
+                        }
+                        """;
 
         HttpResponseMessage response = await client.PostAsync(
             $"/api/study-sessions/{session.Id}/behavior-events", JsonContent(body));
@@ -68,8 +68,7 @@ public sealed class StudySessionBehaviorEventsApiTests
         {
             events = Enumerable.Range(0, 101).Select(index => new
             {
-                eventType = "Interaction",
-                occurredAtUtc = session.StartedAtUtc!.Value.AddSeconds(index)
+                eventType = "Interaction", occurredAtUtc = session.StartedAtUtc!.Value.AddSeconds(index)
             })
         };
 

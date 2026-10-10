@@ -26,11 +26,7 @@ public sealed class StudySessionQuestionConfiguration
         builder.Property(question => question.EstimatedTimeMinutes).IsRequired();
         builder.Property(question => question.Order).IsRequired();
 
-        builder.HasIndex(question => new
-            {
-                question.StudySessionId,
-                question.Order
-            })
+        builder.HasIndex(question => new { question.StudySessionId, question.Order })
             .IsUnique();
 
         builder.HasOne<StudySession>()

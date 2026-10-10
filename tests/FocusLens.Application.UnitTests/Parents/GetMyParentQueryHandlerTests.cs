@@ -1,5 +1,6 @@
 using FocusLens.Application.Parents;
 using FocusLens.Application.UnitTests.Access;
+using FocusLens.Contracts;
 using FocusLens.Domain;
 using FocusLens.Domain.Identity;
 
@@ -14,17 +15,13 @@ public sealed class GetMyParentQueryHandlerTests
         Parent parent = new(parentUserId);
         parent.SetPrivateProperty(
             "User",
-            new ApplicationUser
-            {
-                FirstName = "Mona",
-                LastName = "Hassan"
-            });
+            new ApplicationUser { FirstName = "Mona", LastName = "Hassan" });
 
         GetMyParentQueryHandler handler = new(
             new InMemoryRepository<Parent>(parent),
             new FakeCurrentUser(parentUserId));
 
-        var result = await handler.Handle(
+        ParentResponse? result = await handler.Handle(
             new GetMyParentQuery(),
             CancellationToken.None);
 

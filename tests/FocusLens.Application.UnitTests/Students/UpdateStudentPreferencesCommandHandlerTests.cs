@@ -1,12 +1,17 @@
 using FocusLens.Application.Students;
 using FocusLens.Application.UnitTests.Access;
+using FocusLens.Contracts.Students;
 using FocusLens.Domain;
 using FocusLens.Domain.Access;
 using FocusLens.Domain.Common.Results;
-using FocusLens.Domain.Students;
 using FocusLens.Domain.Identity;
+using FocusLens.Domain.Students;
 using StudentDetailsResponse = FocusLens.Contracts.Students.StudentDetailsResponse;
 using ContractStudentGrade = FocusLens.Contracts.Students.StudentGrade;
+using StudentGoal = FocusLens.Domain.Students.StudentGoal;
+using StudentGrade = FocusLens.Domain.Students.StudentGrade;
+using StudentSubjectType = FocusLens.Domain.Students.StudentSubjectType;
+using StudyTimeGoalPeriod = FocusLens.Domain.Students.StudyTimeGoalPeriod;
 using UpdateStudentPreferencesRequest = FocusLens.Contracts.Students.UpdateStudentPreferencesRequest;
 
 namespace FocusLens.Application.UnitTests.Students;
@@ -118,10 +123,7 @@ public class UpdateStudentPreferencesCommandHandlerTests
         student.SetDateOfBirth(new DateOnly(2010, 5, 12));
 
         Result<StudentDetailsResponse> result = await CreateHandler(student).Handle(
-            new UpdateStudentPreferencesCommand(new UpdateStudentPreferencesRequest
-            {
-                DateOfBirth = null
-            }),
+            new UpdateStudentPreferencesCommand(new UpdateStudentPreferencesRequest { DateOfBirth = null }),
             CancellationToken.None);
 
         Assert.True(result.IsSuccess);
@@ -137,10 +139,7 @@ public class UpdateStudentPreferencesCommandHandlerTests
         student.SetGrade(StudentGrade.Other);
 
         Result<StudentDetailsResponse> result = await CreateHandler(student).Handle(
-            new UpdateStudentPreferencesCommand(new UpdateStudentPreferencesRequest
-            {
-                CustomGrade = "  Year 13  "
-            }),
+            new UpdateStudentPreferencesCommand(new UpdateStudentPreferencesRequest { CustomGrade = "  Year 13  " }),
             CancellationToken.None);
 
         Assert.True(result.IsSuccess);
@@ -155,10 +154,7 @@ public class UpdateStudentPreferencesCommandHandlerTests
         Student student = CreateStudentWithPreferences();
 
         Result<StudentDetailsResponse> result = await CreateHandler(student).Handle(
-            new UpdateStudentPreferencesCommand(new UpdateStudentPreferencesRequest
-            {
-                CustomGrade = "Year 13"
-            }),
+            new UpdateStudentPreferencesCommand(new UpdateStudentPreferencesRequest { CustomGrade = "Year 13" }),
             CancellationToken.None);
 
         Assert.False(result.IsSuccess);
@@ -195,8 +191,8 @@ public class UpdateStudentPreferencesCommandHandlerTests
 
         UpdateStudentPreferencesRequest request = new()
         {
-            StudyTimeGoal = new(
-                FocusLens.Contracts.Students.StudyTimeGoalPeriod.Daily,
+            StudyTimeGoal = new StudyTimeGoalRequest(
+                Contracts.Students.StudyTimeGoalPeriod.Daily,
                 60,
                 null)
         };
@@ -218,8 +214,8 @@ public class UpdateStudentPreferencesCommandHandlerTests
         Result<StudentDetailsResponse> result = await CreateHandler(student).Handle(
             new UpdateStudentPreferencesCommand(new UpdateStudentPreferencesRequest
             {
-                StudyTimeGoal = new(
-                    FocusLens.Contracts.Students.StudyTimeGoalPeriod.Daily,
+                StudyTimeGoal = new StudyTimeGoalRequest(
+                    Contracts.Students.StudyTimeGoalPeriod.Daily,
                     60,
                     [DayOfWeek.Monday],
                     new DateOnly(2026, 9, 14))
@@ -273,10 +269,7 @@ public class UpdateStudentPreferencesCommandHandlerTests
         Student student = CreateStudentWithPreferences();
 
         Result<StudentDetailsResponse> result = await CreateHandler(student).Handle(
-            new UpdateStudentPreferencesCommand(new UpdateStudentPreferencesRequest
-            {
-                WeekStartsOn = (DayOfWeek)99
-            }),
+            new UpdateStudentPreferencesCommand(new UpdateStudentPreferencesRequest { WeekStartsOn = (DayOfWeek)99 }),
             CancellationToken.None);
 
         Assert.False(result.IsSuccess);
@@ -345,19 +338,16 @@ public class UpdateStudentPreferencesCommandHandlerTests
     private static Student CreateStudentWithPreferences()
     {
         Student student = new(Guid.NewGuid());
-        student.SetPrivateProperty("User", new ApplicationUser
-        {
-            FirstName = "Test",
-            LastName = "Student",
-            Email = "test@example.com"
-        });
+        student.SetPrivateProperty("User",
+            new ApplicationUser { FirstName = "Test", LastName = "Student", Email = "test@example.com" });
         student.CompleteOnboarding(
             StudentGoal.FocusBetter,
             StudentGrade.Grade10,
             [StudentSubject.Predefined(StudentSubjectType.Math)]);
         student.SetPreferredName("Test Student");
         student.SetDateOfBirth(new DateOnly(2010, 5, 12));
-        student.SetStudyTimeGoal(StudyTimeGoal.Create(StudyTimeGoalPeriod.Daily, 60, [DayOfWeek.Monday], new DateOnly(2026, 1, 1)).Value);
+        student.SetStudyTimeGoal(StudyTimeGoal
+            .Create(StudyTimeGoalPeriod.Daily, 60, [DayOfWeek.Monday], new DateOnly(2026, 1, 1)).Value);
         return student;
     }
 }

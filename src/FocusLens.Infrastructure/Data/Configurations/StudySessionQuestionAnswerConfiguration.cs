@@ -19,11 +19,7 @@ public sealed class StudySessionQuestionAnswerConfiguration
         builder.Property(answer => answer.AttemptNumber).IsRequired();
         builder.Property(answer => answer.AnsweredAtUtc).IsRequired();
 
-        builder.HasIndex(answer => new
-            {
-                answer.StudySessionQuestionId,
-                answer.AttemptNumber
-            })
+        builder.HasIndex(answer => new { answer.StudySessionQuestionId, answer.AttemptNumber })
             .IsUnique();
 
         builder.HasOne<StudySessionQuestion>()

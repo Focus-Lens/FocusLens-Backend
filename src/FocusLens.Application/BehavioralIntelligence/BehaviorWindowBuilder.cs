@@ -15,7 +15,8 @@ public sealed class BehaviorWindowBuilder
         IReadOnlyCollection<StudySessionBehaviorEvent> sessionEventsThroughWindowEnd,
         IReadOnlyCollection<StudySessionQuestion> sessionQuestions,
         IReadOnlyCollection<StudySessionQuestionAnswer> sessionAnswers,
-        IReadOnlyCollection<BehaviorWindowHistoryItem> history)
+        IReadOnlyCollection<BehaviorWindowHistoryItem> history
+    )
     {
         if (windowEndUtc < windowStartUtc)
         {
@@ -28,7 +29,9 @@ public sealed class BehaviorWindowBuilder
             .ToArray();
 
         StudySessionBehaviorEvent[] windowEvents = allEvents
-            .Where(item => item.OccurredAtUtc >= windowStartUtc && item.OccurredAtUtc < windowEndUtc)
+            .Where(item =>
+                item.OccurredAtUtc >= windowStartUtc && item.OccurredAtUtc < windowEndUtc
+            )
             .ToArray();
 
         BehaviorSection[] sections = BuildSections(
@@ -37,17 +40,19 @@ public sealed class BehaviorWindowBuilder
             windowStartUtc,
             windowEndUtc,
             sessionQuestions,
-            sessionAnswers);
+            sessionAnswers
+        );
 
         return new BehaviorWindowRequest(
-            UserId: studentId.ToString(),
-            SessionId: sessionId.ToString(),
-            WindowIndex: windowIndex,
-            WindowStart: windowStartUtc.ToUnixTimeMilliseconds(),
-            WindowEnd: windowEndUtc.ToUnixTimeMilliseconds(),
-            IsFinal: isFinal,
-            Sections: sections,
-            History: history);
+            studentId.ToString(),
+            sessionId.ToString(),
+            windowIndex,
+            windowStartUtc.ToUnixTimeMilliseconds(),
+            windowEndUtc.ToUnixTimeMilliseconds(),
+            isFinal,
+            sections,
+            history
+        );
     }
 
     private static BehaviorSection[] BuildSections(
@@ -56,7 +61,8 @@ public sealed class BehaviorWindowBuilder
         DateTimeOffset windowStartUtc,
         DateTimeOffset windowEndUtc,
         IReadOnlyCollection<StudySessionQuestion> questions,
-        IReadOnlyCollection<StudySessionQuestionAnswer> answers)
+        IReadOnlyCollection<StudySessionQuestionAnswer> answers
+    )
     {
         Dictionary<Guid, List<StudySessionBehaviorEvent>> sectionEvents = [];
         Guid? activeSection = FindActiveSectionBefore(windowStartUtc, allEvents);
@@ -88,9 +94,12 @@ public sealed class BehaviorWindowBuilder
                 continue;
             }
 
-            if (!sectionEvents.TryGetValue(
+            if (
+                !sectionEvents.TryGetValue(
                     activeSection.Value,
-                    out List<StudySessionBehaviorEvent>? eventsForSection))
+                    out List<StudySessionBehaviorEvent>? eventsForSection
+                )
+            )
             {
                 eventsForSection = [];
                 sectionEvents[activeSection.Value] = eventsForSection;
@@ -100,21 +109,19 @@ public sealed class BehaviorWindowBuilder
         }
 
         return sectionEvents
-            .Select(pair => BuildSection(
-                pair.Key,
-                pair.Value,
-                allEvents,
-                questions,
-                answers))
+            .Select(pair => BuildSection(pair.Key, pair.Value, allEvents, questions, answers))
             .ToArray();
     }
 
     private static Guid? FindActiveSectionBefore(
         DateTimeOffset windowStartUtc,
-        IReadOnlyCollection<StudySessionBehaviorEvent> allEvents)
+        IReadOnlyCollection<StudySessionBehaviorEvent> allEvents
+    )
     {
         return allEvents
-            .Where(item => item.OccurredAtUtc < windowStartUtc && item.StudyMaterialSectionId.HasValue)
+            .Where(item =>
+                item.OccurredAtUtc < windowStartUtc && item.StudyMaterialSectionId.HasValue
+            )
             .OrderByDescending(item => item.OccurredAtUtc)
             .Select(item => item.StudyMaterialSectionId)
             .FirstOrDefault();
@@ -125,7 +132,8 @@ public sealed class BehaviorWindowBuilder
         IReadOnlyCollection<StudySessionBehaviorEvent> sectionEvents,
         IReadOnlyCollection<StudySessionBehaviorEvent> allEvents,
         IReadOnlyCollection<StudySessionQuestion> questions,
-        IReadOnlyCollection<StudySessionQuestionAnswer> answers)
+        IReadOnlyCollection<StudySessionQuestionAnswer> answers
+    )
     {
         StudySessionBehaviorEvent[] orderedSectionEvents = sectionEvents
             .OrderBy(item => item.OccurredAtUtc)
@@ -135,29 +143,41 @@ public sealed class BehaviorWindowBuilder
         DateTimeOffset end = orderedSectionEvents.Last().OccurredAtUtc;
 
         return new BehaviorSection(
-            SectionId: sectionId.ToString(),
-            ConceptId: ResolveConceptId(sectionId, questions),
-            SectionStartTime: start.ToUnixTimeMilliseconds(),
-            SectionEndTime: end.ToUnixTimeMilliseconds(),
-            TimeSpentSeconds: CalculateObservedEventSpanSeconds(orderedSectionEvents),
-            ScrollSpeedAvgPxPerSec: AverageOrNull(sectionEvents.Select(item => item.ScrollSpeedAvgPxPerSec)),
-            ScrollDirectionChanges: SumOrNull(sectionEvents.Select(item => item.ScrollDirectionChanges)),
+            sectionId.ToString(),
+            ResolveConceptId(sectionId, questions),
+            start.ToUnixTimeMilliseconds(),
+            end.ToUnixTimeMilliseconds(),
+            CalculateObservedEventSpanSeconds(orderedSectionEvents),
+            AverageOrNull(
+                sectionEvents.Select(item => item.ScrollSpeedAvgPxPerSec)
+            ),
+            SumOrNull(
+                sectionEvents.Select(item => item.ScrollDirectionChanges)
+            ),
             // AI1 currently requires content_progression_pct to be numeric. Until both APIs
             // support null for this field, zero is the compatibility fallback when unobserved.
-            ContentProgressionPct: LatestOrZero(sectionEvents
-                .Where(item => item.ContentProgressionPct.HasValue)
-                .Select(item => item.ContentProgressionPct!.Value)),
-            SectionRevisitCount: CalculateRevisitCount(sectionId, allEvents),
-            InteractionCount: SumOrNull(sectionEvents.Select(item => item.InteractionCount)),
-            MicroChallenges: BuildMicroChallenges(sectionEvents, allEvents, answers),
-            BackgroundCount: SumOrNull(sectionEvents.Select(item => item.BackgroundCount)),
-            TotalBackgroundSeconds: SumDoubleOrNull(sectionEvents.Select(item => item.BackgroundDurationSeconds)),
-            TabHiddenCount: HasTabVisibilityTelemetry(allEvents)
+            LatestOrZero(
+                sectionEvents
+                    .Where(item => item.ContentProgressionPct.HasValue)
+                    .Select(item => item.ContentProgressionPct!.Value)
+            ),
+            CalculateRevisitCount(sectionId, allEvents),
+            SumOrNull(sectionEvents.Select(item => item.InteractionCount)),
+            BuildMicroChallenges(sectionEvents, allEvents, answers),
+            SumOrNull(sectionEvents.Select(item => item.BackgroundCount)),
+            SumDoubleOrNull(
+                sectionEvents.Select(item => item.BackgroundDurationSeconds)
+            ),
+            HasTabVisibilityTelemetry(allEvents)
                 ? CountEvents(sectionEvents, StudySessionBehaviorEventType.TabHidden)
-                : null);
+                : null
+        );
     }
 
-    private static string ResolveConceptId(Guid sectionId, IReadOnlyCollection<StudySessionQuestion> questions)
+    private static string ResolveConceptId(
+        Guid sectionId,
+        IReadOnlyCollection<StudySessionQuestion> questions
+    )
     {
         string? conceptId = questions
             .Where(item => item.StudyMaterialSectionId == sectionId)
@@ -170,10 +190,14 @@ public sealed class BehaviorWindowBuilder
     private static BehaviorMicroChallenge[] BuildMicroChallenges(
         IReadOnlyCollection<StudySessionBehaviorEvent> sectionEvents,
         IReadOnlyCollection<StudySessionBehaviorEvent> allEvents,
-        IReadOnlyCollection<StudySessionQuestionAnswer> answers)
+        IReadOnlyCollection<StudySessionQuestionAnswer> answers
+    )
     {
         return sectionEvents
-            .Where(item => item.EventType == StudySessionBehaviorEventType.QuestionAnswered && item.StudySessionQuestionId.HasValue)
+            .Where(item =>
+                item.EventType == StudySessionBehaviorEventType.QuestionAnswered
+                && item.StudySessionQuestionId.HasValue
+            )
             .OrderBy(item => item.OccurredAtUtc)
             .Select(answered => BuildMicroChallenge(answered, allEvents, answers))
             .Where(item => item is not null)
@@ -184,14 +208,17 @@ public sealed class BehaviorWindowBuilder
     private static BehaviorMicroChallenge? BuildMicroChallenge(
         StudySessionBehaviorEvent answeredEvent,
         IReadOnlyCollection<StudySessionBehaviorEvent> allEvents,
-        IReadOnlyCollection<StudySessionQuestionAnswer> answers)
+        IReadOnlyCollection<StudySessionQuestionAnswer> answers
+    )
     {
         Guid questionId = answeredEvent.StudySessionQuestionId!.Value;
 
         StudySessionBehaviorEvent? shownEvent = allEvents
-            .Where(item => item.EventType == StudySessionBehaviorEventType.QuestionShown
+            .Where(item =>
+                item.EventType == StudySessionBehaviorEventType.QuestionShown
                 && item.StudySessionQuestionId == questionId
-                && item.OccurredAtUtc <= answeredEvent.OccurredAtUtc)
+                && item.OccurredAtUtc <= answeredEvent.OccurredAtUtc
+            )
             .OrderByDescending(item => item.OccurredAtUtc)
             .FirstOrDefault();
 
@@ -201,7 +228,10 @@ public sealed class BehaviorWindowBuilder
         }
 
         StudySessionQuestionAnswer? answer = answers
-            .Where(item => item.StudySessionQuestionId == questionId && item.AnsweredAtUtc <= answeredEvent.OccurredAtUtc)
+            .Where(item =>
+                item.StudySessionQuestionId == questionId
+                && item.AnsweredAtUtc <= answeredEvent.OccurredAtUtc
+            )
             .OrderByDescending(item => item.AnsweredAtUtc)
             .ThenByDescending(item => item.AttemptNumber)
             .FirstOrDefault();
@@ -212,12 +242,19 @@ public sealed class BehaviorWindowBuilder
         }
 
         return new BehaviorMicroChallenge(
-            QuestionId: questionId.ToString(),
-            ResponseTimeSeconds: Math.Max(0, (answeredEvent.OccurredAtUtc - shownEvent.OccurredAtUtc).TotalSeconds),
-            IsCorrect: answer.IsCorrect);
+            questionId.ToString(),
+            Math.Max(
+                0,
+                (answeredEvent.OccurredAtUtc - shownEvent.OccurredAtUtc).TotalSeconds
+            ),
+            answer.IsCorrect
+        );
     }
 
-    private static int CalculateRevisitCount(Guid sectionId, IReadOnlyCollection<StudySessionBehaviorEvent> allEvents)
+    private static int CalculateRevisitCount(
+        Guid sectionId,
+        IReadOnlyCollection<StudySessionBehaviorEvent> allEvents
+    )
     {
         Guid? previousSection = null;
         int revisits = 0;
@@ -230,7 +267,11 @@ public sealed class BehaviorWindowBuilder
             }
 
             Guid current = item.StudyMaterialSectionId.Value;
-            if (previousSection.HasValue && current == sectionId && previousSection.Value != sectionId)
+            if (
+                previousSection.HasValue
+                && current == sectionId
+                && previousSection.Value != sectionId
+            )
             {
                 revisits++;
             }
@@ -244,31 +285,47 @@ public sealed class BehaviorWindowBuilder
     // This is an event-observed span, not a true foreground/engagement timer. The current
     // behavior-event contract carries no active-time delta, so the backend cannot distinguish
     // an idle gap between events from active reading. Exact active time requires client telemetry.
-    private static double CalculateObservedEventSpanSeconds(IReadOnlyCollection<StudySessionBehaviorEvent> events)
+    private static double CalculateObservedEventSpanSeconds(
+        IReadOnlyCollection<StudySessionBehaviorEvent> events
+    )
     {
         if (events.Count < 2)
         {
             return 0;
         }
 
-        return Math.Max(0, (events.Max(item => item.OccurredAtUtc) - events.Min(item => item.OccurredAtUtc)).TotalSeconds);
+        return Math.Max(
+            0,
+            (
+                events.Max(item => item.OccurredAtUtc) - events.Min(item => item.OccurredAtUtc)
+            ).TotalSeconds
+        );
     }
 
     private static int? SumOrNull(IEnumerable<int?> values)
     {
-        int[] observed = values.Where(value => value.HasValue).Select(value => value!.Value).ToArray();
+        int[] observed = values
+            .Where(value => value.HasValue)
+            .Select(value => value!.Value)
+            .ToArray();
         return observed.Length == 0 ? null : observed.Sum();
     }
 
     private static double? SumDoubleOrNull(IEnumerable<double?> values)
     {
-        double[] observed = values.Where(value => value.HasValue).Select(value => value!.Value).ToArray();
+        double[] observed = values
+            .Where(value => value.HasValue)
+            .Select(value => value!.Value)
+            .ToArray();
         return observed.Length == 0 ? null : observed.Sum();
     }
 
     private static double? AverageOrNull(IEnumerable<double?> values)
     {
-        double[] observed = values.Where(value => value.HasValue).Select(value => value!.Value).ToArray();
+        double[] observed = values
+            .Where(value => value.HasValue)
+            .Select(value => value!.Value)
+            .ToArray();
         return observed.Length == 0 ? null : observed.Average();
     }
 
@@ -279,8 +336,14 @@ public sealed class BehaviorWindowBuilder
     }
 
     private static bool HasTabVisibilityTelemetry(IEnumerable<StudySessionBehaviorEvent> events) =>
-        events.Any(item => item.EventType is StudySessionBehaviorEventType.TabHidden or StudySessionBehaviorEventType.TabVisible);
+        events.Any(item =>
+            item.EventType
+                is StudySessionBehaviorEventType.TabHidden
+                or StudySessionBehaviorEventType.TabVisible
+        );
 
-    private static int CountEvents(IEnumerable<StudySessionBehaviorEvent> events, StudySessionBehaviorEventType eventType) =>
-        events.Count(item => item.EventType == eventType);
+    private static int CountEvents(
+        IEnumerable<StudySessionBehaviorEvent> events,
+        StudySessionBehaviorEventType eventType
+    ) => events.Count(item => item.EventType == eventType);
 }

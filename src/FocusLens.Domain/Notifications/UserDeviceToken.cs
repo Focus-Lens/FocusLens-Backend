@@ -52,10 +52,7 @@ public sealed class UserDeviceToken : AuditableEntity
         DisabledAtUtc = null;
     }
 
-    public void Disable(DateTimeOffset disabledAtUtc)
-    {
-        DisabledAtUtc ??= disabledAtUtc;
-    }
+    public void Disable(DateTimeOffset disabledAtUtc) => DisabledAtUtc ??= disabledAtUtc;
 
     private static string Normalize(string value, string paramName, int maxLength)
     {

@@ -20,17 +20,17 @@ public sealed record StudyTimeGoal
         StartDate = startDate;
     }
 
-    public StudyTimeGoalPeriod Period { get; private set; }
+    public StudyTimeGoalPeriod Period { get; }
 
     public int TargetMinutes { get; private set; }
 
     public IReadOnlyCollection<DayOfWeek> Days { get; private set; } = [];
 
-    public DateOnly? StartDate { get; private set; }
+    public DateOnly? StartDate { get; }
 
     /// <summary>
-    /// The inclusive end of a finite goal period. Weekly goals are deliberately
-    /// tied to the week in which they were created; they do not renew.
+    ///     The inclusive end of a finite goal period. Weekly goals are deliberately
+    ///     tied to the week in which they were created; they do not renew.
     /// </summary>
     public DateOnly? EndDate => Period == StudyTimeGoalPeriod.Weekly && StartDate is DateOnly startDate
         ? startDate.AddDays(6)

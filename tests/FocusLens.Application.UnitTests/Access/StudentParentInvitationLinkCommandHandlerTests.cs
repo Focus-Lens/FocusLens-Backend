@@ -1,12 +1,10 @@
 using System.Security.Cryptography;
 using System.Text;
 using FocusLens.Application.Access;
-using FocusLens.Application.UnitTests.Access;
 using FocusLens.Contracts.Access;
 using FocusLens.Domain;
 using FocusLens.Domain.Access;
 using FocusLens.Domain.Common.Results;
-using FocusLens.Domain.Identity;
 
 namespace FocusLens.Application.UnitTests.Access;
 

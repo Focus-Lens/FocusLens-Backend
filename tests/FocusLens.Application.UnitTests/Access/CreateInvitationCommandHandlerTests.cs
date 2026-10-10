@@ -1,3 +1,5 @@
+using System.Security.Cryptography;
+using System.Text;
 using FocusLens.Application.Access;
 using FocusLens.Contracts.Access;
 using FocusLens.Domain;
@@ -57,8 +59,8 @@ public class CreateInvitationCommandHandlerTests
             (await relationshipRepository.GetAllAsync()).Single();
         Assert.Equal(
             Convert.ToHexString(
-                System.Security.Cryptography.SHA256.HashData(
-                    System.Text.Encoding.UTF8.GetBytes(token))),
+                SHA256.HashData(
+                    Encoding.UTF8.GetBytes(token))),
             savedRelationship.InvitationTokenHash);
     }
 

@@ -9,8 +9,7 @@ public sealed class BehavioralIntelligenceClient(HttpClient httpClient) : IBehav
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
     {
-        PropertyNameCaseInsensitive = true,
-        PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower
+        PropertyNameCaseInsensitive = true, PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower
     };
 
     public async Task<BehaviorWindowResponse> AnalyzeWindowAsync(
@@ -34,7 +33,7 @@ public sealed class BehavioralIntelligenceClient(HttpClient httpClient) : IBehav
         BehaviorWindowResponse? result = JsonSerializer.Deserialize<BehaviorWindowResponse>(body, JsonOptions);
 
         return result
-            ?? throw new InvalidOperationException(
-                "Behavioral Intelligence returned an empty or invalid response.");
+               ?? throw new InvalidOperationException(
+                   "Behavioral Intelligence returned an empty or invalid response.");
     }
 }

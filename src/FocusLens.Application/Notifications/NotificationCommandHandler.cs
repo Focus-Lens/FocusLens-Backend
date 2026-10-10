@@ -22,6 +22,35 @@ public sealed class NotificationCommandHandler(
         IRequestHandler<RegisterDeviceTokenCommand, Result<DeviceTokenResponse>>,
         IRequestHandler<RemoveDeviceTokenCommand, Result<Success>>
 {
+    public async Task<Result<Success>> Handle(
+        MarkAllNotificationsReadCommand request,
+        CancellationToken cancellationToken)
+    {
+        if (currentUser.UserId is not Guid userId || userId == Guid.Empty)
+        {
+            return Error.Unauthorized(
+                "Notifications.CurrentUserUnavailable",
+                "The current user could not be identified.");
+        }
+
+        List<Notification> unreadNotifications = (await notificationRepository.GetAllAsync(notification =>
+                notification.RecipientUserId == userId && notification.ReadAtUtc == null))
+            .ToList();
+
+        DateTimeOffset now = timeProvider.GetUtcNow();
+        foreach (Notification notification in unreadNotifications)
+        {
+            notification.MarkRead(now);
+        }
+
+        if (unreadNotifications.Count > 0)
+        {
+            await unitOfWork.SaveChangesAsync();
+        }
+
+        return Result.Success;
+    }
+
     public async Task<Result<NotificationResponse>> Handle(
         MarkNotificationReadCommand request,
         CancellationToken cancellationToken)
@@ -52,6 +81,89 @@ public sealed class NotificationCommandHandler(
         await unitOfWork.SaveChangesAsync();
 
         return notification.ToResponse();
+    }
+
+    public async Task<Result<DeviceTokenResponse>> Handle(
+        RegisterDeviceTokenCommand request,
+        CancellationToken cancellationToken)
+    {
+        if (currentUser.UserId is not Guid userId || userId == Guid.Empty)
+        {
+            return Error.Unauthorized(
+                "Notifications.CurrentUserUnavailable",
+                "The current user could not be identified.");
+        }
+
+        if (!TryParsePlatform(request.Request.Platform, out DeviceTokenPlatform platform))
+        {
+            return Error.Validation(
+                "Notifications.InvalidDevicePlatform",
+                "Device platform must be Android, Ios, or Web.");
+        }
+
+        if (string.IsNullOrWhiteSpace(request.Request.Token))
+        {
+            return Error.Validation(
+                "Notifications.DeviceTokenRequired",
+                "Device token is required.");
+        }
+
+        string normalizedToken = request.Request.Token.Trim();
+        DateTimeOffset now = timeProvider.GetUtcNow();
+
+        UserDeviceToken? existing =
+            await deviceTokenRepository.FirstOrDefaultAsync(token => token.Token == normalizedToken);
+
+        if (existing is not null && existing.UserId != userId)
+        {
+            return Error.Conflict(
+                "Notifications.DeviceTokenRegisteredToAnotherUser",
+                "This device token is already registered to another account.");
+        }
+
+        if (existing is null)
+        {
+            existing = new UserDeviceToken(userId, platform, normalizedToken, now);
+            deviceTokenRepository.Add(existing);
+        }
+        else
+        {
+            existing.Touch(platform, now);
+            deviceTokenRepository.Update(existing);
+        }
+
+        await unitOfWork.SaveChangesAsync();
+
+        return existing.ToResponse();
+    }
+
+    public async Task<Result<Success>> Handle(
+        RemoveDeviceTokenCommand request,
+        CancellationToken cancellationToken)
+    {
+        if (currentUser.UserId is not Guid userId || userId == Guid.Empty)
+        {
+            return Error.Unauthorized(
+                "Notifications.CurrentUserUnavailable",
+                "The current user could not be identified.");
+        }
+
+        UserDeviceToken? token =
+            await deviceTokenRepository.FirstOrDefaultAsync(token =>
+                token.Id == request.DeviceTokenId && token.UserId == userId);
+
+        if (token is null)
+        {
+            return Error.NotFound(
+                "Notifications.DeviceTokenNotFound",
+                "The device token was not found.");
+        }
+
+        token.Disable(timeProvider.GetUtcNow());
+        deviceTokenRepository.Update(token);
+        await unitOfWork.SaveChangesAsync();
+
+        return Result.Success;
     }
 
     public async Task<Result<StudentNotificationPreferencesResponse>> Handle(
@@ -121,118 +233,6 @@ public sealed class NotificationCommandHandler(
         return preferences.ToResponse();
     }
 
-    public async Task<Result<Success>> Handle(
-        MarkAllNotificationsReadCommand request,
-        CancellationToken cancellationToken)
-    {
-        if (currentUser.UserId is not Guid userId || userId == Guid.Empty)
-        {
-            return Error.Unauthorized(
-                "Notifications.CurrentUserUnavailable",
-                "The current user could not be identified.");
-        }
-
-        List<Notification> unreadNotifications = (await notificationRepository.GetAllAsync(
-                notification =>
-                    notification.RecipientUserId == userId && notification.ReadAtUtc == null))
-            .ToList();
-
-        DateTimeOffset now = timeProvider.GetUtcNow();
-        foreach (Notification notification in unreadNotifications)
-        {
-            notification.MarkRead(now);
-        }
-
-        if (unreadNotifications.Count > 0)
-        {
-            await unitOfWork.SaveChangesAsync();
-        }
-
-        return Result.Success;
-    }
-
-    public async Task<Result<DeviceTokenResponse>> Handle(
-        RegisterDeviceTokenCommand request,
-        CancellationToken cancellationToken)
-    {
-        if (currentUser.UserId is not Guid userId || userId == Guid.Empty)
-        {
-            return Error.Unauthorized(
-                "Notifications.CurrentUserUnavailable",
-                "The current user could not be identified.");
-        }
-
-        if (!TryParsePlatform(request.Request.Platform, out DeviceTokenPlatform platform))
-        {
-            return Error.Validation(
-                "Notifications.InvalidDevicePlatform",
-                "Device platform must be Android, Ios, or Web.");
-        }
-
-        if (string.IsNullOrWhiteSpace(request.Request.Token))
-        {
-            return Error.Validation(
-                "Notifications.DeviceTokenRequired",
-                "Device token is required.");
-        }
-
-        string normalizedToken = request.Request.Token.Trim();
-        DateTimeOffset now = timeProvider.GetUtcNow();
-
-        UserDeviceToken? existing =
-            await deviceTokenRepository.FirstOrDefaultAsync(token => token.Token == normalizedToken);
-
-        if (existing is not null && existing.UserId != userId)
-        {
-            return Error.Conflict(
-                "Notifications.DeviceTokenRegisteredToAnotherUser",
-                "This device token is already registered to another account.");
-        }
-
-        if (existing is null)
-        {
-            existing = new UserDeviceToken(userId, platform, normalizedToken, now);
-            deviceTokenRepository.Add(existing);
-        }
-        else
-        {
-            existing.Touch(platform, now);
-            deviceTokenRepository.Update(existing);
-        }
-
-        await unitOfWork.SaveChangesAsync();
-
-        return existing.ToResponse();
-    }
-
-    public async Task<Result<Success>> Handle(
-        RemoveDeviceTokenCommand request,
-        CancellationToken cancellationToken)
-    {
-        if (currentUser.UserId is not Guid userId || userId == Guid.Empty)
-        {
-            return Error.Unauthorized(
-                "Notifications.CurrentUserUnavailable",
-                "The current user could not be identified.");
-        }
-
-        UserDeviceToken? token = await deviceTokenRepository.FirstOrDefaultAsync(
-            token => token.Id == request.DeviceTokenId && token.UserId == userId);
-
-        if (token is null)
-        {
-            return Error.NotFound(
-                "Notifications.DeviceTokenNotFound",
-                "The device token was not found.");
-        }
-
-        token.Disable(timeProvider.GetUtcNow());
-        deviceTokenRepository.Update(token);
-        await unitOfWork.SaveChangesAsync();
-
-        return Result.Success;
-    }
-
     private static bool TryParseReminderTime(string? value, out StudentReminderTime? reminderTime)
     {
         reminderTime = null;
@@ -254,6 +254,6 @@ public sealed class NotificationCommandHandler(
     }
 
     private static bool TryParsePlatform(string? value, out DeviceTokenPlatform platform) =>
-        Enum.TryParse(value?.Trim(), ignoreCase: true, out platform) &&
+        Enum.TryParse(value?.Trim(), true, out platform) &&
         Enum.IsDefined(platform);
 }

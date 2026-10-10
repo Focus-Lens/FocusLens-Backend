@@ -1,4 +1,3 @@
-using FocusLens.Application.Common.Interfaces;
 using FocusLens.Domain;
 using FocusLens.Domain.ChildSetup;
 using FocusLens.Domain.Common.Interfaces;
@@ -28,8 +27,7 @@ public sealed class SetChildSetupProfileModeCommandHandler(
             );
         }
 
-        Parent? parent = await parentRepository.FirstOrDefaultAsync(
-            item => item.UserId == userId
+        Parent? parent = await parentRepository.FirstOrDefaultAsync(item => item.UserId == userId
         );
 
         if (parent is null)
@@ -68,9 +66,9 @@ public sealed class SetChildSetupProfileModeCommandHandler(
             );
         }
 
-        if (!Enum.TryParse<ChildSetupProfileMode>(
+        if (!Enum.TryParse(
                 request.ProfileSetupMode?.Trim(),
-                ignoreCase: true,
+                true,
                 out ChildSetupProfileMode mode)
             || !Enum.IsDefined(mode))
         {

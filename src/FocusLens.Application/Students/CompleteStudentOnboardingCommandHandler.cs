@@ -1,7 +1,8 @@
 using FocusLens.Application.Common.Errors;
 using FocusLens.Application.Common.Interfaces;
-using FocusLens.Application.Common.Utilities;
 using FocusLens.Application.Common.Mappings;
+using FocusLens.Application.Common.Services;
+using FocusLens.Application.Common.Utilities;
 using FocusLens.Contracts.Students;
 using FocusLens.Domain;
 using FocusLens.Domain.Access;
@@ -56,7 +57,9 @@ public sealed class CompleteStudentOnboardingCommandHandler(
             .Select(MapSubject)
             .ToList();
 
-        DomainStudentGoal? goal = request.Request.Goal is null ? null : StudentEnumMapper.ToDomain(request.Request.Goal.Value);
+        DomainStudentGoal? goal = request.Request.Goal is null
+            ? null
+            : StudentEnumMapper.ToDomain(request.Request.Goal.Value);
 
         student.CompleteOnboarding(
             goal,
@@ -89,7 +92,7 @@ public sealed class CompleteStudentOnboardingCommandHandler(
 
             DayOfWeek weekStartsOn = ResolveWeekStartsOn(activeRelationships, student);
 
-            studentLocalTime ??= new FocusLens.Application.Common.Services.StudentLocalTime(timeProvider);
+            studentLocalTime ??= new StudentLocalTime(timeProvider);
             DateOnly today = studentLocalTime.GetToday(student);
             Result<StudyTimeGoal> studyTimeGoal = StudyTimeGoal.Create(
                 DomainStudyTimeGoalPeriod.Weekly,
@@ -136,10 +139,10 @@ public sealed class CompleteStudentOnboardingCommandHandler(
         }
 
         return new CompleteStudentOnboardingResponse(
-    user.Id,
-    user.FirstName,
-    user.LastName,
-    student.IsOnboardingCompleted ? "completed" : "incomplete");
+            user.Id,
+            user.FirstName,
+            user.LastName,
+            student.IsOnboardingCompleted ? "completed" : "incomplete");
     }
 
     private static StudentSubject MapSubject(StudentSubjectRequest subject)

@@ -11,9 +11,10 @@ namespace FocusLens.Application.UnitTests.Access;
 
 public sealed class ResolveStudentParentInvitationQueryHandlerTests
 {
+    private const string RawToken = "test-invitation-token";
+
     private static readonly DateTimeOffset Now = new(
         2026, 9, 21, 12, 0, 0, TimeSpan.Zero);
-    private const string RawToken = "test-invitation-token";
 
     [Fact]
     public async Task Handle_WithValidInvitation_ReturnsPrivacySafePreview()
@@ -198,11 +199,7 @@ public sealed class ResolveStudentParentInvitationQueryHandlerTests
         student.SetPreferredName("Youssef");
         student.SetPrivateProperty(
             "User",
-            new ApplicationUser
-            {
-                FirstName = "Youssef",
-                Email = "student@example.com"
-            });
+            new ApplicationUser { FirstName = "Youssef", Email = "student@example.com" });
 
         Parent parent = new(Guid.NewGuid());
         ParentStudentRelationship relationship = new(
@@ -259,11 +256,7 @@ public sealed class ResolveStudentParentInvitationQueryHandlerTests
         student.SetDateOfBirth(dateOfBirth);
         student.SetPrivateProperty(
             "User",
-            new ApplicationUser
-            {
-                FirstName = "Youssef",
-                LastName = "Ali"
-            });
+            new ApplicationUser { FirstName = "Youssef", LastName = "Ali" });
 
         return student;
     }
@@ -271,10 +264,7 @@ public sealed class ResolveStudentParentInvitationQueryHandlerTests
     private static string Hash(string token) =>
         Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(token)));
 
-    private static DateOnly DateOfBirthForAge(int age)
-    {
-        return new DateOnly(Now.Year - age, 1, 1);
-    }
+    private static DateOnly DateOfBirthForAge(int age) => new(Now.Year - age, 1, 1);
 
     private sealed class FixedTimeProvider(DateTimeOffset utcNow) : TimeProvider
     {

@@ -1,10 +1,10 @@
-﻿using System.Text;
-using System.Security.Claims;
+﻿using System.Security.Claims;
+using System.Text;
+using FocusLens.Application.Common.Interfaces;
 using FocusLens.Domain.Common.Interfaces;
 using FocusLens.Domain.Identity;
 using FocusLens.Domain.Interfaces;
 using FocusLens.Domain.StudySessions;
-using FocusLens.Application.Common.Interfaces;
 using FocusLens.Infrastructure.AI;
 using FocusLens.Infrastructure.Authentication;
 using FocusLens.Infrastructure.Data;
@@ -15,7 +15,6 @@ using FocusLens.Infrastructure.Notifications;
 using FocusLens.Infrastructure.ProfileImages;
 using FocusLens.Infrastructure.StudySessions;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
-using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
@@ -58,21 +57,20 @@ public static class DependencyInjection
             configuration.GetSection(ProfileImageStorageOptions.SectionName));
         services.Configure<StudySessionImageUploadOptions>(
             configuration.GetSection(StudySessionImageUploadOptions.SectionName));
-          services.AddOptions<FocusLensAiOptions>()
-              .Bind(configuration.GetRequiredSection(FocusLensAiOptions.SectionName))
-              .Validate(
-                  options => Uri.TryCreate(options.BaseUrl, UriKind.Absolute, out _),
-                  "FocusLensAI:BaseUrl must be a valid absolute URI.")
-              .ValidateOnStart();
+        services.AddOptions<FocusLensAiOptions>()
+            .Bind(configuration.GetRequiredSection(FocusLensAiOptions.SectionName))
+            .Validate(
+                options => Uri.TryCreate(options.BaseUrl, UriKind.Absolute, out _),
+                "FocusLensAI:BaseUrl must be a valid absolute URI.")
+            .ValidateOnStart();
 
-          services.AddHttpClient<IFocusLensAiClient, FocusLensAiClient>(
-              (serviceProvider, client) =>
-              {
-                  FocusLensAiOptions options =
-                      serviceProvider.GetRequiredService<IOptions<FocusLensAiOptions>>().Value;
+        services.AddHttpClient<IFocusLensAiClient, FocusLensAiClient>((serviceProvider, client) =>
+        {
+            FocusLensAiOptions options =
+                serviceProvider.GetRequiredService<IOptions<FocusLensAiOptions>>().Value;
 
-                  client.BaseAddress = new Uri(options.BaseUrl, UriKind.Absolute);
-              });
+            client.BaseAddress = new Uri(options.BaseUrl, UriKind.Absolute);
+        });
 
         services.AddOptions<BehavioralIntelligenceOptions>()
             .Bind(configuration.GetRequiredSection(BehavioralIntelligenceOptions.SectionName))
@@ -81,23 +79,22 @@ public static class DependencyInjection
                 "BehavioralIntelligence:BaseUrl must be a valid absolute URI.")
             .ValidateOnStart();
 
-        services.AddHttpClient<IBehavioralIntelligenceClient, BehavioralIntelligenceClient>(
-            (serviceProvider, client) =>
+        services.AddHttpClient<IBehavioralIntelligenceClient, BehavioralIntelligenceClient>((serviceProvider, client) =>
+        {
+            BehavioralIntelligenceOptions options =
+                serviceProvider.GetRequiredService<IOptions<BehavioralIntelligenceOptions>>().Value;
+
+            client.BaseAddress = new Uri(options.BaseUrl, UriKind.Absolute);
+
+            string serviceKey = configuration["AI2_SERVICE_KEY"] ?? string.Empty;
+            if (string.IsNullOrWhiteSpace(serviceKey))
             {
-                BehavioralIntelligenceOptions options =
-                    serviceProvider.GetRequiredService<IOptions<BehavioralIntelligenceOptions>>().Value;
+                throw new InvalidOperationException(
+                    "AI2_SERVICE_KEY must be configured to call the Python Behavioral Intelligence service.");
+            }
 
-                client.BaseAddress = new Uri(options.BaseUrl, UriKind.Absolute);
-
-                string serviceKey = configuration["AI2_SERVICE_KEY"] ?? string.Empty;
-                if (string.IsNullOrWhiteSpace(serviceKey))
-                {
-                    throw new InvalidOperationException(
-                        "AI2_SERVICE_KEY must be configured to call the Python Behavioral Intelligence service.");
-                }
-
-                client.DefaultRequestHeaders.Add("X-Service-Key", serviceKey);
-            });
+            client.DefaultRequestHeaders.Add("X-Service-Key", serviceKey);
+        });
 
         services.AddScoped<IStudyMaterialFileStore, LocalStudyMaterialFileStore>();
         services.AddScoped<IStudySessionImageFileStore, LocalStudySessionImageFileStore>();

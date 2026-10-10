@@ -36,7 +36,8 @@ public class StudentsApiTests
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         JsonElement profile = await GetProfileAsync(client);
         Assert.Equal("incomplete", profile.GetProperty("onboardingStatus").GetString());
-        Assert.Contains("studyTimeGoal", profile.GetProperty("missingFields").EnumerateArray().Select(value => value.GetString()));
+        Assert.Contains("studyTimeGoal",
+            profile.GetProperty("missingFields").EnumerateArray().Select(value => value.GetString()));
     }
 
     [Fact]
@@ -95,8 +96,10 @@ public class StudentsApiTests
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         JsonElement profile = await GetProfileAsync(client);
         Assert.Equal("incomplete", profile.GetProperty("onboardingStatus").GetString());
-        Assert.Contains("dateOfBirth", profile.GetProperty("missingFields").EnumerateArray().Select(value => value.GetString()));
-        Assert.Contains("studyTimeGoal", profile.GetProperty("missingFields").EnumerateArray().Select(value => value.GetString()));
+        Assert.Contains("dateOfBirth",
+            profile.GetProperty("missingFields").EnumerateArray().Select(value => value.GetString()));
+        Assert.Contains("studyTimeGoal",
+            profile.GetProperty("missingFields").EnumerateArray().Select(value => value.GetString()));
     }
 
     [Fact]
@@ -157,7 +160,8 @@ public class StudentsApiTests
         Assert.Equal(0, root.GetProperty("subjects").GetArrayLength());
         Assert.Equal("incomplete", root.GetProperty("onboardingStatus").GetString());
         Assert.Contains("goal", root.GetProperty("missingFields").EnumerateArray().Select(value => value.GetString()));
-        Assert.Contains("subjects", root.GetProperty("missingFields").EnumerateArray().Select(value => value.GetString()));
+        Assert.Contains("subjects",
+            root.GetProperty("missingFields").EnumerateArray().Select(value => value.GetString()));
     }
 
     [Fact]

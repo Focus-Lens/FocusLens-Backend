@@ -14,4 +14,3 @@ public sealed record SetStudySessionDurationRequest(int FocusDurationMinutes);
 public sealed record SetStudySessionSelectionRequest(int FromPage, int ToPage);
 
 public sealed record UpdateStudySessionProgressRequest(int? CurrentPage);
-

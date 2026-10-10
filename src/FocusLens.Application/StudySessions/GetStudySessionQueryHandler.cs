@@ -41,15 +41,12 @@ public sealed class GetStudySessionQueryHandler(
         DateTimeOffset utcNow = timeProvider.GetUtcNow();
 
         IEnumerable<StudySessionSelectedSection> selectedSections =
-            await selectedSectionRepository.GetAllAsync(
-                section => section.StudySessionSelectionId == session.Selection!.Id);
+            await selectedSectionRepository.GetAllAsync(section =>
+                section.StudySessionSelectionId == session.Selection!.Id);
 
         int estimatedStudyTimeMinutes =
             selectedSections.Sum(section => section.EstimatedDurationMinutes);
 
-        return session.ToResponse(utcNow) with
-        {
-            EstimatedStudyTimeMinutes = estimatedStudyTimeMinutes
-        };
+        return session.ToResponse(utcNow) with { EstimatedStudyTimeMinutes = estimatedStudyTimeMinutes };
     }
 }

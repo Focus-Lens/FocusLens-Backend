@@ -55,7 +55,8 @@ public sealed class HomeQueryHandler(
         (Student Student, IReadOnlyCollection<DateOnly> SessionDates)? data = await GetSessionDatesAsync();
         return data is null
             ? null
-            : new StudyStreakResponse(GetStreakDays(data.Value.SessionDates, studentLocalTime.GetToday(data.Value.Student)));
+            : new StudyStreakResponse(GetStreakDays(data.Value.SessionDates,
+                studentLocalTime.GetToday(data.Value.Student)));
     }
 
     private async Task<(Student Student, IReadOnlyCollection<DateOnly> SessionDates)?> GetSessionDatesAsync()

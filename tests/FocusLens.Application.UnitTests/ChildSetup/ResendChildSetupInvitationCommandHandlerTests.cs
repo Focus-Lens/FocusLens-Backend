@@ -6,6 +6,7 @@ using FocusLens.Contracts.ChildSetup;
 using FocusLens.Domain;
 using FocusLens.Domain.ChildSetup;
 using FocusLens.Domain.Common.Results;
+using FocusLens.Domain.Identity;
 
 namespace FocusLens.Application.UnitTests.ChildSetup;
 
@@ -55,11 +56,7 @@ public sealed class ResendChildSetupInvitationCommandHandlerTests
         Parent parent = new(parentUserId);
         parent.SetPrivateProperty(
             "User",
-            new FocusLens.Domain.Identity.ApplicationUser
-            {
-                FirstName = "Karim",
-                LastName = "Mahmoud"
-            });
+            new ApplicationUser { FirstName = "Karim", LastName = "Mahmoud" });
         ChildSetupDraft draft = CreateInvitedDraft(parent.Id);
 
         string oldHash = Hash("old-token");
@@ -189,8 +186,5 @@ public sealed class ResendChildSetupInvitationCommandHandlerTests
         return draft;
     }
 
-    private static string Hash(string token)
-    {
-        return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(token)));
-    }
+    private static string Hash(string token) => Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(token)));
 }

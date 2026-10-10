@@ -1,5 +1,5 @@
-using FocusLens.Application.Common.Mappings;
 using FocusLens.Application.Common.Interfaces;
+using FocusLens.Application.Common.Mappings;
 using FocusLens.Contracts.Students;
 using FocusLens.Domain;
 using FocusLens.Domain.Access;
@@ -63,9 +63,8 @@ public sealed class UpdateStudentPreferencesCommandHandler(
         }
 
         IEnumerable<ParentStudentRelationship> activeRelationships =
-            await relationshipRepository.GetAllAsync(
-                relationship => relationship.StudentId == student.Id &&
-                                relationship.Status == RelationshipStatus.Active);
+            await relationshipRepository.GetAllAsync(relationship => relationship.StudentId == student.Id &&
+                                                                     relationship.Status == RelationshipStatus.Active);
 
         if (!TryUpdateStudyTimeGoal(
                 student,
@@ -148,7 +147,6 @@ public sealed class UpdateStudentPreferencesCommandHandler(
     {
         return request.DateOfBirthProvided
                || request.GoalProvided
-               
                || request.StudyTimeGoalProvided
                || request.GradeProvided
                || request.CustomGradeProvided
@@ -390,8 +388,8 @@ public sealed class UpdateStudentPreferencesCommandHandler(
                              request.ShareSubjectTrendsWithParents !=
                              student.ShareSubjectTrendsWithParents;
         bool detailedAnswersChanged = request.ShareDetailedAnswersWithParentsProvided &&
-                                    request.ShareDetailedAnswersWithParents !=
-                                    student.ShareDetailedAnswersWithParents;
+                                      request.ShareDetailedAnswersWithParents !=
+                                      student.ShareDetailedAnswersWithParents;
 
         return summariesChanged || trendsChanged || detailedAnswersChanged;
     }

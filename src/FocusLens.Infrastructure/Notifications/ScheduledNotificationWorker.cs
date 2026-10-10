@@ -38,7 +38,8 @@ public sealed class ScheduledNotificationWorker(
     private async Task CreateDueNotificationsAsync(CancellationToken cancellationToken)
     {
         using IServiceScope scope = scopeFactory.CreateScope();
-        IBaseRepository<Student> studentRepository = scope.ServiceProvider.GetRequiredService<IBaseRepository<Student>>();
+        IBaseRepository<Student> studentRepository =
+            scope.ServiceProvider.GetRequiredService<IBaseRepository<Student>>();
         IBaseRepository<StudentNotificationPreferences> preferencesRepository =
             scope.ServiceProvider.GetRequiredService<IBaseRepository<StudentNotificationPreferences>>();
         IBaseRepository<ParentStudentRelationship> relationshipRepository =
@@ -133,10 +134,10 @@ public sealed class ScheduledNotificationWorker(
             List<ParentStudentRelationship> relationships =
                 (await relationshipRepository.GetAllAsync(
                     relationship =>
-                    relationship.StudentId == student.Id &&
-                    relationship.Status == RelationshipStatus.Active &&
-                    !relationship.Parent.User.IsDisabled &&
-                    relationship.Parent.User.DeletedAtUtc == null,
+                        relationship.StudentId == student.Id &&
+                        relationship.Status == RelationshipStatus.Active &&
+                        !relationship.Parent.User.IsDisabled &&
+                        relationship.Parent.User.DeletedAtUtc == null,
                     relationship => relationship.Parent,
                     relationship => relationship.Parent.User))
                 .ToList();

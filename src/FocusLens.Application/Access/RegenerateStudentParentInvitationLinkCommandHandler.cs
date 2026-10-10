@@ -32,8 +32,7 @@ public sealed class RegenerateStudentParentInvitationLinkCommandHandler(
                 "The current user could not be identified.");
         }
 
-        Student? student = await studentRepository.FirstOrDefaultAsync(
-            item => item.UserId == userId);
+        Student? student = await studentRepository.FirstOrDefaultAsync(item => item.UserId == userId);
 
         if (student is null)
         {

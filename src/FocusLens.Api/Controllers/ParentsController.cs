@@ -76,23 +76,27 @@ public sealed class ParentsController(ISender sender) : ApiController
     }
 
     [HttpPut("students/{studentId:guid}/overview-week")]
-    public async Task<IActionResult> SetOverviewWeek(Guid studentId, UpdateParentOverviewWeekRequest request, CancellationToken cancellationToken)
+    public async Task<IActionResult> SetOverviewWeek(Guid studentId, UpdateParentOverviewWeekRequest request,
+        CancellationToken cancellationToken)
     {
-        Result<ParentOverviewWeekResponse> result = await sender.Send(new SetParentOverviewWeekCommand(studentId, request.WeekStart), cancellationToken);
+        Result<ParentOverviewWeekResponse> result =
+            await sender.Send(new SetParentOverviewWeekCommand(studentId, request.WeekStart), cancellationToken);
         return result.Match(Ok, Problem);
     }
 
     [HttpGet("students/{studentId:guid}/overview-weeks")]
     public async Task<IActionResult> GetOverviewWeeks(Guid studentId, CancellationToken cancellationToken)
     {
-        Result<ParentOverviewWeeksResponse> result = await sender.Send(new GetParentOverviewWeeksQuery(studentId), cancellationToken);
+        Result<ParentOverviewWeeksResponse> result =
+            await sender.Send(new GetParentOverviewWeeksQuery(studentId), cancellationToken);
         return result.Match(Ok, Problem);
     }
 
     [HttpGet("students/{studentId:guid}/study-goals")]
     public async Task<IActionResult> GetStudentStudyGoals(Guid studentId, CancellationToken cancellationToken)
     {
-        Result<ParentStudyGoalsResponse> result = await sender.Send(new GetParentStudyGoalsQuery(studentId), cancellationToken);
+        Result<ParentStudyGoalsResponse> result =
+            await sender.Send(new GetParentStudyGoalsQuery(studentId), cancellationToken);
         return result.Match(Ok, Problem);
     }
 

@@ -20,7 +20,9 @@ public sealed class ChildSetupInvitation : AuditableEntity
             tokenHash,
             expiresAtUtc,
             protectedToken
-        ) { }
+        )
+    {
+    }
 
     public ChildSetupInvitation(
         Guid childSetupDraftId,
@@ -93,10 +95,7 @@ public sealed class ChildSetupInvitation : AuditableEntity
 
     public ChildSetupDraft ChildSetupDraft { get; private set; } = null!;
 
-    public bool IsExpired(DateTimeOffset now)
-    {
-        return Status == ChildSetupInvitationStatus.Pending && ExpiresAtUtc <= now;
-    }
+    public bool IsExpired(DateTimeOffset now) => Status == ChildSetupInvitationStatus.Pending && ExpiresAtUtc <= now;
 
     public void Claim(DateTimeOffset now)
     {

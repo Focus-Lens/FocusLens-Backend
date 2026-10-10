@@ -1,4 +1,3 @@
-using FocusLens.Application.Common.Interfaces;
 using FocusLens.Contracts.StudySessions;
 using FocusLens.Domain;
 using FocusLens.Domain.Common.Interfaces;
@@ -6,7 +5,6 @@ using FocusLens.Domain.Common.Results;
 using FocusLens.Domain.StudySessions;
 using MediatR;
 using ICurrentUser = FocusLens.Application.Common.Interfaces.ICurrentUser;
-using ContractEventType = FocusLens.Contracts.StudySessions.StudySessionBehaviorEventType;
 using DomainEventType = FocusLens.Domain.StudySessions.StudySessionBehaviorEventType;
 
 namespace FocusLens.Application.StudySessions;
@@ -74,10 +72,10 @@ public sealed class StudySessionBehaviorEventHandler(
         Guid[] ownedQuestionIds = requestedQuestionIds.Length == 0
             ? []
             : (await questionRepository.GetAllAsync(question =>
-                    question.StudySessionId == session.Id &&
-                    requestedQuestionIds.Contains(question.Id)))
-                .Select(question => question.Id)
-                .ToArray();
+                question.StudySessionId == session.Id &&
+                requestedQuestionIds.Contains(question.Id)))
+            .Select(question => question.Id)
+            .ToArray();
 
         List<StudySessionBehaviorEvent> entities = [];
         foreach (StudySessionBehaviorEventRequest item in events)
@@ -107,7 +105,7 @@ public sealed class StudySessionBehaviorEventHandler(
                 session.Id,
                 item.StudyMaterialSectionId,
                 item.StudySessionQuestionId,
-                (DomainEventType)(int)(ContractEventType)item.EventType,
+                (DomainEventType)(int)item.EventType,
                 item.OccurredAtUtc,
                 item.ScrollSpeedAvgPxPerSec,
                 item.ScrollDirectionChanges,

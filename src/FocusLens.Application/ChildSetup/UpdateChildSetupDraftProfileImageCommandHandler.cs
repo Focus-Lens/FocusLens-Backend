@@ -29,8 +29,7 @@ public sealed class UpdateChildSetupDraftProfileImageCommandHandler(
                 "The current user could not be identified.");
         }
 
-        Parent? parent = await parentRepository.FirstOrDefaultAsync(
-            item => item.UserId == userId);
+        Parent? parent = await parentRepository.FirstOrDefaultAsync(item => item.UserId == userId);
 
         if (parent is null)
         {

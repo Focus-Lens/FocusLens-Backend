@@ -1,5 +1,5 @@
-using FocusLens.Contracts.Students;
 using FocusLens.Application.Parents;
+using FocusLens.Contracts.Students;
 using FocusLens.Domain;
 using FocusLens.Domain.Students;
 

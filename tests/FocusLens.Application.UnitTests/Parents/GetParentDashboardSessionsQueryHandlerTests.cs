@@ -17,12 +17,13 @@ public sealed class GetParentDashboardSessionsQueryHandlerTests
     public async Task Sessions_UsesLatestBehaviorWindowForFocusAnalysis()
     {
         TestContext context = CreateContext();
-        StudySession session = Completed(context.Student.Id, new DateTimeOffset(2026, 9, 20, 9, 0, 0, TimeSpan.Zero), 30);
+        StudySession session =
+            Completed(context.Student.Id, new DateTimeOffset(2026, 9, 20, 9, 0, 0, TimeSpan.Zero), 30);
         StudySessionBehaviorWindow first = BehaviorWindow(session.Id, 1, 42, "DISTRACTED", "DECLINING");
         StudySessionBehaviorWindow latest = BehaviorWindow(session.Id, 2, 87, "DEEP_FOCUS", "IMPROVING");
 
         Result<ParentDashboardSessionHistoryResponse> result = await CreateHandler(context, [session], [first, latest])
-            .Handle(new(context.Student.Id, null, null), CancellationToken.None);
+            .Handle(new GetParentDashboardSessionsQuery(context.Student.Id, null, null), CancellationToken.None);
 
         Assert.True(result.IsSuccess);
         ParentDashboardStudySessionResponse response = Assert.Single(result.Value.Sessions);
@@ -35,10 +36,11 @@ public sealed class GetParentDashboardSessionsQueryHandlerTests
     public async Task Sessions_WithoutBehaviorWindowReturnsNullFocusAnalysis()
     {
         TestContext context = CreateContext();
-        StudySession session = Completed(context.Student.Id, new DateTimeOffset(2026, 9, 20, 9, 0, 0, TimeSpan.Zero), 30);
+        StudySession session =
+            Completed(context.Student.Id, new DateTimeOffset(2026, 9, 20, 9, 0, 0, TimeSpan.Zero), 30);
 
         Result<ParentDashboardSessionHistoryResponse> result = await CreateHandler(context, [session])
-            .Handle(new(context.Student.Id, null, null), CancellationToken.None);
+            .Handle(new GetParentDashboardSessionsQuery(context.Student.Id, null, null), CancellationToken.None);
 
         Assert.True(result.IsSuccess);
         ParentDashboardStudySessionResponse response = Assert.Single(result.Value.Sessions);
@@ -52,15 +54,21 @@ public sealed class GetParentDashboardSessionsQueryHandlerTests
     {
         TestContext context = CreateContext();
         Guid includedSubjectId = Guid.NewGuid();
-        StudySession mostRecent = Completed(context.Student.Id, new DateTimeOffset(2026, 9, 20, 10, 0, 0, TimeSpan.Zero), 30, includedSubjectId);
-        StudySession expectedPageSession = Completed(context.Student.Id, new DateTimeOffset(2026, 9, 20, 9, 0, 0, TimeSpan.Zero), 30, includedSubjectId);
-        StudySession otherSubject = Completed(context.Student.Id, new DateTimeOffset(2026, 9, 20, 8, 0, 0, TimeSpan.Zero), 30, Guid.NewGuid());
-        StudySession active = Active(context.Student.Id, new DateTimeOffset(2026, 9, 20, 7, 0, 0, TimeSpan.Zero), 30, includedSubjectId);
+        StudySession mostRecent = Completed(context.Student.Id,
+            new DateTimeOffset(2026, 9, 20, 10, 0, 0, TimeSpan.Zero), 30, includedSubjectId);
+        StudySession expectedPageSession = Completed(context.Student.Id,
+            new DateTimeOffset(2026, 9, 20, 9, 0, 0, TimeSpan.Zero), 30, includedSubjectId);
+        StudySession otherSubject = Completed(context.Student.Id,
+            new DateTimeOffset(2026, 9, 20, 8, 0, 0, TimeSpan.Zero), 30, Guid.NewGuid());
+        StudySession active = Active(context.Student.Id, new DateTimeOffset(2026, 9, 20, 7, 0, 0, TimeSpan.Zero), 30,
+            includedSubjectId);
 
         Result<ParentDashboardSessionHistoryResponse> result = await CreateHandler(
                 context,
                 [mostRecent, expectedPageSession, otherSubject, active])
-            .Handle(new(context.Student.Id, [nameof(StudySessionStatus.Completed)], includedSubjectId, 2, 1), CancellationToken.None);
+            .Handle(
+                new GetParentDashboardSessionsQuery(context.Student.Id, [nameof(StudySessionStatus.Completed)],
+                    includedSubjectId, 2, 1), CancellationToken.None);
 
         Assert.True(result.IsSuccess);
         Assert.Equal(2, result.Value.Pagination.TotalCount);
@@ -77,7 +85,7 @@ public sealed class GetParentDashboardSessionsQueryHandlerTests
         context.Student.SetParentSharingPreferences(false, true);
 
         Result<ParentDashboardSessionHistoryResponse> result = await CreateHandler(context, [])
-            .Handle(new(context.Student.Id, null, null), CancellationToken.None);
+            .Handle(new GetParentDashboardSessionsQuery(context.Student.Id, null, null), CancellationToken.None);
 
         Error error = Assert.Single(result.Errors);
         Assert.Equal("ParentDashboard.SessionSummariesPrivate", error.Code);
@@ -105,7 +113,7 @@ public sealed class GetParentDashboardSessionsQueryHandlerTests
         student.SetParentSharingPreferences(true, true);
         ParentStudentRelationship relationship = new(parent.Id, student.Id);
         relationship.Accept();
-        return new(parent, student, relationship);
+        return new TestContext(parent, student, relationship);
     }
 
     private static StudySessionBehaviorWindow BehaviorWindow(

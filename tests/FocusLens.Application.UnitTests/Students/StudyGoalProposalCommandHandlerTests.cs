@@ -6,7 +6,6 @@ using FocusLens.Domain.Access;
 using FocusLens.Domain.Common.Results;
 using FocusLens.Domain.Identity;
 using FocusLens.Domain.Students;
-using MediatR;
 using DomainStudyTimeGoalPeriod = FocusLens.Domain.Students.StudyTimeGoalPeriod;
 
 namespace FocusLens.Application.UnitTests.Students;
@@ -18,11 +17,7 @@ public sealed class StudyGoalProposalCommandHandlerTests
     {
         Guid parentUserId = Guid.NewGuid();
         Parent parent = CreateParent(parentUserId);
-        parent.SetPrivateProperty("User", new ApplicationUser
-        {
-            FirstName = "Mona",
-            LastName = "Hassan"
-        });
+        parent.SetPrivateProperty("User", new ApplicationUser { FirstName = "Mona", LastName = "Hassan" });
 
         Student student = CreateStudent();
 
@@ -591,11 +586,7 @@ public sealed class StudyGoalProposalCommandHandlerTests
 
         parent.SetPrivateProperty(
             "User",
-            new ApplicationUser
-            {
-                FirstName = "Ahmed",
-                LastName = "Mahmoud"
-            });
+            new ApplicationUser { FirstName = "Ahmed", LastName = "Mahmoud" });
 
         StudyGoalProposal firstProposal = new(
             parent.Id,
@@ -644,12 +635,7 @@ public sealed class StudyGoalProposalCommandHandlerTests
 
         student.SetPrivateProperty(
             "User",
-            new ApplicationUser
-            {
-                FirstName = "Test",
-                LastName = "Student",
-                Email = "test@example.com"
-            });
+            new ApplicationUser { FirstName = "Test", LastName = "Student", Email = "test@example.com" });
 
         return student;
     }
@@ -663,12 +649,7 @@ public sealed class StudyGoalProposalCommandHandlerTests
 
         parent.SetPrivateProperty(
             "User",
-            new ApplicationUser
-            {
-                FirstName = "Test",
-                LastName = "Parent",
-                Email = "parent@example.com"
-            });
+            new ApplicationUser { FirstName = "Test", LastName = "Parent", Email = "parent@example.com" });
 
         return parent;
     }

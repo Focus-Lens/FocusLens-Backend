@@ -25,7 +25,10 @@ public sealed class GetPrivacyQueryHandler(
                 && document.PublishedOnUtc != null))
             .OrderByDescending(document => document.PublishedOnUtc)
             .FirstOrDefault();
-        if (privacy?.PublishedOnUtc is null) return ApplicationErrors.Terms.NotFound;
+        if (privacy?.PublishedOnUtc is null)
+        {
+            return ApplicationErrors.Terms.NotFound;
+        }
 
         return new TermsResponse(privacy.Id, privacy.Audience.ToString(), privacy.Version,
             privacy.Content, privacy.PublishedOnUtc.Value);

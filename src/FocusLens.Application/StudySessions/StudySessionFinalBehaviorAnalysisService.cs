@@ -1,7 +1,6 @@
 using FocusLens.Application.BehavioralIntelligence;
-using FocusLens.Contracts.BehavioralIntelligence;
 using FocusLens.Application.Common.Interfaces;
-using FocusLens.Domain;
+using FocusLens.Contracts.BehavioralIntelligence;
 using FocusLens.Domain.Common.Interfaces;
 using FocusLens.Domain.Common.Results;
 using FocusLens.Domain.StudySessions;
@@ -80,8 +79,7 @@ public sealed class StudySessionFinalBehaviorAnalysisService(
         }
 
         StudySessionQuestion[] questions =
-            (await questionRepository.GetAllAsync(
-                item => item.StudySessionId == session.Id))
+            (await questionRepository.GetAllAsync(item => item.StudySessionId == session.Id))
             .OrderBy(item => item.Order)
             .ToArray();
 
@@ -91,21 +89,18 @@ public sealed class StudySessionFinalBehaviorAnalysisService(
 
         StudySessionQuestionAnswer[] answers = questionIds.Length == 0
             ? []
-            : (await answerRepository.GetAllAsync(
-                    item => questionIds.Contains(item.StudySessionQuestionId)))
-                .OrderBy(item => item.AnsweredAtUtc)
-                .ToArray();
+            : (await answerRepository.GetAllAsync(item => questionIds.Contains(item.StudySessionQuestionId)))
+            .OrderBy(item => item.AnsweredAtUtc)
+            .ToArray();
 
         StudySessionBehaviorEvent[] events =
-            (await behaviorEventRepository.GetAllAsync(
-                item => item.StudySessionId == session.Id &&
-                        item.OccurredAtUtc <= timelineEndUtc))
+            (await behaviorEventRepository.GetAllAsync(item => item.StudySessionId == session.Id &&
+                                                               item.OccurredAtUtc <= timelineEndUtc))
             .OrderBy(item => item.OccurredAtUtc)
             .ToArray();
 
         StudySessionBehaviorWindow[] persistedWindows =
-            (await windowRepository.GetAllAsync(
-                item => item.StudySessionId == session.Id))
+            (await windowRepository.GetAllAsync(item => item.StudySessionId == session.Id))
             .OrderBy(item => item.WindowIndex)
             .ToArray();
 
@@ -113,8 +108,7 @@ public sealed class StudySessionFinalBehaviorAnalysisService(
         {
             BehaviorWindowTimelineItem? nextWindow =
                 timeline.FirstOrDefault(window =>
-                    persistedWindows.All(
-                        persisted => persisted.WindowIndex != window.WindowIndex));
+                    persistedWindows.All(persisted => persisted.WindowIndex != window.WindowIndex));
 
             if (nextWindow is null)
             {
@@ -196,7 +190,7 @@ public sealed class StudySessionFinalBehaviorAnalysisService(
 
             persistedWindows =
             [
-                ..persistedWindows,
+                .. persistedWindows,
                 windowResult.Value
             ];
         }

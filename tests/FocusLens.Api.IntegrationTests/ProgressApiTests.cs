@@ -3,9 +3,10 @@ using System.Net.Http.Headers;
 using System.Text.Json;
 using FocusLens.Domain;
 using FocusLens.Domain.Access;
+using FocusLens.Domain.Common.Results;
+using FocusLens.Domain.Identity;
 using FocusLens.Domain.Students;
 using FocusLens.Domain.StudySessions;
-using FocusLens.Domain.Identity;
 
 namespace FocusLens.Api.IntegrationTests;
 
@@ -143,8 +144,9 @@ public sealed class ProgressApiTests
         using HttpClient client = CreateClient(factory, userId, "Student");
         using JsonDocument lastSeven = JsonDocument.Parse(await (await client.GetAsync("/api/progress?range=Last7Days"))
             .Content.ReadAsStringAsync());
-        using JsonDocument lastThirty = JsonDocument.Parse(await (await client.GetAsync("/api/progress?range=Last30Days"))
-            .Content.ReadAsStringAsync());
+        using JsonDocument lastThirty = JsonDocument.Parse(
+            await (await client.GetAsync("/api/progress?range=Last30Days"))
+                .Content.ReadAsStringAsync());
         using JsonDocument empty = JsonDocument.Parse(await (await client.GetAsync(
             "/api/progress?range=Custom&dateFrom=2026-01-01&dateTo=2026-01-01")).Content.ReadAsStringAsync());
 
@@ -191,7 +193,8 @@ public sealed class ProgressApiTests
         return student;
     }
 
-    private static StudySession CreateHistoricalSession(Student student, StudentSubject subject, DateTimeOffset startedAt,
+    private static StudySession CreateHistoricalSession(Student student, StudentSubject subject,
+        DateTimeOffset startedAt,
         StudySessionStatus finalStatus)
     {
         StudySession session = StudySession.Create(student.Id, StudySessionMode.Digital).Value;
@@ -202,7 +205,7 @@ public sealed class ProgressApiTests
         Assert.True(session.SetStudyMaterial(material).IsSuccess);
         Assert.True(session.MarkReady().IsSuccess);
         Assert.True(session.Start(startedAt).IsSuccess);
-        var result = finalStatus switch
+        Result<Success> result = finalStatus switch
         {
             StudySessionStatus.Paused => session.Pause(startedAt.AddMinutes(42)),
             StudySessionStatus.Completed => session.CompleteSuccessfully(startedAt.AddMinutes(42)),

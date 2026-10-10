@@ -41,11 +41,16 @@ public static class SessionFocusMetricsCalculator
 
     private static int? CalculateWeightedFocusScore(IEnumerable<StudySessionBehaviorWindow> windows)
     {
-        StudySessionBehaviorWindow[] weightedWindows = windows
-            .Where(window => window.FocusScore.HasValue &&
-                             window.WindowActiveTimeSeconds is double seconds &&
-                             double.IsFinite(seconds) && seconds > 0)
-            .ToArray();
+        StudySessionBehaviorWindow[] weightedWindows =
+        [
+            .. windows
+                .Where(window =>
+                    window.FocusScore.HasValue
+                    && window.WindowActiveTimeSeconds is double seconds
+                    && double.IsFinite(seconds)
+                    && seconds > 0
+                )
+        ];
 
         if (weightedWindows.Length == 0)
         {
@@ -54,7 +59,8 @@ public static class SessionFocusMetricsCalculator
 
         double totalWeight = weightedWindows.Sum(window => window.WindowActiveTimeSeconds!.Value);
         double weightedScore = weightedWindows.Sum(window =>
-            window.FocusScore!.Value * window.WindowActiveTimeSeconds!.Value);
+            window.FocusScore!.Value * window.WindowActiveTimeSeconds!.Value
+        );
 
         return (int)Math.Round(weightedScore / totalWeight, MidpointRounding.AwayFromZero);
     }
@@ -63,9 +69,12 @@ public static class SessionFocusMetricsCalculator
     {
         StudySessionBehaviorWindow[] allWindows = windows.ToArray();
         var stateWeights = allWindows
-            .Where(window => !string.IsNullOrWhiteSpace(window.FocusState) &&
-                             window.WindowActiveTimeSeconds is double seconds &&
-                             double.IsFinite(seconds) && seconds > 0)
+            .Where(window =>
+                !string.IsNullOrWhiteSpace(window.FocusState)
+                && window.WindowActiveTimeSeconds is double seconds
+                && double.IsFinite(seconds)
+                && seconds > 0
+            )
             .GroupBy(window => window.FocusState!.Trim(), StringComparer.OrdinalIgnoreCase)
             .Select(group => new
             {
@@ -73,7 +82,8 @@ public static class SessionFocusMetricsCalculator
                 Weight = Math.Round(
                     group.Sum(window => window.WindowActiveTimeSeconds!.Value),
                     6,
-                    MidpointRounding.ToEven)
+                    MidpointRounding.ToEven
+                )
             })
             .ToArray();
 
@@ -83,10 +93,13 @@ public static class SessionFocusMetricsCalculator
             // state. When every scored window has zero weight, apply the documented severity
             // tie-break instead of losing all state information. Empty/unscored windows remain null.
             return allWindows
-                .Where(window => window.FocusScore.HasValue &&
-                                 !string.IsNullOrWhiteSpace(window.FocusState) &&
-                                 window.WindowActiveTimeSeconds is double seconds &&
-                                 double.IsFinite(seconds) && seconds == 0)
+                .Where(window =>
+                    window.FocusScore.HasValue
+                    && !string.IsNullOrWhiteSpace(window.FocusState)
+                    && window.WindowActiveTimeSeconds is double seconds
+                    && double.IsFinite(seconds)
+                    && seconds == 0
+                )
                 .Select(window => window.FocusState!.Trim())
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .OrderBy(GetSeverity)
@@ -101,7 +114,6 @@ public static class SessionFocusMetricsCalculator
             .First()
             .State;
     }
-
 
     private static string? CalculateTrend(IEnumerable<StudySessionBehaviorWindow> windows)
     {
@@ -124,14 +136,17 @@ public static class SessionFocusMetricsCalculator
         }
 
         int change = scores[^1] - scores[0];
-        return change >= 8 ? "IMPROVING" : change <= -8 ? "DECLINING" : "STABLE";
+        return change >= 8 ? "IMPROVING"
+            : change <= -8 ? "DECLINING"
+            : "STABLE";
     }
 
     private static int GetSeverity(string state)
     {
         int index = Array.FindIndex(
             StateSeverityOrder,
-            candidate => string.Equals(candidate, state, StringComparison.OrdinalIgnoreCase));
+            candidate => string.Equals(candidate, state, StringComparison.OrdinalIgnoreCase)
+        );
         return index < 0 ? int.MaxValue : index;
     }
 }

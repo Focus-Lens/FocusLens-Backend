@@ -63,10 +63,7 @@ public sealed class Notification : AuditableEntity
 
     public bool IsRead => ReadAtUtc is not null;
 
-    public void MarkRead(DateTimeOffset readAtUtc)
-    {
-        ReadAtUtc ??= readAtUtc;
-    }
+    public void MarkRead(DateTimeOffset readAtUtc) => ReadAtUtc ??= readAtUtc;
 
     public void MarkPushSent(DateTimeOffset sentAtUtc)
     {

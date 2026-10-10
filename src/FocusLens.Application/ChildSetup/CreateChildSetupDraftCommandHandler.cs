@@ -1,5 +1,4 @@
 using FocusLens.Contracts.ChildSetup;
-using FocusLens.Contracts.Students;
 using FocusLens.Domain;
 using FocusLens.Domain.ChildSetup;
 using FocusLens.Domain.Common.Interfaces;

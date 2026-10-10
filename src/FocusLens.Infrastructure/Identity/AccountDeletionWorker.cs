@@ -1,9 +1,8 @@
 using FocusLens.Domain;
-using FocusLens.Domain.Access;
 using FocusLens.Domain.Identity;
-using FocusLens.Domain.Students;
 using FocusLens.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -42,7 +41,7 @@ public sealed class AccountDeletionWorker(
         DateTimeOffset now = timeProvider.GetUtcNow();
         List<Guid> userIds = await db.Users
             .Where(user => user.IsDisabled && user.DeletedAtUtc != null && user.RestoreUntilUtc != null
-                && user.RestoreUntilUtc <= now)
+                           && user.RestoreUntilUtc <= now)
             .Select(user => user.Id)
             .ToListAsync(cancellationToken);
 
@@ -57,7 +56,7 @@ public sealed class AccountDeletionWorker(
         Guid userId,
         CancellationToken cancellationToken)
     {
-        await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
+        await using IDbContextTransaction transaction = await db.Database.BeginTransactionAsync(cancellationToken);
 
         Parent? parent = await db.Parents.SingleOrDefaultAsync(item => item.UserId == userId, cancellationToken);
         Student? student = await db.Students.SingleOrDefaultAsync(item => item.UserId == userId, cancellationToken);
@@ -92,9 +91,11 @@ public sealed class AccountDeletionWorker(
         // These are user-owned records. Other dependent profile data is removed by
         // the configured database cascades when the profile/account is removed.
         await db.RefreshTokens.Where(token => token.UserId == userId).ExecuteDeleteAsync(cancellationToken);
-        await db.Notifications.Where(notification => notification.RecipientUserId == userId).ExecuteDeleteAsync(cancellationToken);
+        await db.Notifications.Where(notification => notification.RecipientUserId == userId)
+            .ExecuteDeleteAsync(cancellationToken);
         await db.UserDeviceTokens.Where(token => token.UserId == userId).ExecuteDeleteAsync(cancellationToken);
-        await db.UserTermsAcceptances.Where(acceptance => acceptance.UserId == userId).ExecuteDeleteAsync(cancellationToken);
+        await db.UserTermsAcceptances.Where(acceptance => acceptance.UserId == userId)
+            .ExecuteDeleteAsync(cancellationToken);
         await db.StudentNotificationPreferences.Where(preference => preference.StudentUserId == userId)
             .ExecuteDeleteAsync(cancellationToken);
 

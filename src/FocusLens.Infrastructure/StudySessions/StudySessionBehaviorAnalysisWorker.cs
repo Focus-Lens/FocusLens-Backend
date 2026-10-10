@@ -63,15 +63,14 @@ public sealed class StudySessionBehaviorAnalysisWorker(
         DateTimeOffset now = timeProvider.GetUtcNow();
 
         StudySessionBehaviorAnalysisJob? job =
-            await jobRepository.FirstOrDefaultAsync(
-                item =>
-                    (item.Status == StudySessionBehaviorAnalysisJobStatus.Pending &&
-                     (item.NextAttemptAtUtc == null ||
-                      item.NextAttemptAtUtc <= now))
-                    ||
-                    (item.Status == StudySessionBehaviorAnalysisJobStatus.Processing &&
-                     item.ProcessingStartedAtUtc != null &&
-                     item.ProcessingStartedAtUtc <= now - ProcessingLease));
+            await jobRepository.FirstOrDefaultAsync(item =>
+                (item.Status == StudySessionBehaviorAnalysisJobStatus.Pending &&
+                 (item.NextAttemptAtUtc == null ||
+                  item.NextAttemptAtUtc <= now))
+                ||
+                (item.Status == StudySessionBehaviorAnalysisJobStatus.Processing &&
+                 item.ProcessingStartedAtUtc != null &&
+                 item.ProcessingStartedAtUtc <= now - ProcessingLease));
 
         if (job is null)
         {

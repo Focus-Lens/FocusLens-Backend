@@ -4,10 +4,10 @@ namespace FocusLens.Contracts.Notifications;
 
 public sealed class UpdateStudentNotificationPreferencesRequest
 {
-    private bool? _studyRemindersEnabled;
-    private bool? _sessionSummariesEnabled;
     private bool? _parentActivityEnabled;
     private string? _reminderTime;
+    private bool? _sessionSummariesEnabled;
+    private bool? _studyRemindersEnabled;
 
     public bool? StudyRemindersEnabled
     {

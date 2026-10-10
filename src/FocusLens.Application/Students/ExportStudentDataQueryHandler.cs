@@ -1,12 +1,12 @@
 using System.Text;
 using System.Text.Json;
+using FocusLens.Application.Reports;
 using FocusLens.Domain;
 using FocusLens.Domain.Common.Interfaces;
 using FocusLens.Domain.Students;
 using FocusLens.Domain.StudySessions;
 using MediatR;
 using ICurrentUser = FocusLens.Application.Common.Interfaces.ICurrentUser;
-using FocusLens.Application.Reports;
 
 namespace FocusLens.Application.Students;
 
@@ -95,12 +95,7 @@ public sealed class ExportStudentDataQueryHandler(
                 student.PreferredName,
                 student.DateOfBirth,
                 student.Grade,
-                subjects = student.Subjects.Select(subject => new
-                {
-                    subject.Id,
-                    subject.Type,
-                    subject.CustomName
-                }),
+                subjects = student.Subjects.Select(subject => new { subject.Id, subject.Type, subject.CustomName }),
                 student.ShareSessionSummariesWithParents,
                 student.ShareSubjectTrendsWithParents
             },

@@ -4,8 +4,7 @@ public sealed record ParentDashboardResponse(
     Guid StudentId,
     ParentDashboardWeekResponse Week,
     ParentDashboardWeeklyStudyPulseResponse WeeklyStudyPulse,
-    ParentDashboardFocusPatternResponse FocusPattern)
-;
+    ParentDashboardFocusPatternResponse FocusPattern);
 
 public sealed record ParentDashboardWeekResponse(DateOnly StartsOn, DateOnly EndsOn, bool IsCurrentWeek);
 

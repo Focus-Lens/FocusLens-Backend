@@ -14,8 +14,8 @@ public sealed class LoginCommandHandler
     : IRequestHandler<LoginCommand, Result<AuthResponse>>
 {
     private readonly IIdentityService _identityService;
-    private readonly ITokenProvider _tokenProvider;
     private readonly IBaseRepository<Student> _studentRepository;
+    private readonly ITokenProvider _tokenProvider;
 
     public LoginCommandHandler(
         IIdentityService identityService,
@@ -60,8 +60,7 @@ public sealed class LoginCommandHandler
         Student? student = null;
         if (roles.Contains(ApplicationRoles.Student, StringComparer.Ordinal))
         {
-            student = await _studentRepository.FirstOrDefaultAsync(
-                item => item.UserId == user.Id);
+            student = await _studentRepository.FirstOrDefaultAsync(item => item.UserId == user.Id);
 
             if (student is null)
             {
@@ -69,9 +68,8 @@ public sealed class LoginCommandHandler
                     "Students.NotFound",
                     "The current user does not have a student profile.");
             }
-
-
         }
+
         TokenPair tokenPair = await _tokenProvider.CreateTokenPairAsync(
             user,
             cancellationToken);

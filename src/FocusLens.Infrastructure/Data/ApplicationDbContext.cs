@@ -2,8 +2,8 @@ using FocusLens.Domain;
 using FocusLens.Domain.Access;
 using FocusLens.Domain.ChildSetup;
 using FocusLens.Domain.Identity;
-using FocusLens.Domain.Students;
 using FocusLens.Domain.Notifications;
+using FocusLens.Domain.Students;
 using FocusLens.Domain.StudySessions;
 using FocusLens.Infrastructure.Identity.Verification;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
@@ -52,9 +52,11 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
 
     public DbSet<StudySessionBehaviorWindow> StudySessionBehaviorWindows =>
         Set<StudySessionBehaviorWindow>();
+
     public DbSet<StudySessionPauseInterval> StudySessionPauseIntervals => Set<StudySessionPauseInterval>();
 
-    public DbSet<StudySessionBehaviorAnalysisJob> StudySessionBehaviorAnalysisJobs => Set<StudySessionBehaviorAnalysisJob>();
+    public DbSet<StudySessionBehaviorAnalysisJob> StudySessionBehaviorAnalysisJobs =>
+        Set<StudySessionBehaviorAnalysisJob>();
 
 
     public DbSet<ParentStudentRelationship> ParentStudentRelationships =>
@@ -78,7 +80,8 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
 
     public DbSet<UserDeviceToken> UserDeviceTokens => Set<UserDeviceToken>();
 
-    public DbSet<StudentNotificationPreferences> StudentNotificationPreferences => Set<StudentNotificationPreferences>();
+    public DbSet<StudentNotificationPreferences> StudentNotificationPreferences =>
+        Set<StudentNotificationPreferences>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

@@ -124,11 +124,11 @@ public sealed class StudySessionSelection : AuditableEntity
     public Result<Success> SetSelectedAiSectionIds(IEnumerable<string>? sectionIds)
     {
         string[] ids = sectionIds?
-            .Where(id => !string.IsNullOrWhiteSpace(id))
-            .Select(id => id.Trim())
-            .Distinct(StringComparer.Ordinal)
-            .ToArray()
-            ?? [];
+                           .Where(id => !string.IsNullOrWhiteSpace(id))
+                           .Select(id => id.Trim())
+                           .Distinct(StringComparer.Ordinal)
+                           .ToArray()
+                       ?? [];
 
         if (ids.Length == 0)
         {
@@ -156,12 +156,11 @@ public sealed class StudySessionSelection : AuditableEntity
 
         _selectedSections.Clear();
         _selectedSections.AddRange(
-            selectedSections.Select(
-                (section, index) =>
-                    new StudySessionSelectedSection(
-                        section.Id,
-                        section.EstimatedDurationMinutes,
-                        index + 1)));
+            selectedSections.Select((section, index) =>
+                new StudySessionSelectedSection(
+                    section.Id,
+                    section.EstimatedDurationMinutes,
+                    index + 1)));
         return Result.Success;
     }
 }

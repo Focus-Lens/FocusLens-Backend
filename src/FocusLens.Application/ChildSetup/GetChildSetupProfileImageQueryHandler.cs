@@ -16,10 +16,7 @@ public sealed class GetChildSetupProfileImageQueryHandler(
 {
     private static readonly Dictionary<string, string> ContentTypes = new(StringComparer.OrdinalIgnoreCase)
     {
-        [".jpg"] = "image/jpeg",
-        [".jpeg"] = "image/jpeg",
-        [".png"] = "image/png",
-        [".webp"] = "image/webp"
+        [".jpg"] = "image/jpeg", [".jpeg"] = "image/jpeg", [".png"] = "image/png", [".webp"] = "image/webp"
     };
 
     public async Task<Result<ChildSetupProfileImageFile>> Handle(
@@ -33,8 +30,7 @@ public sealed class GetChildSetupProfileImageQueryHandler(
                 "The current user could not be identified.");
         }
 
-        Parent? parent = await parentRepository.FirstOrDefaultAsync(
-            item => item.UserId == userId);
+        Parent? parent = await parentRepository.FirstOrDefaultAsync(item => item.UserId == userId);
 
         if (parent is null)
         {

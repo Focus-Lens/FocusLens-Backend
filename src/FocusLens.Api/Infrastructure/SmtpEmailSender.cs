@@ -203,9 +203,6 @@ using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
 using FocusLens.Application.Common.Interfaces;
-using FocusLens.Settings;
-using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 using MimeKit;
 
 namespace FocusLens.API.Infrastructure;
@@ -217,11 +214,11 @@ public sealed class SmtpEmailSender : IEmailSender
     private const string ParentStudentInvitationTemplate = "ParentStudentInvitation.html";
     private const string StudentParentInvitationTemplate = "StudentParentInvitation.html";
     private const string ChildSetupInvitationTemplate = "ChildSetupInvitation.html";
+    private readonly IConfiguration _configuration;
+    private readonly IHttpClientFactory _httpClientFactory;
+    private readonly ILogger<SmtpEmailSender> _logger;
 
     private readonly EmailTemplateRenderer _templateRenderer;
-    private readonly ILogger<SmtpEmailSender> _logger;
-    private readonly IHttpClientFactory _httpClientFactory;
-    private readonly IConfiguration _configuration;
 
     public SmtpEmailSender(
         EmailTemplateRenderer templateRenderer,
@@ -291,11 +288,7 @@ public sealed class SmtpEmailSender : IEmailSender
     {
         string htmlBody = await _templateRenderer.RenderAsync(
             ParentStudentInvitationTemplate,
-            new Dictionary<string, string>
-            {
-                ["{{ParentEmail}}"] = parentEmail,
-                ["{{InvitationUrl}}"] = invitationUrl
-            },
+            new Dictionary<string, string> { ["{{ParentEmail}}"] = parentEmail, ["{{InvitationUrl}}"] = invitationUrl },
             cancellationToken);
 
         await SendAsync(
@@ -315,8 +308,7 @@ public sealed class SmtpEmailSender : IEmailSender
             StudentParentInvitationTemplate,
             new Dictionary<string, string>
             {
-                ["{{StudentDisplayName}}"] = studentDisplayName,
-                ["{{InvitationUrl}}"] = invitationUrl
+                ["{{StudentDisplayName}}"] = studentDisplayName, ["{{InvitationUrl}}"] = invitationUrl
             },
             cancellationToken);
 
@@ -335,11 +327,7 @@ public sealed class SmtpEmailSender : IEmailSender
     {
         string htmlBody = await _templateRenderer.RenderAsync(
             ChildSetupInvitationTemplate,
-            new Dictionary<string, string>
-            {
-                ["{{ParentName}}"] = parentName,
-                ["{{InvitationUrl}}"] = invitationUrl
-            },
+            new Dictionary<string, string> { ["{{ParentName}}"] = parentName, ["{{InvitationUrl}}"] = invitationUrl },
             cancellationToken);
 
         await SendAsync(
@@ -384,10 +372,7 @@ public sealed class SmtpEmailSender : IEmailSender
 
             message.Subject = subject;
 
-            BodyBuilder bodyBuilder = new()
-            {
-                HtmlBody = htmlBody
-            };
+            BodyBuilder bodyBuilder = new() { HtmlBody = htmlBody };
 
             string logoPath = Path.Combine(
                 Directory.GetCurrentDirectory(),
@@ -447,10 +432,7 @@ public sealed class SmtpEmailSender : IEmailSender
                     "Bearer",
                     accessToken);
 
-            var requestBody = new
-            {
-                raw = rawMessage
-            };
+            var requestBody = new { raw = rawMessage };
 
             string json =
                 JsonSerializer.Serialize(requestBody);
@@ -582,7 +564,7 @@ public sealed class SmtpEmailSender : IEmailSender
         }
 
         return accessTokenElement.GetString()
-            ?? throw new InvalidOperationException(
-                "Google returned an empty access_token.");
+               ?? throw new InvalidOperationException(
+                   "Google returned an empty access_token.");
     }
 }

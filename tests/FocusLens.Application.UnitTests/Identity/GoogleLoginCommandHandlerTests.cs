@@ -73,7 +73,8 @@ public class GoogleLoginCommandHandlerTests
             [StudentSubject.Predefined(StudentSubjectType.Math)]);
         student.SetPreferredName("Focus Student");
         student.SetDateOfBirth(new DateOnly(2010, 5, 12));
-        student.SetStudyTimeGoal(StudyTimeGoal.Create(StudyTimeGoalPeriod.Daily, 60, [DayOfWeek.Monday], new DateOnly(2026, 1, 1)).Value);
+        student.SetStudyTimeGoal(StudyTimeGoal
+            .Create(StudyTimeGoalPeriod.Daily, 60, [DayOfWeek.Monday], new DateOnly(2026, 1, 1)).Value);
         fixture.Students.Add(student);
 
         Result<AuthResponse> result = await fixture.Handler.Handle(
@@ -258,7 +259,8 @@ public class GoogleLoginCommandHandlerTests
             [StudentSubject.Predefined(StudentSubjectType.Math)]);
         student.SetPreferredName("Focus Student");
         student.SetDateOfBirth(new DateOnly(2010, 5, 12));
-        student.SetStudyTimeGoal(StudyTimeGoal.Create(StudyTimeGoalPeriod.Daily, 60, [DayOfWeek.Monday], new DateOnly(2026, 1, 1)).Value);
+        student.SetStudyTimeGoal(StudyTimeGoal
+            .Create(StudyTimeGoalPeriod.Daily, 60, [DayOfWeek.Monday], new DateOnly(2026, 1, 1)).Value);
         return student;
     }
 
@@ -316,6 +318,8 @@ public class GoogleLoginCommandHandlerTests
 
         public IReadOnlyCollection<ApplicationUser> Users => _users.Values;
 
+        public bool PasswordIsValid { get; set; } = true;
+
         public Task<ApplicationUser?> FindByIdAsync(Guid userId)
             => Task.FromResult(_users.GetValueOrDefault(userId));
 
@@ -324,8 +328,6 @@ public class GoogleLoginCommandHandlerTests
                 _usersByEmail.TryGetValue(email, out Guid userId)
                     ? _users[userId]
                     : null);
-
-        public bool PasswordIsValid { get; set; } = true;
 
         public Task<bool> CheckPasswordAsync(ApplicationUser user, string password)
             => Task.FromResult(PasswordIsValid);

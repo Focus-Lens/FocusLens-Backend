@@ -153,9 +153,10 @@ public sealed class ActivateChildSetupCommandHandler(
             }
         }
 
-        ParentStudentRelationship? relationship = await relationshipRepository.FirstOrDefaultAsync(
-            item => item.ParentId == draft.ParentId && item.StudentId == student.Id
-        );
+        ParentStudentRelationship? relationship =
+            await relationshipRepository.FirstOrDefaultAsync(item =>
+                item.ParentId == draft.ParentId && item.StudentId == student.Id
+            );
 
         if (relationship is null)
         {

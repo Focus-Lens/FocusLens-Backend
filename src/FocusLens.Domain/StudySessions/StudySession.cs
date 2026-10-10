@@ -52,6 +52,7 @@ public sealed class StudySession : AuditableEntity
 
     public IReadOnlyCollection<StudySessionCompletedSection> CompletedSections =>
         _completedSections.AsReadOnly();
+
     public IReadOnlyCollection<StudySessionPauseInterval> PauseIntervals => _pauseIntervals.AsReadOnly();
 
     public static Result<StudySession> Create(Guid studentId, StudySessionMode mode)
@@ -330,6 +331,7 @@ public sealed class StudySession : AuditableEntity
         {
             LastActivityAtUtc = activityAtUtc;
         }
+
         return Result.Success;
     }
 
@@ -419,7 +421,9 @@ public sealed class StudySession : AuditableEntity
     {
         StudySessionPauseInterval? interval = _pauseIntervals.LastOrDefault(item => item.EndedAtUtc is null);
         if (interval is null || interval.Close(utcNow).IsError)
+        {
             throw new InvalidOperationException("A paused study session must have exactly one open pause interval.");
+        }
     }
 
     private void AccumulatePause(DateTimeOffset utcNow)

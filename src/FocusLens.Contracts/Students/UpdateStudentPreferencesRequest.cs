@@ -4,18 +4,18 @@ namespace FocusLens.Contracts.Students;
 
 public sealed class UpdateStudentPreferencesRequest
 {
+    private string? _customGrade;
     private DateOnly? _dateOfBirth;
     private StudentGoal? _goal;
     private StudentGrade? _grade;
-    private string? _customGrade;
     private string? _preferredName;
+    private bool? _shareDetailedAnswersWithParents;
     private bool? _shareSessionSummariesWithParents;
     private bool? _shareSubjectTrendsWithParents;
-    private bool? _shareDetailedAnswersWithParents;
-    private DayOfWeek? _weekStartsOn;
-    
+
     private StudyTimeGoalRequest? _studyTimeGoal;
     private IReadOnlyCollection<StudentSubjectRequest>? _subjects;
+    private DayOfWeek? _weekStartsOn;
 
     public DateOnly? DateOfBirth
     {
@@ -131,7 +131,6 @@ public sealed class UpdateStudentPreferencesRequest
 
     [JsonIgnore] public bool GoalProvided { get; private set; }
 
-    
 
     [JsonIgnore] public bool StudyTimeGoalProvided { get; private set; }
 

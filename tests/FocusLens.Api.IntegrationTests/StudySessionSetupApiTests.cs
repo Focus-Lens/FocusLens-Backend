@@ -170,18 +170,18 @@ public sealed class StudySessionSetupApiTests
         return content;
     }
 
-   private static async Task AssertNoContentAsync(HttpResponseMessage response)
-{
-    string body = await response.Content.ReadAsStringAsync();
+    private static async Task AssertNoContentAsync(HttpResponseMessage response)
+    {
+        string body = await response.Content.ReadAsStringAsync();
 
-    Assert.True(
-        response.StatusCode == HttpStatusCode.NoContent,
-        $"Expected NoContent, got {(int)response.StatusCode} ({response.StatusCode}). Body: {body}");
+        Assert.True(
+            response.StatusCode == HttpStatusCode.NoContent,
+            $"Expected NoContent, got {(int)response.StatusCode} ({response.StatusCode}). Body: {body}");
 
-    Assert.Equal(string.Empty, body);
-}
+        Assert.Equal(string.Empty, body);
+    }
 
-[Fact]
+    [Fact]
     public async Task Reuse_CreatesFreshDraftWithSameMaterialAndSelectedSections()
     {
         await using CustomWebApplicationFactory factory = new();
@@ -210,7 +210,7 @@ public sealed class StudySessionSetupApiTests
             .Count(item => item.StudySessionSelectionId == reusedSelectionId));
     }
 
-private static async Task<(Guid UserId, StudySession Session)> SeedReusableSessionAsync(
+    private static async Task<(Guid UserId, StudySession Session)> SeedReusableSessionAsync(
         CustomWebApplicationFactory factory)
     {
         Guid userId = Guid.NewGuid();

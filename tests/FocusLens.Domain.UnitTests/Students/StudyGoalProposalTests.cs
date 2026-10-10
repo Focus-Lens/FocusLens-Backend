@@ -1,3 +1,4 @@
+using FocusLens.Domain.Common.Results;
 using FocusLens.Domain.Students;
 
 namespace FocusLens.Domain.UnitTests.Students;
@@ -51,7 +52,7 @@ public sealed class StudyGoalProposalTests
 
     private static StudyGoalProposal CreateProposal()
     {
-        var goal = StudyTimeGoal.Create(
+        Result<StudyTimeGoal> goal = StudyTimeGoal.Create(
             StudyTimeGoalPeriod.Weekly,
             240,
             [DayOfWeek.Monday],

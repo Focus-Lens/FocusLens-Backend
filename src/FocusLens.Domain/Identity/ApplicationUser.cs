@@ -36,9 +36,7 @@ public sealed class ApplicationUser : IdentityUser<Guid>
     {
         if (string.IsNullOrWhiteSpace(termsVersion))
         {
-            throw new ArgumentException(
-                "Terms version is required.",
-                nameof(termsVersion));
+            throw new ArgumentException("Terms version is required.", nameof(termsVersion));
         }
 
         TermsVersion = termsVersion.Trim();
@@ -53,9 +51,7 @@ public sealed class ApplicationUser : IdentityUser<Guid>
     }
 
     public bool CanSelfRestore(DateTimeOffset utcNow) =>
-        DeletedAtUtc is not null &&
-        RestoreUntilUtc is not null &&
-        utcNow <= RestoreUntilUtc.Value;
+        DeletedAtUtc is not null && RestoreUntilUtc is not null && utcNow <= RestoreUntilUtc.Value;
 
     public void Restore()
     {

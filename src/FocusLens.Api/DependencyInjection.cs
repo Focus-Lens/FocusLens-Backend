@@ -5,7 +5,6 @@ using FocusLens.Application.Common.Interfaces;
 using FocusLens.Application.Features.Identity.Options;
 using FocusLens.Infrastructure.Authentication;
 using FocusLens.Settings;
-using Microsoft.AspNetCore.RateLimiting;
 
 namespace FocusLens.API;
 
@@ -34,9 +33,7 @@ public static class DependencyInjection
                         $"{context.User.FindFirst("sub")?.Value ?? context.Connection.RemoteIpAddress?.ToString() ?? "unknown"}:{context.Request.RouteValues["draftId"]}",
                         _ => new FixedWindowRateLimiterOptions
                         {
-                            PermitLimit = 5,
-                            Window = TimeSpan.FromMinutes(1),
-                            QueueLimit = 0,
+                            PermitLimit = 5, Window = TimeSpan.FromMinutes(1), QueueLimit = 0
                         }
                     )
             );

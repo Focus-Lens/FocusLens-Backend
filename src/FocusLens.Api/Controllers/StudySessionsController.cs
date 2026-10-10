@@ -1,6 +1,6 @@
 using FocusLens.Application.StudySessions;
-using FocusLens.Contracts.StudySessions;
 using FocusLens.Contracts.BehavioralIntelligence;
+using FocusLens.Contracts.StudySessions;
 using FocusLens.Domain.Common.Results;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;

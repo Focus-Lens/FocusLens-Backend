@@ -44,5 +44,4 @@ public sealed class StudentParentInvitationCommandHandlerTests
         Assert.Equal("parent@example.com", emailSender.StudentParentInvitations[0].ParentEmail);
         Assert.Equal("Youssef", emailSender.StudentParentInvitations[0].StudentDisplayName);
     }
-
 }

@@ -5,7 +5,6 @@ using FocusLens.Domain;
 using FocusLens.Domain.ChildSetup;
 using FocusLens.Domain.Common.Results;
 using FocusLens.Domain.Students;
-
 using DomainStudyTimeGoalPeriod = FocusLens.Domain.Students.StudyTimeGoalPeriod;
 
 namespace FocusLens.Application.UnitTests.ChildSetup;

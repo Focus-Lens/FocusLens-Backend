@@ -17,17 +17,19 @@ public sealed class ReportSessionMetricsCalculator(
             return new Dictionary<Guid, ReportSessionMetrics>();
         }
 
-        StudySessionQuestion[] questions = (await questionRepository.GetAllAsync(
-                question => sessionIds.Contains(question.StudySessionId)))
+        StudySessionQuestion[] questions =
+            (await questionRepository.GetAllAsync(question => sessionIds.Contains(question.StudySessionId)))
             .ToArray();
         Guid[] questionIds = questions.Select(question => question.Id).ToArray();
         StudySessionQuestionAnswer[] answers = questionIds.Length == 0
             ? []
             : (await answerRepository.GetAllAsync(answer => questionIds.Contains(answer.StudySessionQuestionId)))
-                .ToArray();
+            .ToArray();
 
-        ILookup<Guid, StudySessionQuestion> questionsBySession = questions.ToLookup(question => question.StudySessionId);
-        Dictionary<Guid, Guid> sessionByQuestion = questions.ToDictionary(question => question.Id, question => question.StudySessionId);
+        ILookup<Guid, StudySessionQuestion>
+            questionsBySession = questions.ToLookup(question => question.StudySessionId);
+        Dictionary<Guid, Guid> sessionByQuestion =
+            questions.ToDictionary(question => question.Id, question => question.StudySessionId);
         ILookup<Guid, StudySessionQuestionAnswer> answersBySession = answers
             .Where(answer => sessionByQuestion.ContainsKey(answer.StudySessionQuestionId))
             .ToLookup(answer => sessionByQuestion[answer.StudySessionQuestionId]);
@@ -69,7 +71,7 @@ public sealed class ReportSessionMetricsCalculator(
         int duration = session.StartedAtUtc is null || end is null
             ? 0
             : Math.Max(0, (int)Math.Floor((end.Value - session.StartedAtUtc.Value -
-                                            TimeSpan.FromSeconds(session.AccumulatedPausedSeconds)).TotalMinutes));
+                                           TimeSpan.FromSeconds(session.AccumulatedPausedSeconds)).TotalMinutes));
 
         return new ReportSessionMetrics(duration, completionPercentage, questions.Length, correctQuestions,
             answers.Length, learningPercentage, completedSections, totalSelectedSections);

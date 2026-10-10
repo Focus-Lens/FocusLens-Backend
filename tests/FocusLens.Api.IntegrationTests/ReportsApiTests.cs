@@ -3,6 +3,7 @@ using System.Net.Http.Headers;
 using System.Text.Json;
 using FocusLens.Domain;
 using FocusLens.Domain.Access;
+using FocusLens.Domain.Common.Results;
 using FocusLens.Domain.Students;
 using FocusLens.Domain.StudySessions;
 
@@ -18,8 +19,10 @@ public sealed class ReportsApiTests
         Student student = CreateStudent(userId, out StudentSubject math, out _);
         DateTimeOffset start = new(2026, 9, 8, 10, 0, 0, TimeSpan.Zero);
         StudySession paused = CreateHistoricalSession(student, math, start, StudySessionStatus.Paused);
-        StudySession completed = CreateHistoricalSession(student, math, start.AddDays(-1), StudySessionStatus.Completed);
-        StudySession cancelled = CreateHistoricalSession(student, math, start.AddDays(-2), StudySessionStatus.Cancelled);
+        StudySession completed =
+            CreateHistoricalSession(student, math, start.AddDays(-1), StudySessionStatus.Completed);
+        StudySession cancelled =
+            CreateHistoricalSession(student, math, start.AddDays(-2), StudySessionStatus.Cancelled);
         StudySession active = CreateActiveSession(student, math, start.AddDays(-3));
         StudySession draft = StudySession.Create(student.Id, StudySessionMode.Digital).Value;
         StudySessionQuestion question = CreateQuestion(paused.Id);
@@ -55,7 +58,8 @@ public sealed class ReportsApiTests
         JsonElement items = document.RootElement.GetProperty("items");
         Assert.Equal(3, items.GetArrayLength());
         Assert.DoesNotContain(items.EnumerateArray(), item => item.GetProperty("sessionId").GetGuid() == active.Id);
-        JsonElement pausedItem = items.EnumerateArray().Single(item => item.GetProperty("sessionId").GetGuid() == paused.Id);
+        JsonElement pausedItem =
+            items.EnumerateArray().Single(item => item.GetProperty("sessionId").GetGuid() == paused.Id);
         Assert.Equal(42, pausedItem.GetProperty("actualDurationMinutes").GetInt32());
         Assert.Equal(1, pausedItem.GetProperty("questionsGenerated").GetInt32());
         Assert.Equal(1, pausedItem.GetProperty("correctQuestions").GetInt32());
@@ -192,7 +196,8 @@ public sealed class ReportsApiTests
         using JsonDocument pagedDocument = JsonDocument.Parse(await paged.Content.ReadAsStringAsync());
         Assert.Equal(HttpStatusCode.OK, paged.StatusCode);
         Assert.Equal(3, pagedDocument.RootElement.GetProperty("totalCount").GetInt32());
-        Assert.Equal(biologySession.Id, pagedDocument.RootElement.GetProperty("items")[0].GetProperty("sessionId").GetGuid());
+        Assert.Equal(biologySession.Id,
+            pagedDocument.RootElement.GetProperty("items")[0].GetProperty("sessionId").GetGuid());
     }
 
     [Fact]
@@ -271,7 +276,7 @@ public sealed class ReportsApiTests
             (await parentClient.GetAsync($"/api/reports/sessions?studentId={child.Id}")).StatusCode);
         using JsonDocument parentDetail = JsonDocument.Parse(
             await (await parentClient.GetAsync(
-                $"/api/reports/sessions/{childSession.Id}?studentId={child.Id}"))
+                    $"/api/reports/sessions/{childSession.Id}?studentId={child.Id}"))
                 .Content.ReadAsStringAsync());
         Assert.Equal(1, parentDetail.RootElement.GetProperty("focusQuality").GetArrayLength());
         Assert.Equal(82, parentDetail.RootElement.GetProperty("focusQuality")[0]
@@ -301,7 +306,7 @@ public sealed class ReportsApiTests
         StudySessionStatus finalStatus)
     {
         StudySession session = CreateActiveSession(student, subject, startedAt);
-        var result = finalStatus switch
+        Result<Success> result = finalStatus switch
         {
             StudySessionStatus.Paused => session.Pause(startedAt.AddMinutes(42)),
             StudySessionStatus.Completed => session.CompleteSuccessfully(startedAt.AddMinutes(42)),

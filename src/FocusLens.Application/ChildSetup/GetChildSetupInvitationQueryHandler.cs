@@ -65,8 +65,6 @@ public sealed class GetChildSetupInvitationQueryHandler(
         );
     }
 
-    private static string HashToken(string token)
-    {
-        return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(token)));
-    }
+    private static string HashToken(string token) =>
+        Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(token)));
 }

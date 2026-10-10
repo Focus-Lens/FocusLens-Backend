@@ -1,7 +1,6 @@
 using System.Text;
 using FocusLens.Application.Parents;
 using FocusLens.Application.UnitTests.Access;
-using FocusLens.Contracts;
 using FocusLens.Domain;
 using FocusLens.Domain.Access;
 using FocusLens.Domain.Common.Results;
@@ -21,7 +20,8 @@ public sealed class ExportParentDashboardSessionsQueryHandlerTests
         StudySession completed = ReadySession(context.Student.Id, 30);
         Assert.True(completed.Start(new DateTimeOffset(2026, 10, 2, 20, 0, 0, TimeSpan.Zero)).IsSuccess);
         Assert.True(completed.UpdateProgress(1, new DateTimeOffset(2026, 10, 2, 20, 15, 0, TimeSpan.Zero)).IsSuccess);
-        Assert.True(completed.CompleteSuccessfully(new DateTimeOffset(2026, 10, 2, 20, 30, 0, TimeSpan.Zero)).IsSuccess);
+        Assert.True(completed.CompleteSuccessfully(new DateTimeOffset(2026, 10, 2, 20, 30, 0, TimeSpan.Zero))
+            .IsSuccess);
 
         StudySession active = ReadySession(context.Student.Id, 30);
         Assert.True(active.Start(new DateTimeOffset(2026, 10, 2, 19, 0, 0, TimeSpan.Zero)).IsSuccess);
@@ -86,7 +86,7 @@ public sealed class ExportParentDashboardSessionsQueryHandlerTests
         student.SetParentSharingPreferences(true, true);
         ParentStudentRelationship relationship = new(parent.Id, student.Id);
         relationship.Accept();
-        return new(parent, student, relationship);
+        return new TestContext(parent, student, relationship);
     }
 
     private static StudySession ReadySession(Guid studentId, int minutes)

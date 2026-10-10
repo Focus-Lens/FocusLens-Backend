@@ -1,5 +1,5 @@
-using FocusLens.Contracts.Students;
 using FocusLens.Application.Common.Interfaces;
+using FocusLens.Contracts.Students;
 using FocusLens.Domain;
 using FocusLens.Domain.Common.Interfaces;
 using FocusLens.Domain.Common.Results;

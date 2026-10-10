@@ -25,16 +25,14 @@ public sealed class DeleteStudyHistoryCommandHandler(
                 "The current user could not be identified.");
         }
 
-        Student? student = await studentRepository.FirstOrDefaultAsync(
-            item => item.UserId == userId);
+        Student? student = await studentRepository.FirstOrDefaultAsync(item => item.UserId == userId);
         if (student is null)
         {
             return Error.NotFound("Students.NotFound", "The student profile was not found.");
         }
 
-        StudySession[] sessions = (await sessionRepository.GetAllAsync(
-                session => session.StudentId == student.Id &&
-                           session.Status == StudySessionStatus.Completed))
+        StudySession[] sessions = (await sessionRepository.GetAllAsync(session => session.StudentId == student.Id &&
+                session.Status == StudySessionStatus.Completed))
             .ToArray();
 
         sessionRepository.DeleteRange(sessions);

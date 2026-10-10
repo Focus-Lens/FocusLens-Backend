@@ -31,11 +31,7 @@ public sealed class StudySessionBehaviorAnalysisJobConfiguration
         builder.HasIndex(item => item.StudySessionId)
             .IsUnique();
 
-        builder.HasIndex(item => new
-        {
-            item.Status,
-            item.NextAttemptAtUtc
-        });
+        builder.HasIndex(item => new { item.Status, item.NextAttemptAtUtc });
 
         builder.HasOne<StudySession>()
             .WithMany()
