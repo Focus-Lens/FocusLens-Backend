@@ -1,3 +1,4 @@
+using FocusLens.Application.BehavioralIntelligence;
 using FocusLens.Application.Common.Interfaces;
 using FocusLens.Application.Common.Services;
 using FocusLens.Contracts;
@@ -96,14 +97,19 @@ public sealed class GetParentDashboardSessionsQueryHandler(
             .Take(request.PageSize)
             .ToArray();
 
-        IReadOnlyDictionary<Guid, StudySessionBehaviorWindow> latestWindows =
-            await GetLatestWindowsAsync(paginatedSessions);
+        IReadOnlyDictionary<Guid, StudySessionBehaviorWindow[]> windowsBySession =
+            await GetWindowsBySessionAsync(paginatedSessions);
         ParentDashboardStudySessionResponse[] pageSessions = paginatedSessions
-            .Select(session => ParentDashboardHelpers.ToSessionResponse(
-                session,
-                subjectNamesById,
-                utcNow,
-                latestWindows.GetValueOrDefault(session.Id)))
+            .Select(session =>
+            {
+                StudySessionBehaviorWindow[] sessionWindows = windowsBySession.GetValueOrDefault(session.Id) ?? [];
+                SessionFocusMetrics focusMetrics = SessionFocusMetricsCalculator.Calculate(sessionWindows);
+                return ParentDashboardHelpers.ToSessionResponse(
+                    session,
+                    subjectNamesById,
+                    utcNow,
+                    focusMetrics);
+            })
             .ToArray();
 
         return new ParentDashboardSessionHistoryResponse(
@@ -118,19 +124,19 @@ public sealed class GetParentDashboardSessionsQueryHandler(
         };
     }
 
-    private async Task<IReadOnlyDictionary<Guid, StudySessionBehaviorWindow>> GetLatestWindowsAsync(
+    private async Task<IReadOnlyDictionary<Guid, StudySessionBehaviorWindow[]>> GetWindowsBySessionAsync(
         IReadOnlyCollection<StudySession> sessions)
     {
         Guid[] sessionIds = sessions.Select(session => session.Id).ToArray();
         if (sessionIds.Length == 0)
         {
-            return new Dictionary<Guid, StudySessionBehaviorWindow>();
+            return new Dictionary<Guid, StudySessionBehaviorWindow[]>();
         }
 
         return (await behaviorWindowRepository.GetAllAsync(item => sessionIds.Contains(item.StudySessionId)))
             .GroupBy(item => item.StudySessionId)
             .ToDictionary(group => group.Key, group => group
-                .OrderByDescending(item => item.WindowIndex)
-                .First());
+                .OrderBy(item => item.WindowIndex)
+                .ToArray());
     }
 }

@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Text;
+using FocusLens.Application.BehavioralIntelligence;
 using FocusLens.Application.Common.Interfaces;
 using FocusLens.Application.Common.Utilities;
 using FocusLens.Contracts;
@@ -178,7 +179,7 @@ internal static class ParentDashboardHelpers
         StudySession session,
         IReadOnlyDictionary<Guid, string?> subjectNamesById,
         DateTimeOffset utcNow,
-        StudySessionBehaviorWindow? behaviorWindow = null)
+        SessionFocusMetrics? focusMetrics = null)
     {
         string? subjectName = session.SelectedSubjectId is Guid subjectId &&
                               subjectNamesById.TryGetValue(subjectId, out string? name)
@@ -199,9 +200,9 @@ internal static class ParentDashboardHelpers
             session.FocusDurationMinutes is int plannedDuration
                 ? DurationDisplayFormatter.FormatMinutes(plannedDuration)
                 : null,
-            behaviorWindow?.FocusScore,
-            behaviorWindow?.FocusState,
-            behaviorWindow?.FocusTrend);
+            focusMetrics?.FocusScore,
+            focusMetrics?.FocusState,
+            focusMetrics?.FocusTrend);
     }
 
     public static IReadOnlyDictionary<Guid, string?> GetSubjectNamesById(Student student) =>

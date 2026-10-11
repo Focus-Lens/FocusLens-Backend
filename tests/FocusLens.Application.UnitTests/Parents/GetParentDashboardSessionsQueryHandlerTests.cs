@@ -14,21 +14,23 @@ public sealed class GetParentDashboardSessionsQueryHandlerTests
     private static readonly DateTimeOffset Now = new(2026, 9, 20, 12, 0, 0, TimeSpan.Zero);
 
     [Fact]
-    public async Task Sessions_UsesLatestBehaviorWindowForFocusAnalysis()
+    public async Task Sessions_UsesAllBehaviorWindowsForWeightedFocusAnalysis()
     {
         TestContext context = CreateContext();
         StudySession session =
             Completed(context.Student.Id, new DateTimeOffset(2026, 9, 20, 9, 0, 0, TimeSpan.Zero), 30);
-        StudySessionBehaviorWindow first = BehaviorWindow(session.Id, 1, 42, "DISTRACTED", "DECLINING");
-        StudySessionBehaviorWindow latest = BehaviorWindow(session.Id, 2, 87, "DEEP_FOCUS", "IMPROVING");
+        StudySessionBehaviorWindow first = BehaviorWindow(
+            session.Id, 1, 40, "NORMAL_FOCUSED", "DECLINING", 180);
+        StudySessionBehaviorWindow latest = BehaviorWindow(
+            session.Id, 2, 80, "SKIMMING", "STABLE", 60);
 
         Result<ParentDashboardSessionHistoryResponse> result = await CreateHandler(context, [session], [first, latest])
             .Handle(new GetParentDashboardSessionsQuery(context.Student.Id, null, null), CancellationToken.None);
 
         Assert.True(result.IsSuccess);
         ParentDashboardStudySessionResponse response = Assert.Single(result.Value.Sessions);
-        Assert.Equal(87, response.FocusQuality);
-        Assert.Equal("DEEP_FOCUS", response.FocusState);
+        Assert.Equal(50, response.FocusQuality);
+        Assert.Equal("NORMAL_FOCUSED", response.FocusState);
         Assert.Equal("IMPROVING", response.FocusTrend);
     }
 
@@ -121,12 +123,14 @@ public sealed class GetParentDashboardSessionsQueryHandlerTests
         int windowIndex,
         int focusScore,
         string focusState,
-        string focusTrend)
+        string focusTrend,
+        double? activeTimeSeconds = null)
     {
         DateTimeOffset start = new(2026, 9, 20, 9, 0, 0, TimeSpan.Zero);
         StudySessionBehaviorWindow window = StudySessionBehaviorWindow.Create(
             sessionId, windowIndex, start, start.AddMinutes(5), false).Value;
-        Assert.True(window.RecordAnalysis(focusScore, focusState, focusTrend, null, null, null, null, false).IsSuccess);
+        Assert.True(window.RecordAnalysis(
+            focusScore, focusState, focusTrend, null, null, null, null, false, activeTimeSeconds).IsSuccess);
         return window;
     }
 
