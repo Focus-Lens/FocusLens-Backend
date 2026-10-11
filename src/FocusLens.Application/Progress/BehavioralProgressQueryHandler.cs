@@ -159,7 +159,12 @@ public sealed class BehavioralProgressQueryHandler(
             return null;
         }
 
-        return await studentRepository.FirstOrDefaultAsync(student => student.Id == studentId);
+        Student? connectedStudent = await studentRepository.FirstOrDefaultAsync(
+            student => student.Id == studentId);
+
+        return connectedStudent?.ShareSubjectTrendsWithParents == true
+            ? connectedStudent
+            : null;
     }
 
     private sealed record DateRange(DateOnly From, DateOnly To);

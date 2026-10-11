@@ -3,6 +3,8 @@ using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
 using FocusLens.Domain;
+using FocusLens.Domain.Access;
+using FocusLens.Domain.Identity;
 using FocusLens.Domain.Students;
 using FocusLens.Domain.StudySessions;
 using FocusLens.Infrastructure.Data;
@@ -59,6 +61,78 @@ public sealed class BehavioralIntelligenceApiTests
         Assert.Equal(80, root.GetProperty("focus").GetProperty("latestScore").GetInt32());
         Assert.Equal("Improving", root.GetProperty("focus").GetProperty("trend").GetString());
         Assert.Equal(80, root.GetProperty("understanding").GetProperty("latestScore").GetInt32());
+    }
+
+    [Theory]
+    [InlineData(false, HttpStatusCode.NotFound)]
+    [InlineData(true, HttpStatusCode.OK)]
+    public async Task BehavioralProgress_ParentAccess_RequiresSubjectTrendSharing(
+        bool shareSubjectTrends,
+        HttpStatusCode expectedStatus)
+    {
+        DateTimeOffset now = new(2026, 9, 15, 12, 0, 0, TimeSpan.Zero);
+        await using CustomWebApplicationFactory factory = new(now);
+
+        Guid childUserId = Guid.NewGuid();
+        Guid parentUserId = Guid.NewGuid();
+        StudentSubject subject = StudentSubject.Predefined(StudentSubjectType.Math);
+        Student child = new(childUserId);
+        child.ReplaceSubjects([subject]);
+        child.SetParentSharingPreferences(
+            shareSessionSummaries: true,
+            shareSubjectTrends: shareSubjectTrends);
+
+        StudyMaterial material = StudyMaterial.Create(
+            child.Id, "behavioral-progress.pdf", 1, 1,
+            "materials/behavioral-progress.pdf", StudyMaterialSource.Upload).Value;
+        StudySession session = CreateFinishedSession(child, subject, material, now.AddMinutes(-10));
+        StudySessionBehaviorWindow window = StudySessionBehaviorWindow.Create(
+            session.Id, 1, now.AddMinutes(-5), now, false).Value;
+        Assert.True(window.RecordAnalysis(
+            75,
+            "NORMAL_FOCUSED",
+            "STABLE",
+            80,
+            "STABLE",
+            "CONTINUE",
+            "CONTINUE",
+            false).IsSuccess);
+
+        Parent parent = new(parentUserId);
+        ParentStudentRelationship relationship = new(parent.Id, child.Id);
+        relationship.Accept(now.AddDays(-1));
+
+        await factory.SeedAsync(db =>
+        {
+            db.Users.AddRange(
+                new ApplicationUser { Id = parentUserId, FirstName = "Test", LastName = "Parent" },
+                new ApplicationUser { Id = childUserId, FirstName = "Test", LastName = "Student" });
+            db.Students.Add(child);
+            db.Parents.Add(parent);
+            db.ParentStudentRelationships.Add(relationship);
+            db.StudyMaterials.Add(material);
+            db.StudySessions.Add(session);
+            db.StudySessionBehaviorWindows.Add(window);
+            return Task.CompletedTask;
+        });
+
+        using HttpClient client = factory.CreateClient();
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue(
+            "Bearer", TestJwtTokenFactory.Create(parentUserId, "Parent"));
+
+        HttpResponseMessage response = await client.GetAsync(
+            $"/api/progress/behavioral?studentId={child.Id}&range=Week");
+
+        Assert.Equal(expectedStatus, response.StatusCode);
+        if (expectedStatus != HttpStatusCode.OK)
+        {
+            return;
+        }
+
+        using JsonDocument document = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        Assert.Equal(
+            75,
+            document.RootElement.GetProperty("focus").GetProperty("latestScore").GetInt32());
     }
 
     [Fact]
