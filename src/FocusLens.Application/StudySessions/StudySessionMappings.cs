@@ -2,6 +2,7 @@ using FocusLens.Contracts.StudySessions;
 using FocusLens.Domain.StudySessions;
 using ContractStudyMaterialSource = FocusLens.Contracts.StudySessions.StudyMaterialSource;
 using ContractStudySessionMode = FocusLens.Contracts.StudySessions.StudySessionMode;
+using ContractStudySessionType = FocusLens.Contracts.StudySessions.StudySessionType;
 
 namespace FocusLens.Application.StudySessions;
 
@@ -13,6 +14,7 @@ internal static class StudySessionMappings
             session.Id,
             session.StudentId,
             (ContractStudySessionMode)session.Mode,
+            (ContractStudySessionType)session.SessionType,
             session.Status.ToString(),
             session.StartedAtUtc,
             session.PausedAtUtc,

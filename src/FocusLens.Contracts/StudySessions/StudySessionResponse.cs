@@ -4,6 +4,7 @@ public sealed record StudySessionResponse(
     Guid Id,
     Guid StudentId,
     StudySessionMode Mode,
+    StudySessionType SessionType,
     string Status,
     DateTimeOffset? StartedAtUtc,
     DateTimeOffset? PausedAtUtc,

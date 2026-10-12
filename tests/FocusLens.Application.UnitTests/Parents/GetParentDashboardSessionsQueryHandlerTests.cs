@@ -17,18 +17,53 @@ public sealed class GetParentDashboardSessionsQueryHandlerTests
     public async Task Sessions_UsesAllBehaviorWindowsForWeightedFocusAnalysis()
     {
         TestContext context = CreateContext();
-        StudySession session =
-            Completed(context.Student.Id, new DateTimeOffset(2026, 9, 20, 9, 0, 0, TimeSpan.Zero), 30);
-        StudySessionBehaviorWindow first = BehaviorWindow(
-            session.Id, 1, 40, "NORMAL_FOCUSED", "DECLINING", 180);
-        StudySessionBehaviorWindow latest = BehaviorWindow(
-            session.Id, 2, 80, "SKIMMING", "STABLE", 60);
+        StudySession session = Completed(
+            context.Student.Id,
+            new DateTimeOffset(2026, 9, 20, 9, 0, 0, TimeSpan.Zero),
+            30
+        );
 
-        Result<ParentDashboardSessionHistoryResponse> result = await CreateHandler(context, [session], [first, latest])
-            .Handle(new GetParentDashboardSessionsQuery(context.Student.Id, null, null), CancellationToken.None);
+        StudySessionBehaviorWindow first = BehaviorWindow(
+            session.Id,
+            1,
+            40,
+            "NORMAL_FOCUSED",
+            "DECLINING",
+            180
+        );
+
+        StudySessionBehaviorWindow middle = BehaviorWindow(
+            session.Id,
+            2,
+            50,
+            "NORMAL_FOCUSED",
+            "STABLE",
+            60
+        );
+
+        StudySessionBehaviorWindow latest = BehaviorWindow(
+            session.Id,
+            3,
+            80,
+            "SKIMMING",
+            "STABLE",
+            60
+        );
+
+        Result<ParentDashboardSessionHistoryResponse> result = await CreateHandler(
+                context,
+                [session],
+                [first, middle, latest]
+            )
+            .Handle(
+                new GetParentDashboardSessionsQuery(context.Student.Id, null, null),
+                CancellationToken.None
+            );
 
         Assert.True(result.IsSuccess);
+
         ParentDashboardStudySessionResponse response = Assert.Single(result.Value.Sessions);
+
         Assert.Equal(50, response.FocusQuality);
         Assert.Equal("NORMAL_FOCUSED", response.FocusState);
         Assert.Equal("IMPROVING", response.FocusTrend);
@@ -38,11 +73,20 @@ public sealed class GetParentDashboardSessionsQueryHandlerTests
     public async Task Sessions_WithoutBehaviorWindowReturnsNullFocusAnalysis()
     {
         TestContext context = CreateContext();
-        StudySession session =
-            Completed(context.Student.Id, new DateTimeOffset(2026, 9, 20, 9, 0, 0, TimeSpan.Zero), 30);
+        StudySession session = Completed(
+            context.Student.Id,
+            new DateTimeOffset(2026, 9, 20, 9, 0, 0, TimeSpan.Zero),
+            30
+        );
 
-        Result<ParentDashboardSessionHistoryResponse> result = await CreateHandler(context, [session])
-            .Handle(new GetParentDashboardSessionsQuery(context.Student.Id, null, null), CancellationToken.None);
+        Result<ParentDashboardSessionHistoryResponse> result = await CreateHandler(
+                context,
+                [session]
+            )
+            .Handle(
+                new GetParentDashboardSessionsQuery(context.Student.Id, null, null),
+                CancellationToken.None
+            );
 
         Assert.True(result.IsSuccess);
         ParentDashboardStudySessionResponse response = Assert.Single(result.Value.Sessions);
@@ -56,21 +100,45 @@ public sealed class GetParentDashboardSessionsQueryHandlerTests
     {
         TestContext context = CreateContext();
         Guid includedSubjectId = Guid.NewGuid();
-        StudySession mostRecent = Completed(context.Student.Id,
-            new DateTimeOffset(2026, 9, 20, 10, 0, 0, TimeSpan.Zero), 30, includedSubjectId);
-        StudySession expectedPageSession = Completed(context.Student.Id,
-            new DateTimeOffset(2026, 9, 20, 9, 0, 0, TimeSpan.Zero), 30, includedSubjectId);
-        StudySession otherSubject = Completed(context.Student.Id,
-            new DateTimeOffset(2026, 9, 20, 8, 0, 0, TimeSpan.Zero), 30, Guid.NewGuid());
-        StudySession active = Active(context.Student.Id, new DateTimeOffset(2026, 9, 20, 7, 0, 0, TimeSpan.Zero), 30,
-            includedSubjectId);
+        StudySession mostRecent = Completed(
+            context.Student.Id,
+            new DateTimeOffset(2026, 9, 20, 10, 0, 0, TimeSpan.Zero),
+            30,
+            includedSubjectId
+        );
+        StudySession expectedPageSession = Completed(
+            context.Student.Id,
+            new DateTimeOffset(2026, 9, 20, 9, 0, 0, TimeSpan.Zero),
+            30,
+            includedSubjectId
+        );
+        StudySession otherSubject = Completed(
+            context.Student.Id,
+            new DateTimeOffset(2026, 9, 20, 8, 0, 0, TimeSpan.Zero),
+            30,
+            Guid.NewGuid()
+        );
+        StudySession active = Active(
+            context.Student.Id,
+            new DateTimeOffset(2026, 9, 20, 7, 0, 0, TimeSpan.Zero),
+            30,
+            includedSubjectId
+        );
 
         Result<ParentDashboardSessionHistoryResponse> result = await CreateHandler(
                 context,
-                [mostRecent, expectedPageSession, otherSubject, active])
+                [mostRecent, expectedPageSession, otherSubject, active]
+            )
             .Handle(
-                new GetParentDashboardSessionsQuery(context.Student.Id, [nameof(StudySessionStatus.Completed)],
-                    includedSubjectId, 2, 1), CancellationToken.None);
+                new GetParentDashboardSessionsQuery(
+                    context.Student.Id,
+                    [nameof(StudySessionStatus.Completed)],
+                    includedSubjectId,
+                    2,
+                    1
+                ),
+                CancellationToken.None
+            );
 
         Assert.True(result.IsSuccess);
         Assert.Equal(2, result.Value.Pagination.TotalCount);
@@ -87,7 +155,10 @@ public sealed class GetParentDashboardSessionsQueryHandlerTests
         context.Student.SetParentSharingPreferences(false, true);
 
         Result<ParentDashboardSessionHistoryResponse> result = await CreateHandler(context, [])
-            .Handle(new GetParentDashboardSessionsQuery(context.Student.Id, null, null), CancellationToken.None);
+            .Handle(
+                new GetParentDashboardSessionsQuery(context.Student.Id, null, null),
+                CancellationToken.None
+            );
 
         Error error = Assert.Single(result.Errors);
         Assert.Equal("ParentDashboard.SessionSummariesPrivate", error.Code);
@@ -96,15 +167,20 @@ public sealed class GetParentDashboardSessionsQueryHandlerTests
     private static GetParentDashboardSessionsQueryHandler CreateHandler(
         TestContext context,
         IEnumerable<StudySession> sessions,
-        IEnumerable<StudySessionBehaviorWindow>? behaviorWindows = null) => new(
-        new InMemoryRepository<Parent>(context.Parent),
-        new InMemoryRepository<ParentStudentRelationship>(context.Relationship),
-        new InMemoryRepository<Student>(context.Student),
-        new InMemoryRepository<StudySession>(sessions.ToArray()),
-        new InMemoryRepository<StudySessionBehaviorWindow>((behaviorWindows ?? []).ToArray()),
-        new InMemoryRepository<StudentWeek>(new StudentWeek(context.Student.Id, new DateOnly(2026, 9, 19))),
-        new FakeCurrentUser(context.Parent.UserId),
-        new FixedTimeProvider(Now));
+        IEnumerable<StudySessionBehaviorWindow>? behaviorWindows = null
+    ) =>
+        new(
+            new InMemoryRepository<Parent>(context.Parent),
+            new InMemoryRepository<ParentStudentRelationship>(context.Relationship),
+            new InMemoryRepository<Student>(context.Student),
+            new InMemoryRepository<StudySession>(sessions.ToArray()),
+            new InMemoryRepository<StudySessionBehaviorWindow>((behaviorWindows ?? []).ToArray()),
+            new InMemoryRepository<StudentWeek>(
+                new StudentWeek(context.Student.Id, new DateOnly(2026, 9, 19))
+            ),
+            new FakeCurrentUser(context.Parent.UserId),
+            new FixedTimeProvider(Now)
+        );
 
     private static TestContext CreateContext()
     {
@@ -124,17 +200,37 @@ public sealed class GetParentDashboardSessionsQueryHandlerTests
         int focusScore,
         string focusState,
         string focusTrend,
-        double? activeTimeSeconds = null)
+        double? activeTimeSeconds = null
+    )
     {
         DateTimeOffset start = new(2026, 9, 20, 9, 0, 0, TimeSpan.Zero);
-        StudySessionBehaviorWindow window = StudySessionBehaviorWindow.Create(
-            sessionId, windowIndex, start, start.AddMinutes(5), false).Value;
-        Assert.True(window.RecordAnalysis(
-            focusScore, focusState, focusTrend, null, null, null, null, false, activeTimeSeconds).IsSuccess);
+        StudySessionBehaviorWindow window = StudySessionBehaviorWindow
+            .Create(sessionId, windowIndex, start, start.AddMinutes(5), false)
+            .Value;
+        Assert.True(
+            window
+                .RecordAnalysis(
+                    focusScore,
+                    focusState,
+                    focusTrend,
+                    null,
+                    null,
+                    null,
+                    null,
+                    false,
+                    activeTimeSeconds
+                )
+                .IsSuccess
+        );
         return window;
     }
 
-    private static StudySession Completed(Guid studentId, DateTimeOffset started, int minutes, Guid? subjectId = null)
+    private static StudySession Completed(
+        Guid studentId,
+        DateTimeOffset started,
+        int minutes,
+        Guid? subjectId = null
+    )
     {
         StudySession session = ReadySession(studentId, minutes, subjectId);
         Assert.True(session.Start(started).IsSuccess);
@@ -142,7 +238,12 @@ public sealed class GetParentDashboardSessionsQueryHandlerTests
         return session;
     }
 
-    private static StudySession Active(Guid studentId, DateTimeOffset started, int minutes, Guid? subjectId = null)
+    private static StudySession Active(
+        Guid studentId,
+        DateTimeOffset started,
+        int minutes,
+        Guid? subjectId = null
+    )
     {
         StudySession session = ReadySession(studentId, minutes, subjectId);
         Assert.True(session.Start(started).IsSuccess);
@@ -153,18 +254,34 @@ public sealed class GetParentDashboardSessionsQueryHandlerTests
     private static StudySession ReadySession(Guid studentId, int minutes, Guid? subjectId)
     {
         StudySession session = StudySession.Create(studentId, StudySessionMode.Digital).Value;
-        StudyMaterial material = StudyMaterial.Create(studentId, "book.pdf", 1, 1,
-            $"materials/{Guid.NewGuid()}/book.pdf", StudyMaterialSource.Upload).Value;
+        StudyMaterial material = StudyMaterial
+            .Create(
+                studentId,
+                "book.pdf",
+                1,
+                1,
+                $"materials/{Guid.NewGuid()}/book.pdf",
+                StudyMaterialSource.Upload
+            )
+            .Value;
         Assert.True(session.SetSubjectId(subjectId ?? Guid.NewGuid()).IsSuccess);
         Assert.True(session.SetDuration(minutes).IsSuccess);
         Assert.True(session.SetStudyMaterial(material).IsSuccess);
-        Assert.True(session.SetSelection(StudySessionSelection.Create(session, material, 1, 1).Value).IsSuccess);
+        Assert.True(
+            session
+                .SetSelection(StudySessionSelection.Create(session, material, 1, 1).Value)
+                .IsSuccess
+        );
         Assert.True(session.SetSelectedSections([]).IsSuccess);
         Assert.True(session.MarkReady().IsSuccess);
         return session;
     }
 
-    private sealed record TestContext(Parent Parent, Student Student, ParentStudentRelationship Relationship);
+    private sealed record TestContext(
+        Parent Parent,
+        Student Student,
+        ParentStudentRelationship Relationship
+    );
 
     private sealed class FixedTimeProvider(DateTimeOffset now) : TimeProvider
     {

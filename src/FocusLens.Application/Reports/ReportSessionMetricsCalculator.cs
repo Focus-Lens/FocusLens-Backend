@@ -52,6 +52,10 @@ public sealed class ReportSessionMetricsCalculator(
             .Select(answer => answer.StudySessionQuestionId)
             .Distinct()
             .Count();
+        int questionsAnswered = answers
+            .Select(answer => answer.StudySessionQuestionId)
+            .Distinct()
+            .Count();
         int totalSelectedSections = session.Selection?.SelectedSections.Count ?? 0;
         int completedSections = session.CompletedSections.Count;
         int completionPercentage = totalSelectedSections == 0
@@ -73,8 +77,8 @@ public sealed class ReportSessionMetricsCalculator(
             : Math.Max(0, (int)Math.Floor((end.Value - session.StartedAtUtc.Value -
                                            TimeSpan.FromSeconds(session.AccumulatedPausedSeconds)).TotalMinutes));
 
-        return new ReportSessionMetrics(duration, completionPercentage, questions.Length, correctQuestions,
-            answers.Length, learningPercentage, completedSections, totalSelectedSections);
+        return new ReportSessionMetrics(duration, completionPercentage, questions.Length, questionsAnswered,
+            correctQuestions, answers.Length, learningPercentage, completedSections, totalSelectedSections);
     }
 }
 
@@ -82,6 +86,7 @@ public sealed record ReportSessionMetrics(
     int DurationMinutes,
     int CompletionPercentage,
     int QuestionCount,
+    int QuestionsAnswered,
     int CorrectQuestions,
     int Attempts,
     int LearningPercentage,

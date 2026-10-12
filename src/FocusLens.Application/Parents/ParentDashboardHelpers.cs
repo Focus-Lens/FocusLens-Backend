@@ -202,7 +202,7 @@ internal static class ParentDashboardHelpers
                 : null,
             focusMetrics?.FocusScore,
             focusMetrics?.FocusState,
-            focusMetrics?.FocusTrend);
+            focusMetrics?.WithinSessionFocusTrend);
     }
 
     public static IReadOnlyDictionary<Guid, string?> GetSubjectNamesById(Student student) =>

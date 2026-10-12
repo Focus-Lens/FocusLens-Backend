@@ -10,6 +10,9 @@ public sealed record CreateStudySessionCommand(CreateStudySessionRequest Request
 public sealed record SetStudySessionModeCommand(Guid SessionId, SetStudySessionModeRequest Request)
     : IRequest<Result<Success>>;
 
+public sealed record SetStudySessionTypeCommand(Guid SessionId, SetStudySessionTypeRequest Request)
+    : IRequest<Result<Success>>;
+
 public sealed record SetStudySessionSubjectCommand(Guid SessionId, SetStudySessionSubjectRequest Request)
     : IRequest<Result<Success>>;
 

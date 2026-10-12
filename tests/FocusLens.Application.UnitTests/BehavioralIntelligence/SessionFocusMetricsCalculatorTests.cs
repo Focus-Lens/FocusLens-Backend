@@ -13,14 +13,15 @@ public sealed class SessionFocusMetricsCalculatorTests
         StudySessionBehaviorWindow[] windows =
         [
             CreateWindow(sessionId, 1, start, 40, "SKIMMING", 60),
-            CreateWindow(sessionId, 2, start.AddMinutes(5), 80, "NORMAL_FOCUSED", 180)
+            CreateWindow(sessionId, 2, start.AddMinutes(5), 80, "NORMAL_FOCUSED", 180),
+            CreateWindow(sessionId, 3, start.AddMinutes(10), 70, "NORMAL_FOCUSED", 0)
         ];
 
         SessionFocusMetrics result = SessionFocusMetricsCalculator.Calculate(windows);
 
         Assert.Equal(70, result.FocusScore);
         Assert.Equal("NORMAL_FOCUSED", result.FocusState);
-        Assert.Equal("IMPROVING", result.FocusTrend);
+        Assert.Equal("IMPROVING", result.WithinSessionFocusTrend);
     }
 
     [Fact]
@@ -54,7 +55,7 @@ public sealed class SessionFocusMetricsCalculatorTests
 
         Assert.Null(result.FocusScore);
         Assert.Equal("SKIMMING", result.FocusState);
-        Assert.Equal("STABLE", result.FocusTrend);
+        Assert.Null(result.WithinSessionFocusTrend);
     }
 
     [Theory]
@@ -70,7 +71,7 @@ public sealed class SessionFocusMetricsCalculatorTests
                 sessionId, index + 1, start.AddMinutes(index * 5), score, "NORMAL_FOCUSED", 60))
             .ToArray();
 
-        Assert.Equal(expectedTrend, SessionFocusMetricsCalculator.Calculate(windows).FocusTrend);
+        Assert.Equal(expectedTrend, SessionFocusMetricsCalculator.Calculate(windows).WithinSessionFocusTrend);
     }
 
     [Fact]
@@ -81,14 +82,15 @@ public sealed class SessionFocusMetricsCalculatorTests
         StudySessionBehaviorWindow[] windows =
         [
             CreateWindow(sessionId, 1, start, 45, "SKIMMING", null),
-            CreateWindow(sessionId, 2, start.AddMinutes(5), 68, "NORMAL_FOCUSED", null)
+            CreateWindow(sessionId, 2, start.AddMinutes(5), 68, "NORMAL_FOCUSED", null),
+            CreateWindow(sessionId, 3, start.AddMinutes(10), 70, "NORMAL_FOCUSED", null)
         ];
 
         SessionFocusMetrics result = SessionFocusMetricsCalculator.Calculate(windows);
 
-        Assert.Equal(68, result.FocusScore);
+        Assert.Equal(70, result.FocusScore);
         Assert.Equal("NORMAL_FOCUSED", result.FocusState);
-        Assert.Equal("IMPROVING", result.FocusTrend);
+        Assert.Equal("IMPROVING", result.WithinSessionFocusTrend);
     }
 
     [Fact]

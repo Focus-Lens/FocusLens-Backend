@@ -26,6 +26,7 @@ public sealed class ReportsApiTests
         StudySession active = CreateActiveSession(student, math, start.AddDays(-3));
         StudySession draft = StudySession.Create(student.Id, StudySessionMode.Digital).Value;
         StudySessionQuestion question = CreateQuestion(paused.Id);
+        StudySessionQuestion unansweredQuestion = CreateQuestion(paused.Id, order: 2);
         StudySessionBehaviorWindow behaviorWindow = StudySessionBehaviorWindow.Create(
             paused.Id,
             1,
@@ -44,7 +45,7 @@ public sealed class ReportsApiTests
         {
             db.Students.Add(student);
             db.StudySessions.AddRange(paused, completed, cancelled, active, draft);
-            db.StudySessionQuestions.Add(question);
+            db.StudySessionQuestions.AddRange(question, unansweredQuestion);
             db.StudySessionQuestionAnswers.AddRange(answers);
             db.StudySessionBehaviorWindows.Add(behaviorWindow);
             return Task.CompletedTask;
@@ -61,13 +62,22 @@ public sealed class ReportsApiTests
         JsonElement pausedItem =
             items.EnumerateArray().Single(item => item.GetProperty("sessionId").GetGuid() == paused.Id);
         Assert.Equal(42, pausedItem.GetProperty("actualDurationMinutes").GetInt32());
-        Assert.Equal(1, pausedItem.GetProperty("questionsGenerated").GetInt32());
+        Assert.Equal(2, pausedItem.GetProperty("questionsGenerated").GetInt32());
+        Assert.Equal(1, pausedItem.GetProperty("questionsAnswered").GetInt32());
         Assert.Equal(1, pausedItem.GetProperty("correctQuestions").GetInt32());
         Assert.Equal(3, pausedItem.GetProperty("attempts").GetInt32());
-        Assert.Equal(100, pausedItem.GetProperty("learningPercentage").GetInt32());
+        Assert.Equal(50, pausedItem.GetProperty("learningPercentage").GetInt32());
+
+        HttpResponseMessage detailResponse = await client.GetAsync($"/api/reports/sessions/{paused.Id}");
+        Assert.Equal(HttpStatusCode.OK, detailResponse.StatusCode);
+        using JsonDocument detailDocument = JsonDocument.Parse(await detailResponse.Content.ReadAsStringAsync());
+        JsonElement detail = detailDocument.RootElement;
+        Assert.Equal(2, detail.GetProperty("questionsGenerated").GetInt32());
+        Assert.Equal(1, detail.GetProperty("questionsAnswered").GetInt32());
+        Assert.Equal(3, detail.GetProperty("attempts").GetInt32());
         Assert.Equal(82, pausedItem.GetProperty("focusScore").GetInt32());
         Assert.Equal("Focused", pausedItem.GetProperty("focusState").GetString());
-        Assert.Equal("STABLE", pausedItem.GetProperty("focusTrend").GetString());
+        Assert.Equal(JsonValueKind.Null, pausedItem.GetProperty("withinSessionFocusTrend").ValueKind);
 
         HttpResponseMessage activeDetail = await client.GetAsync($"/api/reports/sessions/{active.Id}");
         Assert.Equal(HttpStatusCode.NotFound, activeDetail.StatusCode);
@@ -84,7 +94,8 @@ public sealed class ReportsApiTests
         StudySessionBehaviorWindow[] windows =
         [
             CreateBehaviorWindow(session.Id, 1, start, start.AddMinutes(5), 40, "SKIMMING", 60),
-            CreateBehaviorWindow(session.Id, 2, start.AddMinutes(5), start.AddMinutes(10), 80, "NORMAL_FOCUSED", 180)
+            CreateBehaviorWindow(session.Id, 2, start.AddMinutes(5), start.AddMinutes(10), 80, "NORMAL_FOCUSED", 180),
+            CreateBehaviorWindow(session.Id, 3, start.AddMinutes(10), start.AddMinutes(15), 70, "NORMAL_FOCUSED", 0)
         ];
 
         await factory.SeedAsync(db =>
@@ -103,7 +114,11 @@ public sealed class ReportsApiTests
         JsonElement root = document.RootElement;
         Assert.Equal(70, root.GetProperty("focusScore").GetInt32());
         Assert.Equal("NORMAL_FOCUSED", root.GetProperty("focusState").GetString());
-        Assert.Equal("IMPROVING", root.GetProperty("focusTrend").GetString());
+        Assert.Equal("IMPROVING", root.GetProperty("withinSessionFocusTrend").GetString());
+        Assert.Equal(root.GetProperty("withinSessionFocusTrend").GetString(),
+            root.GetProperty("focusTrend").GetString());
+        Assert.Equal(JsonValueKind.Null, root.GetProperty("recentSessionsFocusTrend").ValueKind);
+        Assert.Equal(3, root.GetProperty("focusQuality").GetArrayLength());
         Assert.Equal(40, root.GetProperty("focusQuality")[0].GetProperty("focusScore").GetInt32());
         Assert.Equal(80, root.GetProperty("focusQuality")[1].GetProperty("focusScore").GetInt32());
 
@@ -114,7 +129,68 @@ public sealed class ReportsApiTests
             .Single(item => item.GetProperty("sessionId").GetGuid() == session.Id);
         Assert.Equal(70, listItem.GetProperty("focusScore").GetInt32());
         Assert.Equal("NORMAL_FOCUSED", listItem.GetProperty("focusState").GetString());
-        Assert.Equal("IMPROVING", listItem.GetProperty("focusTrend").GetString());
+        Assert.Equal("IMPROVING", listItem.GetProperty("withinSessionFocusTrend").GetString());
+        Assert.Equal(listItem.GetProperty("withinSessionFocusTrend").GetString(),
+            listItem.GetProperty("focusTrend").GetString());
+        Assert.Equal("Study session", listItem.GetProperty("sessionType").GetString());
+    }
+
+    [Fact]
+    public async Task ReportSessionDetail_SeparatesWithinSessionTrendFromRecentSubjectTrendAndHonorsSharing()
+    {
+        await using CustomWebApplicationFactory factory = new();
+        Guid childUserId = Guid.NewGuid();
+        Student child = CreateStudent(childUserId, out StudentSubject math, out _);
+        child.SetParentSharingPreferences(shareSessionSummaries: true, shareSubjectTrends: false, shareDetailedAnswers: false);
+        DateTimeOffset oldestStart = new(2026, 9, 1, 10, 0, 0, TimeSpan.Zero);
+        StudySession oldest = CreateHistoricalSession(child, math, oldestStart, StudySessionStatus.Completed);
+        StudySession newestPrevious = CreateHistoricalSession(child, math, oldestStart.AddDays(1), StudySessionStatus.Completed);
+        StudySession current = CreateHistoricalSession(child, math, oldestStart.AddDays(2), StudySessionStatus.Completed);
+
+        StudySessionBehaviorWindow[] windows =
+        [
+            CreateBehaviorWindow(oldest.Id, 1, oldestStart, oldestStart.AddMinutes(5), 60, activeTimeSeconds: 60),
+            CreateBehaviorWindow(oldest.Id, 2, oldestStart.AddMinutes(5), oldestStart.AddMinutes(10), 60, activeTimeSeconds: 60),
+            CreateBehaviorWindow(oldest.Id, 3, oldestStart.AddMinutes(10), oldestStart.AddMinutes(15), 60, activeTimeSeconds: 60),
+            CreateBehaviorWindow(newestPrevious.Id, 1, oldestStart.AddDays(1), oldestStart.AddDays(1).AddMinutes(5), 70, activeTimeSeconds: 60),
+            CreateBehaviorWindow(newestPrevious.Id, 2, oldestStart.AddDays(1).AddMinutes(5), oldestStart.AddDays(1).AddMinutes(10), 70, activeTimeSeconds: 60),
+            CreateBehaviorWindow(newestPrevious.Id, 3, oldestStart.AddDays(1).AddMinutes(10), oldestStart.AddDays(1).AddMinutes(15), 70, activeTimeSeconds: 60),
+            CreateBehaviorWindow(current.Id, 1, oldestStart.AddDays(2), oldestStart.AddDays(2).AddMinutes(5), 78, activeTimeSeconds: 60),
+            CreateBehaviorWindow(current.Id, 2, oldestStart.AddDays(2).AddMinutes(5), oldestStart.AddDays(2).AddMinutes(10), 80, activeTimeSeconds: 60),
+            CreateBehaviorWindow(current.Id, 3, oldestStart.AddDays(2).AddMinutes(10), oldestStart.AddDays(2).AddMinutes(15), 82, activeTimeSeconds: 60)
+        ];
+
+        Guid parentUserId = Guid.NewGuid();
+        Parent parent = new(parentUserId);
+        ParentStudentRelationship relationship = new(parent.Id, child.Id);
+        relationship.Accept(oldestStart.AddDays(-1));
+
+        await factory.SeedAsync(db =>
+        {
+            db.Students.Add(child);
+            db.Parents.Add(parent);
+            db.ParentStudentRelationships.Add(relationship);
+            db.StudySessions.AddRange(oldest, newestPrevious, current);
+            db.StudySessionBehaviorWindows.AddRange(windows);
+            return Task.CompletedTask;
+        });
+
+        using HttpClient studentClient = CreateClient(factory, childUserId, "Student");
+        HttpResponseMessage studentResponse = await studentClient.GetAsync($"/api/reports/sessions/{current.Id}");
+        Assert.Equal(HttpStatusCode.OK, studentResponse.StatusCode);
+        using JsonDocument studentDocument = JsonDocument.Parse(await studentResponse.Content.ReadAsStringAsync());
+        JsonElement studentReport = studentDocument.RootElement;
+        Assert.Equal("STABLE", studentReport.GetProperty("withinSessionFocusTrend").GetString());
+        Assert.Equal("IMPROVING", studentReport.GetProperty("recentSessionsFocusTrend").GetString());
+
+        using HttpClient parentClient = CreateClient(factory, parentUserId, "Parent");
+        HttpResponseMessage parentResponse = await parentClient.GetAsync(
+            $"/api/reports/sessions/{current.Id}?studentId={child.Id}");
+        Assert.Equal(HttpStatusCode.OK, parentResponse.StatusCode);
+        using JsonDocument parentDocument = JsonDocument.Parse(await parentResponse.Content.ReadAsStringAsync());
+        JsonElement parentReport = parentDocument.RootElement;
+        Assert.Equal("STABLE", parentReport.GetProperty("withinSessionFocusTrend").GetString());
+        Assert.Equal(JsonValueKind.Null, parentReport.GetProperty("recentSessionsFocusTrend").ValueKind);
     }
 
     [Fact]
@@ -244,6 +320,50 @@ public sealed class ReportsApiTests
     }
 
     [Fact]
+    public async Task ParentReport_ReturnsProcessedLearningMetricsWhenDetailedAnswerSharingIsDisabled()
+    {
+        await using CustomWebApplicationFactory factory = new();
+        Guid childUserId = Guid.NewGuid();
+        Student child = CreateStudent(childUserId, out StudentSubject math, out _);
+        child.SetParentSharingPreferences(shareSessionSummaries: true, shareSubjectTrends: true, shareDetailedAnswers: false);
+        StudySession session = CreateHistoricalSession(child, math,
+            new DateTimeOffset(2026, 9, 8, 10, 0, 0, TimeSpan.Zero), StudySessionStatus.Completed);
+        StudySessionQuestion question = CreateQuestion(session.Id);
+        StudySessionQuestionAnswer answer = CreateAnswer(question.Id, "A", true, 1);
+        Guid parentUserId = Guid.NewGuid();
+        Parent parent = new(parentUserId);
+        ParentStudentRelationship relationship = new(parent.Id, child.Id);
+        relationship.Accept(new DateTimeOffset(2026, 9, 1, 10, 0, 0, TimeSpan.Zero));
+
+        await factory.SeedAsync(db =>
+        {
+            db.Students.Add(child);
+            db.Parents.Add(parent);
+            db.ParentStudentRelationships.Add(relationship);
+            db.StudySessions.Add(session);
+            db.StudySessionQuestions.Add(question);
+            db.StudySessionQuestionAnswers.Add(answer);
+            return Task.CompletedTask;
+        });
+
+        using HttpClient client = CreateClient(factory, parentUserId, "Parent");
+        HttpResponseMessage response = await client.GetAsync(
+            $"/api/reports/sessions/{session.Id}?studentId={child.Id}");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        using JsonDocument document = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        JsonElement report = document.RootElement;
+        Assert.Equal(1, report.GetProperty("questionsGenerated").GetInt32());
+        Assert.Equal(1, report.GetProperty("questionsAnswered").GetInt32());
+        Assert.Equal(1, report.GetProperty("correctQuestions").GetInt32());
+        Assert.Equal(1, report.GetProperty("attempts").GetInt32());
+        Assert.Equal(100, report.GetProperty("learningPercentage").GetInt32());
+        Assert.False(report.TryGetProperty("question", out _));
+        Assert.False(report.TryGetProperty("answers", out _));
+        Assert.Equal("Study session", report.GetProperty("sessionType").GetString());
+    }
+
+    [Fact]
     public async Task ParentReports_RequireAnActiveRelationship_AndStudentCannotRequestAnotherStudent()
     {
         await using CustomWebApplicationFactory factory = new();
@@ -347,9 +467,9 @@ public sealed class ReportsApiTests
         return window;
     }
 
-    private static StudySessionQuestion CreateQuestion(Guid sessionId) =>
+    private static StudySessionQuestion CreateQuestion(Guid sessionId, int order = 1) =>
         StudySessionQuestion.Create(sessionId, null, "section", "Section", "concept", "Concept", "Question?",
-            ["A", "B", "C", "D"], "A", "easy", "Explanation", 2, 1).Value;
+            ["A", "B", "C", "D"], "A", "easy", "Explanation", 2, order).Value;
 
     private static StudySessionQuestionAnswer CreateAnswer(Guid questionId, string answer, bool correct, int attempt) =>
         StudySessionQuestionAnswer.Create(questionId, answer, correct, null, attempt,

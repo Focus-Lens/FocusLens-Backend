@@ -10,6 +10,9 @@ public static class StudySessionErrors
     public static readonly Error InvalidMode =
         Error.Validation("StudySessions.InvalidMode", "Study session mode is invalid.");
 
+    public static readonly Error InvalidSessionType =
+        Error.Validation("StudySessions.InvalidSessionType", "Study session type is invalid.");
+
     public static readonly Error SubjectRequired =
         Error.Validation("StudySessions.SubjectRequired", "A subject is required.");
 

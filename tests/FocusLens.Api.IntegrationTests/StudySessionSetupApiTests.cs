@@ -27,6 +27,24 @@ public sealed class StudySessionSetupApiTests
     }
 
     [Fact]
+    public async Task SetSessionType_ReturnsNoContentAndPersistsSelection()
+    {
+        await using CustomWebApplicationFactory factory = new();
+        (Guid userId, StudySession session, _) = await SeedSessionAsync(factory);
+        using HttpClient client = CreateStudentClient(factory, userId);
+
+        HttpResponseMessage response = await client.PutAsync(
+            $"/api/study-sessions/{session.Id}/type",
+            JsonContent("""{"sessionType":"Practice"}"""));
+
+        await AssertNoContentAsync(response);
+        using IServiceScope scope = factory.Services.CreateScope();
+        ApplicationDbContext dbContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        Assert.Equal(StudySessionType.Practice,
+            dbContext.StudySessions.Single(item => item.Id == session.Id).SessionType);
+    }
+
+    [Fact]
     public async Task SetSubject_ReturnsNoContent()
     {
         await using CustomWebApplicationFactory factory = new();

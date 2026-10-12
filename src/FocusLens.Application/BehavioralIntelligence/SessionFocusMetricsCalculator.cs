@@ -3,7 +3,10 @@ using FocusLens.Domain.StudySessions;
 namespace FocusLens.Application.BehavioralIntelligence;
 
 /// <summary>Session-level focus metrics derived from the ordered analysis windows.</summary>
-public sealed record SessionFocusMetrics(int? FocusScore, string? FocusState, string? FocusTrend);
+public sealed record SessionFocusMetrics(
+    int? FocusScore,
+    string? FocusState,
+    string? WithinSessionFocusTrend);
 
 public static class SessionFocusMetricsCalculator
 {
@@ -125,14 +128,11 @@ public static class SessionFocusMetricsCalculator
             .TakeLast(3)
             .ToArray();
 
-        if (scores.Length == 0)
+        // A within-session trend needs at least three scored windows to avoid
+        // presenting a two-point or single-point observation as a stable pattern.
+        if (scores.Length < 3)
         {
             return null;
-        }
-
-        if (scores.Length < 2)
-        {
-            return "STABLE";
         }
 
         int change = scores[^1] - scores[0];

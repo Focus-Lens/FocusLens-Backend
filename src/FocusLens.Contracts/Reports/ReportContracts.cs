@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace FocusLens.Contracts.Reports;
 
 public sealed record ReportSessionListItemResponse(
@@ -6,18 +8,24 @@ public sealed record ReportSessionListItemResponse(
     string Subject,
     string MaterialName,
     string Mode,
+    string SessionType,
     string Status,
     int ActualDurationMinutes,
     int CompletionPercentage,
     int QuestionsGenerated,
+    int QuestionsAnswered,
     int CorrectQuestions,
     int Attempts,
     int LearningPercentage,
     int? FocusScore,
     string? FocusState,
-    string? FocusTrend,
+    string? WithinSessionFocusTrend,
     int? UnderstandingScore,
-    string? UnderstandingTrend);
+    string? UnderstandingTrend)
+{
+    [JsonPropertyName("focusTrend")]
+    public string? FocusTrend => WithinSessionFocusTrend;
+}
 
 public sealed record ReportSessionListResponse(
     IReadOnlyCollection<ReportSessionListItemResponse> Items,
@@ -37,10 +45,12 @@ public sealed record ReportSessionDetailResponse(
     string Subject,
     string MaterialName,
     string Mode,
+    string SessionType,
     string Status,
     int ActualDurationMinutes,
     int CompletionPercentage,
     int QuestionsGenerated,
+    int QuestionsAnswered,
     int CorrectQuestions,
     int Attempts,
     int LearningPercentage,
@@ -49,9 +59,14 @@ public sealed record ReportSessionDetailResponse(
     int PauseCount,
     int? FocusScore,
     string? FocusState,
-    string? FocusTrend,
+    string? WithinSessionFocusTrend,
+    string? RecentSessionsFocusTrend,
     IReadOnlyCollection<ReportSessionFocusQualityPointResponse> FocusQuality,
     int? UnderstandingScore,
     string? UnderstandingTrend,
     string Summary,
-    IReadOnlyCollection<string> Highlights);
+    IReadOnlyCollection<string> Highlights)
+{
+    [JsonPropertyName("focusTrend")]
+    public string? FocusTrend => WithinSessionFocusTrend;
+}

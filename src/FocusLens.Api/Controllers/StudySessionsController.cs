@@ -43,6 +43,17 @@ public sealed class StudySessionsController(ISender sender) : ApiController
         return result.Match(_ => NoContent(), Problem);
     }
 
+    [HttpPut("{sessionId:guid}/type")]
+    public async Task<IActionResult> SetSessionType(
+        Guid sessionId,
+        [FromBody] SetStudySessionTypeRequest request,
+        CancellationToken cancellationToken)
+    {
+        Result<Success> result =
+            await sender.Send(new SetStudySessionTypeCommand(sessionId, request), cancellationToken);
+        return result.Match(_ => NoContent(), Problem);
+    }
+
     [HttpPut("{sessionId:guid}/subject")]
     public async Task<IActionResult> SetSubject(Guid sessionId, [FromBody] SetStudySessionSubjectRequest request,
         CancellationToken cancellationToken)

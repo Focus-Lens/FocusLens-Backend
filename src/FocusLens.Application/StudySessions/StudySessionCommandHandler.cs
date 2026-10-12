@@ -9,6 +9,7 @@ using Microsoft.Extensions.Options;
 using ICurrentUser = FocusLens.Application.Common.Interfaces.ICurrentUser;
 using DomainStudyMaterialSource = FocusLens.Domain.StudySessions.StudyMaterialSource;
 using DomainStudySessionMode = FocusLens.Domain.StudySessions.StudySessionMode;
+using DomainStudySessionType = FocusLens.Domain.StudySessions.StudySessionType;
 using StudyMaterialSource = FocusLens.Contracts.StudySessions.StudyMaterialSource;
 
 namespace FocusLens.Application.StudySessions;
@@ -31,6 +32,7 @@ public sealed class StudySessionCommandHandler(
     TimeProvider timeProvider = null!)
     : IRequestHandler<CreateStudySessionCommand, Result<StudySessionResponse>>,
         IRequestHandler<SetStudySessionModeCommand, Result<Success>>,
+        IRequestHandler<SetStudySessionTypeCommand, Result<Success>>,
         IRequestHandler<SetStudySessionSubjectCommand, Result<Success>>,
         IRequestHandler<SetStudySessionDurationCommand, Result<Success>>,
         IRequestHandler<SetStudySessionSelectionCommand, Result<StudySessionSelectionResponse>>,
@@ -66,8 +68,15 @@ public sealed class StudySessionCommandHandler(
             return StudySessionErrors.InvalidMode;
         }
 
-        Result<StudySession> sessionResult =
-            StudySession.Create(studentResult.Value.Id, (DomainStudySessionMode)request.Request.Mode);
+        if (!Enum.IsDefined(request.Request.SessionType))
+        {
+            return StudySessionErrors.InvalidSessionType;
+        }
+
+        Result<StudySession> sessionResult = StudySession.Create(
+            studentResult.Value.Id,
+            (DomainStudySessionMode)request.Request.Mode,
+            (DomainStudySessionType)request.Request.SessionType);
         if (sessionResult.IsError)
         {
             return sessionResult.TopError;
@@ -240,7 +249,8 @@ public sealed class StudySessionCommandHandler(
                 "One or more selected study sections are no longer available.");
         }
 
-        Result<StudySession> newSessionResult = StudySession.Create(source.StudentId, source.Mode);
+        Result<StudySession> newSessionResult =
+            StudySession.Create(source.StudentId, source.Mode, source.SessionType);
         if (newSessionResult.IsError)
         {
             return newSessionResult.TopError;
@@ -356,6 +366,24 @@ public sealed class StudySessionCommandHandler(
         }
 
         return await CreateSelectionAsync(sessionResult.Value, request.Request, cancellationToken);
+    }
+
+    public async Task<Result<Success>> Handle(SetStudySessionTypeCommand request,
+        CancellationToken cancellationToken)
+    {
+        Result<StudySession> sessionResult = await GetSessionAsync(request.SessionId);
+        if (sessionResult.IsError)
+        {
+            return sessionResult.TopError;
+        }
+
+        if (!Enum.IsDefined(request.Request.SessionType))
+        {
+            return StudySessionErrors.InvalidSessionType;
+        }
+
+        return await SaveSessionAsync(
+            sessionResult.Value.SetSessionType((DomainStudySessionType)request.Request.SessionType));
     }
 
     public async Task<Result<Success>> Handle(SetStudySessionSubjectCommand request,

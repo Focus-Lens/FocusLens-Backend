@@ -993,6 +993,12 @@ namespace FocusLens.Infrastructure.Data.Migrations
                         .HasMaxLength(20)
                         .HasColumnType("nvarchar(20)");
 
+                    b.Property<string>("SessionType")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasDefaultValue("StudySession")
+                        .HasColumnType("nvarchar(30)");
+
                     b.Property<DateTimeOffset?>("PausedAtUtc")
                         .HasColumnType("datetimeoffset");
 

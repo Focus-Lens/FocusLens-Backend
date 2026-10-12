@@ -11,17 +11,20 @@ public sealed class StudySession : AuditableEntity
 
     private StudySession() { }
 
-    private StudySession(Guid studentId, StudySessionMode mode)
+    private StudySession(Guid studentId, StudySessionMode mode, StudySessionType sessionType)
         : base(Guid.CreateVersion7())
     {
         StudentId = studentId;
         Mode = mode;
+        SessionType = sessionType;
         Status = StudySessionStatus.Draft;
     }
 
     public Guid StudentId { get; }
 
     public StudySessionMode Mode { get; private set; }
+
+    public StudySessionType SessionType { get; private set; } = StudySessionType.StudySession;
 
     public StudySessionStatus Status { get; private set; }
 
@@ -55,7 +58,10 @@ public sealed class StudySession : AuditableEntity
 
     public IReadOnlyCollection<StudySessionPauseInterval> PauseIntervals => _pauseIntervals.AsReadOnly();
 
-    public static Result<StudySession> Create(Guid studentId, StudySessionMode mode)
+    public static Result<StudySession> Create(
+        Guid studentId,
+        StudySessionMode mode,
+        StudySessionType sessionType = StudySessionType.StudySession)
     {
         if (studentId == Guid.Empty)
         {
@@ -67,7 +73,12 @@ public sealed class StudySession : AuditableEntity
             return StudySessionErrors.InvalidMode;
         }
 
-        return new StudySession(studentId, mode);
+        if (!Enum.IsDefined(sessionType))
+        {
+            return StudySessionErrors.InvalidSessionType;
+        }
+
+        return new StudySession(studentId, mode, sessionType);
     }
 
     public Result<Success> SetMode(StudySessionMode mode)
@@ -79,6 +90,19 @@ public sealed class StudySession : AuditableEntity
         }
 
         Mode = mode;
+        MarkDraft();
+        return Result.Success;
+    }
+
+    public Result<Success> SetSessionType(StudySessionType sessionType)
+    {
+        Result<Success> configurable = EnsureConfigurable();
+        if (configurable.IsError || !Enum.IsDefined(sessionType))
+        {
+            return configurable.IsError ? configurable : StudySessionErrors.InvalidSessionType;
+        }
+
+        SessionType = sessionType;
         MarkDraft();
         return Result.Success;
     }
