@@ -136,6 +136,361 @@ public sealed class BehavioralIntelligenceApiTests
     }
 
     [Fact]
+    public async Task BehavioralProgress_UsesStudentLocalDatesAndActiveTimeWeightedFocusScores()
+    {
+        DateTimeOffset now = new(2026, 9, 15, 0, 30, 0, TimeSpan.Zero);
+        await using CustomWebApplicationFactory factory = new(now);
+        Guid userId = Guid.NewGuid();
+        StudentSubject subject = StudentSubject.Predefined(StudentSubjectType.Math);
+        Student student = new(userId);
+        student.ReplaceSubjects([subject]);
+        student.SetTimeZoneId("Africa/Cairo");
+
+        StudyMaterial material = StudyMaterial
+            .Create(
+                student.Id,
+                "local-progress.pdf",
+                1,
+                1,
+                "materials/local-progress.pdf",
+                StudyMaterialSource.Upload
+            )
+            .Value;
+        StudySession session = StudySession.Create(student.Id, StudySessionMode.Digital).Value;
+        Assert.True(session.SetSubject(subject).IsSuccess);
+        Assert.True(session.SetDuration(240).IsSuccess);
+        Assert.True(session.SetStudyMaterial(material).IsSuccess);
+        Assert.True(session.MarkReady().IsSuccess);
+        Assert.True(
+            session.Start(new DateTimeOffset(2026, 9, 14, 20, 0, 0, TimeSpan.Zero)).IsSuccess
+        );
+        Assert.True(session.End(now.AddMinutes(-10)).IsSuccess);
+
+        StudySessionBehaviorWindow first = StudySessionBehaviorWindow
+            .Create(
+                session.Id,
+                1,
+                new DateTimeOffset(2026, 9, 14, 21, 25, 0, TimeSpan.Zero),
+                new DateTimeOffset(2026, 9, 14, 21, 30, 0, TimeSpan.Zero),
+                false
+            )
+            .Value;
+        Assert.True(
+            first
+                .RecordAnalysis(
+                    40,
+                    "NORMAL_FOCUSED",
+                    "STABLE",
+                    70,
+                    "STABLE",
+                    "CONTINUE",
+                    "CONTINUE",
+                    false,
+                    windowActiveTimeSeconds: 180
+                )
+                .IsSuccess
+        );
+
+        StudySessionBehaviorWindow second = StudySessionBehaviorWindow
+            .Create(
+                session.Id,
+                2,
+                new DateTimeOffset(2026, 9, 14, 22, 25, 0, TimeSpan.Zero),
+                new DateTimeOffset(2026, 9, 14, 22, 30, 0, TimeSpan.Zero),
+                false
+            )
+            .Value;
+        Assert.True(
+            second
+                .RecordAnalysis(
+                    80,
+                    "NORMAL_FOCUSED",
+                    "STABLE",
+                    90,
+                    "STABLE",
+                    "CONTINUE",
+                    "CONTINUE",
+                    false,
+                    windowActiveTimeSeconds: 60
+                )
+                .IsSuccess
+        );
+
+        await factory.SeedAsync(db =>
+        {
+            db.Students.Add(student);
+            db.StudyMaterials.Add(material);
+            db.StudySessions.Add(session);
+            db.StudySessionBehaviorWindows.AddRange(first, second);
+            return Task.CompletedTask;
+        });
+
+        using HttpClient client = factory.CreateClient();
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue(
+            "Bearer",
+            TestJwtTokenFactory.Create(userId, "Student")
+        );
+        HttpResponseMessage response = await client.GetAsync("/api/progress/behavioral?range=Week");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        using JsonDocument document = JsonDocument.Parse(
+            await response.Content.ReadAsStringAsync()
+        );
+        JsonElement root = document.RootElement;
+        Assert.Equal("2026-09-15", root.GetProperty("dateTo").GetString());
+
+        JsonElement scoredDay = Assert.Single(
+            root.GetProperty("daily").EnumerateArray(),
+            item => item.GetProperty("focusScore").ValueKind != JsonValueKind.Null
+        );
+        Assert.Equal("2026-09-15", scoredDay.GetProperty("date").GetString());
+        Assert.Equal(2, scoredDay.GetProperty("analyzedWindowCount").GetInt32());
+        Assert.Equal(50, scoredDay.GetProperty("focusScore").GetInt32());
+        Assert.Equal(80, scoredDay.GetProperty("understandingScore").GetInt32());
+        Assert.Equal(50, root.GetProperty("focus").GetProperty("latestScore").GetInt32());
+        Assert.Contains(
+            "local calendar date",
+            root.GetProperty("focus").GetProperty("calculation").GetString()
+        );
+    }
+
+    [Fact]
+    public async Task BehavioralProgress_UsesSameDateRangeContractAsProgress()
+    {
+        DateTimeOffset now = new(2026, 9, 15, 0, 30, 0, TimeSpan.Zero);
+        await using CustomWebApplicationFactory factory = new(now);
+        Guid userId = Guid.NewGuid();
+        Student student = new(userId);
+        student.SetTimeZoneId("Africa/Cairo");
+
+        await factory.SeedAsync(db =>
+        {
+            db.Students.Add(student);
+            return Task.CompletedTask;
+        });
+
+        using HttpClient client = factory.CreateClient();
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue(
+            "Bearer", TestJwtTokenFactory.Create(userId, "Student"));
+
+        string[] ranges =
+        [
+            "/api/progress?range=Last7Days",
+            "/api/progress?range=Last30Days",
+            "/api/progress?range=Custom&dateFrom=2026-09-01&dateTo=2026-09-10"
+        ];
+        string[] behavioralRanges =
+        [
+            "/api/progress/behavioral?range=Last7Days",
+            "/api/progress/behavioral?range=Last30Days",
+            "/api/progress/behavioral?range=Custom&dateFrom=2026-09-01&dateTo=2026-09-10"
+        ];
+
+        for (int index = 0; index < ranges.Length; index++)
+        {
+            using HttpResponseMessage progressResponse = await client.GetAsync(ranges[index]);
+            using HttpResponseMessage behavioralResponse = await client.GetAsync(behavioralRanges[index]);
+            Assert.Equal(HttpStatusCode.OK, progressResponse.StatusCode);
+            Assert.Equal(HttpStatusCode.OK, behavioralResponse.StatusCode);
+
+            using JsonDocument progressDocument = JsonDocument.Parse(
+                await progressResponse.Content.ReadAsStringAsync());
+            using JsonDocument behavioralDocument = JsonDocument.Parse(
+                await behavioralResponse.Content.ReadAsStringAsync());
+            Assert.Equal(
+                progressDocument.RootElement.GetProperty("dateFrom").GetString(),
+                behavioralDocument.RootElement.GetProperty("dateFrom").GetString());
+            Assert.Equal(
+                progressDocument.RootElement.GetProperty("dateTo").GetString(),
+                behavioralDocument.RootElement.GetProperty("dateTo").GetString());
+        }
+
+        const string invalidRange = "?range=Custom&dateFrom=2026-09-10&dateTo=2026-09-01";
+        Assert.Equal(HttpStatusCode.BadRequest,
+            (await client.GetAsync($"/api/progress{invalidRange}")).StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest,
+            (await client.GetAsync($"/api/progress/behavioral{invalidRange}")).StatusCode);
+    }
+
+    [Fact]
+    public async Task BehavioralProgress_IncludesInRangeWindowsFromSessionsStartedBeforeRange()
+    {
+        DateTimeOffset now = new(2026, 9, 15, 12, 0, 0, TimeSpan.Zero);
+        await using CustomWebApplicationFactory factory = new(now);
+        Guid userId = Guid.NewGuid();
+        StudentSubject subject = StudentSubject.Predefined(StudentSubjectType.Math);
+        Student student = new(userId);
+        student.ReplaceSubjects([subject]);
+        student.SetTimeZoneId("Africa/Cairo");
+        StudyMaterial material = StudyMaterial.Create(
+            student.Id, "cross-date-progress.pdf", 1, 1,
+            "materials/cross-date-progress.pdf", StudyMaterialSource.Upload).Value;
+
+        // The session starts at 23:58 in Cairo on Aug 31, but its behavior window
+        // ends at 00:02 on Sep 1, inside the selected date range.
+        DateTimeOffset startedAt = new(2026, 8, 31, 20, 58, 0, TimeSpan.Zero);
+        StudySession session = CreateFinishedSession(student, subject, material, startedAt);
+        StudySessionBehaviorWindow window = CreateAnalyzedWindow(
+            session.Id, new DateTimeOffset(2026, 8, 31, 21, 2, 0, TimeSpan.Zero), 75);
+
+        await factory.SeedAsync(db =>
+        {
+            db.Students.Add(student);
+            db.StudyMaterials.Add(material);
+            db.StudySessions.Add(session);
+            db.StudySessionBehaviorWindows.Add(window);
+            return Task.CompletedTask;
+        });
+
+        using HttpClient client = factory.CreateClient();
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue(
+            "Bearer", TestJwtTokenFactory.Create(userId, "Student"));
+        using HttpResponseMessage response = await client.GetAsync(
+            "/api/progress/behavioral?range=Custom&dateFrom=2026-09-01&dateTo=2026-09-10");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        using JsonDocument document = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        JsonElement root = document.RootElement;
+        JsonElement dailyItem = Assert.Single(root.GetProperty("daily").EnumerateArray(),
+            item => item.GetProperty("date").GetString() == "2026-09-01");
+        Assert.Equal(1, dailyItem.GetProperty("analyzedWindowCount").GetInt32());
+        Assert.Equal(75, dailyItem.GetProperty("focusScore").GetInt32());
+        Assert.Equal(75, dailyItem.GetProperty("understandingScore").GetInt32());
+
+        // Session-level subject insights intentionally remain scoped by session start date.
+        Assert.Empty(root.GetProperty("subjects").EnumerateArray());
+
+        JsonElement evening = Assert.Single(root.GetProperty("timeOfDay").EnumerateArray(),
+            item => item.GetProperty("period").GetString() == "Evening");
+        Assert.Equal(1, evening.GetProperty("analyzedWindowCount").GetInt32());
+        Assert.Equal(75, evening.GetProperty("averageFocusScore").GetInt32());
+    }
+
+    [Fact]
+    public async Task BehavioralProgress_ReturnsSubjectFocusTrendsAndLocalTimeOfDayInsights()
+    {
+        DateTimeOffset now = new(2026, 9, 15, 0, 30, 0, TimeSpan.Zero);
+        await using CustomWebApplicationFactory factory = new(now);
+        Guid userId = Guid.NewGuid();
+        StudentSubject math = StudentSubject.Predefined(StudentSubjectType.Math);
+        StudentSubject biology = StudentSubject.Predefined(StudentSubjectType.Biology);
+        StudentSubject english = StudentSubject.Predefined(StudentSubjectType.English);
+        Student student = new(userId);
+        student.ReplaceSubjects([math, biology, english]);
+        student.SetTimeZoneId("Africa/Cairo");
+        StudyMaterial material = StudyMaterial.Create(
+            student.Id, "progress-insights.pdf", 1, 1,
+            "materials/progress-insights.pdf", StudyMaterialSource.Upload).Value;
+
+        List<StudySession> sessions = [];
+        List<StudySessionBehaviorWindow> windows = [];
+        (DateTimeOffset WindowEnd, int Score)[] mathWindows =
+        [
+            (new DateTimeOffset(2026, 9, 12, 13, 0, 0, TimeSpan.Zero), 60),
+            (new DateTimeOffset(2026, 9, 13, 13, 0, 0, TimeSpan.Zero), 70),
+            (new DateTimeOffset(2026, 9, 14, 13, 0, 0, TimeSpan.Zero), 80)
+        ];
+        (DateTimeOffset WindowEnd, int Score)[] biologyWindows =
+        [
+            (new DateTimeOffset(2026, 9, 12, 20, 0, 0, TimeSpan.Zero), 40),
+            (new DateTimeOffset(2026, 9, 13, 20, 0, 0, TimeSpan.Zero), 50),
+            (new DateTimeOffset(2026, 9, 14, 20, 0, 0, TimeSpan.Zero), 60)
+        ];
+
+        foreach ((DateTimeOffset windowEnd, int score) in mathWindows)
+        {
+            StudySession session = CreateFinishedSession(
+                student, math, material, windowEnd.AddMinutes(-4));
+            sessions.Add(session);
+            windows.Add(CreateAnalyzedWindow(session.Id, windowEnd, score));
+        }
+
+        foreach ((DateTimeOffset windowEnd, int score) in biologyWindows)
+        {
+            StudySession session = CreateFinishedSession(
+                student, biology, material, windowEnd.AddMinutes(-4));
+            sessions.Add(session);
+            windows.Add(CreateAnalyzedWindow(session.Id, windowEnd, score));
+        }
+
+        DateTimeOffset morningWindowEnd = new(2026, 9, 14, 6, 0, 0, TimeSpan.Zero);
+        StudySession englishSession = CreateFinishedSession(
+            student, english, material, morningWindowEnd.AddMinutes(-4));
+        sessions.Add(englishSession);
+        windows.Add(CreateAnalyzedWindow(englishSession.Id, morningWindowEnd, 75));
+
+        await factory.SeedAsync(db =>
+        {
+            db.Students.Add(student);
+            db.StudyMaterials.Add(material);
+            db.StudySessions.AddRange(sessions);
+            db.StudySessionBehaviorWindows.AddRange(windows);
+            return Task.CompletedTask;
+        });
+
+        using HttpClient client = factory.CreateClient();
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue(
+            "Bearer", TestJwtTokenFactory.Create(userId, "Student"));
+        using HttpResponseMessage response = await client.GetAsync(
+            "/api/progress/behavioral?range=Last30Days");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        using JsonDocument document = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        JsonElement root = document.RootElement;
+        JsonElement subjectInsights = root.GetProperty("subjects");
+        JsonElement mathInsight = subjectInsights.EnumerateArray()
+            .Single(item => item.GetProperty("subjectId").GetGuid() == math.Id);
+        Assert.Equal(3, mathInsight.GetProperty("analyzedDayCount").GetInt32());
+        Assert.Equal(80, mathInsight.GetProperty("latestFocusScore").GetInt32());
+        Assert.Equal("Improving", mathInsight.GetProperty("focusTrend").GetString());
+        Assert.Equal("EnoughData", mathInsight.GetProperty("focusDataStatus").GetString());
+
+        JsonElement biologyInsight = subjectInsights.EnumerateArray()
+            .Single(item => item.GetProperty("subjectId").GetGuid() == biology.Id);
+        Assert.Equal("Improving", biologyInsight.GetProperty("focusTrend").GetString());
+        Assert.Equal("EnoughData", biologyInsight.GetProperty("focusDataStatus").GetString());
+
+        JsonElement englishInsight = subjectInsights.EnumerateArray()
+            .Single(item => item.GetProperty("subjectId").GetGuid() == english.Id);
+        Assert.Equal("InsufficientData", englishInsight.GetProperty("focusDataStatus").GetString());
+        Assert.Equal(JsonValueKind.Null, englishInsight.GetProperty("focusTrend").ValueKind);
+
+        JsonElement timeOfDay = root.GetProperty("timeOfDay");
+        JsonElement afternoon = timeOfDay.EnumerateArray()
+            .Single(item => item.GetProperty("period").GetString() == "Afternoon");
+        Assert.Equal(3, afternoon.GetProperty("analyzedDayCount").GetInt32());
+        Assert.Equal(70, afternoon.GetProperty("averageFocusScore").GetInt32());
+        Assert.Equal("EnoughData", afternoon.GetProperty("focusDataStatus").GetString());
+
+        JsonElement evening = timeOfDay.EnumerateArray()
+            .Single(item => item.GetProperty("period").GetString() == "Evening");
+        Assert.Equal(3, evening.GetProperty("analyzedDayCount").GetInt32());
+        Assert.Equal("EnoughData", evening.GetProperty("focusDataStatus").GetString());
+        Assert.Equal(50, evening.GetProperty("averageFocusScore").GetInt32());
+        Assert.Equal("Afternoon", root.GetProperty("strongestTimeOfDay").GetString());
+    }
+
+    private static StudySessionBehaviorWindow CreateAnalyzedWindow(
+        Guid sessionId,
+        DateTimeOffset windowEnd,
+        int focusScore)
+    {
+        StudySessionBehaviorWindow window = StudySessionBehaviorWindow.Create(
+            sessionId, 1, windowEnd.AddMinutes(-3), windowEnd, false).Value;
+        Assert.True(window.RecordAnalysis(
+            focusScore,
+            "NORMAL_FOCUSED",
+            "STABLE",
+            75,
+            "STABLE",
+            "CONTINUE",
+            "CONTINUE",
+            false,
+            windowActiveTimeSeconds: 180).IsSuccess);
+        return window;
+    }
+
+    [Fact]
     public async Task AnalyzeBehaviorWindow_CallsBehavioralIntelligence_AndPersistsResult()
     {
         DateTimeOffset now = new(2026, 9, 14, 22, 45, 0, TimeSpan.Zero);

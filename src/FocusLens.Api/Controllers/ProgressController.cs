@@ -33,10 +33,17 @@ public sealed class ProgressController(ISender sender) : ControllerBase
     public async Task<IActionResult> GetBehavioral(
         [FromQuery] Guid? studentId,
         [FromQuery] string? range,
+        [FromQuery] DateOnly? dateFrom,
+        [FromQuery] DateOnly? dateTo,
         CancellationToken cancellationToken)
     {
+        if (!HasValidBehavioralRange(range, dateFrom, dateTo))
+        {
+            return BadRequest(new { error = "The requested progress date range is invalid." });
+        }
+
         BehavioralProgressResponse? response = await sender.Send(
-            new GetBehavioralProgressQuery(studentId, range), cancellationToken);
+            new GetBehavioralProgressQuery(studentId, range, dateFrom, dateTo), cancellationToken);
         return response is null ? NotFound() : Ok(response);
     }
 
@@ -49,5 +56,20 @@ public sealed class ProgressController(ISender sender) : ControllerBase
                 dateFrom is not null &&
                 dateTo is not null &&
                 dateFrom <= dateTo);
+    }
+
+    private static bool HasValidBehavioralRange(string? range, DateOnly? dateFrom, DateOnly? dateTo)
+    {
+        string value = string.IsNullOrWhiteSpace(range) ? "Last30Days" : range.Trim();
+
+        // Keep the previous behavioral range names as aliases for existing clients.
+        if (value.Equals("Week", StringComparison.OrdinalIgnoreCase) ||
+            value.Equals("Month", StringComparison.OrdinalIgnoreCase) ||
+            value.Equals("AllTime", StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        return HasValidRange(value, dateFrom, dateTo);
     }
 }
