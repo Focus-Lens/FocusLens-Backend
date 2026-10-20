@@ -87,6 +87,82 @@ public sealed class StudySessionSetupApiTests
     }
 
     [Fact]
+    public async Task PauseAndResume_PersistsPauseIntervalAndClosesIt()
+    {
+        await using CustomWebApplicationFactory factory = new();
+        (Guid userId, StudySession session, _) = await SeedSessionAsync(factory, true);
+        using HttpClient client = CreateStudentClient(factory, userId);
+
+        await AssertNoContentAsync(await client.PostAsync(
+            $"/api/study-sessions/{session.Id}/start", null));
+
+        using HttpResponseMessage pauseResponse = await client.PostAsync(
+            $"/api/study-sessions/{session.Id}/pause", null);
+        Assert.Equal(HttpStatusCode.OK, pauseResponse.StatusCode);
+        using JsonDocument pauseDocument = JsonDocument.Parse(
+            await pauseResponse.Content.ReadAsStringAsync());
+        Assert.Equal("Paused", pauseDocument.RootElement.GetProperty("status").GetString());
+
+        Guid pauseIntervalId;
+        using (IServiceScope scope = factory.Services.CreateScope())
+        {
+            ApplicationDbContext db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            StudySession persisted = db.StudySessions.Single(item => item.Id == session.Id);
+            Assert.Equal(StudySessionStatus.Paused, persisted.Status);
+            Assert.NotNull(persisted.PausedAtUtc);
+
+            StudySessionPauseInterval interval = db.StudySessionPauseIntervals
+                .Single(item => item.StudySessionId == session.Id);
+            Assert.Null(interval.EndedAtUtc);
+            pauseIntervalId = interval.Id;
+        }
+
+        using HttpResponseMessage resumeResponse = await client.PostAsync(
+            $"/api/study-sessions/{session.Id}/resume", null);
+        Assert.Equal(HttpStatusCode.OK, resumeResponse.StatusCode);
+        using JsonDocument resumeDocument = JsonDocument.Parse(
+            await resumeResponse.Content.ReadAsStringAsync());
+        Assert.Equal("Active", resumeDocument.RootElement.GetProperty("status").GetString());
+
+        using IServiceScope resumeScope = factory.Services.CreateScope();
+        ApplicationDbContext resumedDb = resumeScope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        StudySession resumed = resumedDb.StudySessions.Single(item => item.Id == session.Id);
+        Assert.Equal(StudySessionStatus.Active, resumed.Status);
+        Assert.Null(resumed.PausedAtUtc);
+        StudySessionPauseInterval closedInterval = resumedDb.StudySessionPauseIntervals
+            .Single(item => item.Id == pauseIntervalId);
+        Assert.NotNull(closedInterval.EndedAtUtc);
+    }
+
+    [Fact]
+    public async Task EndWhilePaused_ClosesOpenPauseInterval()
+    {
+        await using CustomWebApplicationFactory factory = new();
+        (Guid userId, StudySession session, _) = await SeedSessionAsync(factory, true);
+        using HttpClient client = CreateStudentClient(factory, userId);
+
+        await AssertNoContentAsync(await client.PostAsync(
+            $"/api/study-sessions/{session.Id}/start", null));
+
+        using HttpResponseMessage pauseResponse = await client.PostAsync(
+            $"/api/study-sessions/{session.Id}/pause", null);
+        Assert.Equal(HttpStatusCode.OK, pauseResponse.StatusCode);
+
+        using HttpResponseMessage endResponse = await client.PostAsync(
+            $"/api/study-sessions/{session.Id}/end", null);
+        Assert.Equal(HttpStatusCode.OK, endResponse.StatusCode);
+
+        using IServiceScope scope = factory.Services.CreateScope();
+        ApplicationDbContext db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        StudySession persisted = db.StudySessions.Single(item => item.Id == session.Id);
+        Assert.Equal(StudySessionStatus.Cancelled, persisted.Status);
+        Assert.Null(persisted.PausedAtUtc);
+        StudySessionPauseInterval interval = db.StudySessionPauseIntervals
+            .Single(item => item.StudySessionId == session.Id);
+        Assert.NotNull(interval.EndedAtUtc);
+    }
+
+    [Fact]
     public async Task UploadImages_WithMultipleValidImages_ReturnsMetadataAndDoesNotMarkSessionReady()
     {
         await using CustomWebApplicationFactory factory = new();

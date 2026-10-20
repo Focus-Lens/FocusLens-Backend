@@ -17,6 +17,7 @@ namespace FocusLens.Application.StudySessions;
 public sealed class StudySessionCommandHandler(
     IBaseRepository<Student> studentRepository,
     IBaseRepository<StudySession> studySessionRepository,
+    IBaseRepository<StudySessionPauseInterval> pauseIntervalRepository,
     IBaseRepository<StudyMaterial> materialRepository,
     IBaseRepository<StudySessionSelection> selectionRepository,
     IBaseRepository<StudySessionSelectedSection> selectedSectionRepository,
@@ -114,7 +115,8 @@ public sealed class StudySessionCommandHandler(
         Result<StudySession> sessionResult =
             await GetSessionAsync(
                 request.SessionId,
-                includeMaterial: true);
+                includeMaterial: true,
+                includePauseIntervals: true);
 
         if (sessionResult.IsError)
         {
@@ -155,26 +157,37 @@ public sealed class StudySessionCommandHandler(
         Result<StudySession> sessionResult =
             await GetSessionAsync(
                 request.SessionId,
-                includeSelection: true);
+                includeSelection: true,
+                includePauseIntervals: true);
 
         if (sessionResult.IsError)
         {
             return sessionResult.TopError;
         }
 
+        StudySession session = sessionResult.Value;
+        HashSet<Guid> existingPauseIntervalIds = session.PauseIntervals
+            .Select(interval => interval.Id)
+            .ToHashSet();
+
         DateTimeOffset now = timeProvider.GetUtcNow();
 
-        Result<Success> pauseResult =
-            sessionResult.Value.Pause(now);
+        Result<Success> pauseResult = session.Pause(now);
 
         if (pauseResult.IsError)
         {
             return pauseResult.TopError;
         }
 
-        return await SaveSessionAsync(
-            pauseResult,
-            sessionResult.Value);
+        foreach (StudySessionPauseInterval interval in session.PauseIntervals
+                     .Where(interval => !existingPauseIntervalIds.Contains(interval.Id)))
+        {
+            // The interval is created inside the aggregate. Explicitly mark it Added;
+            // EF otherwise detects the already-keyed dependent as Modified.
+            pauseIntervalRepository.Add(interval);
+        }
+
+        return await SaveSessionAsync(pauseResult, session);
     }
 
 
@@ -185,7 +198,8 @@ public sealed class StudySessionCommandHandler(
         Result<StudySession> sessionResult =
             await GetSessionAsync(
                 request.SessionId,
-                includeSelection: true);
+                includeSelection: true,
+                includePauseIntervals: true);
 
         if (sessionResult.IsError)
         {
@@ -845,7 +859,7 @@ public sealed class StudySessionCommandHandler(
     }
 
     private async Task<Result<StudySession>> GetSessionAsync(Guid sessionId, Student? knownStudent = null,
-        bool includeMaterial = false, bool includeSelection = false)
+        bool includeMaterial = false, bool includeSelection = false, bool includePauseIntervals = false)
     {
         if (sessionId == Guid.Empty)
         {
@@ -858,14 +872,20 @@ public sealed class StudySessionCommandHandler(
             return studentResult.TopError;
         }
 
-        StudySession? session = includeMaterial && includeSelection
-            ? await studySessionRepository.FirstOrDefaultAsync(
-                item => item.Id == sessionId && item.StudentId == studentResult.Value.Id, item => item.Material!,
-                item => item.Selection!.SelectedSections, item => item.CompletedSections)
-            : includeMaterial
+        StudySession? session = includeMaterial
+            ? includePauseIntervals
                 ? await studySessionRepository.FirstOrDefaultAsync(
                     item => item.Id == sessionId && item.StudentId == studentResult.Value.Id,
+                    item => item.Material!, item => item.Selection!.SelectedSections,
+                    item => item.CompletedSections, item => item.PauseIntervals)
+                : await studySessionRepository.FirstOrDefaultAsync(
+                    item => item.Id == sessionId && item.StudentId == studentResult.Value.Id,
                     item => item.Material!, item => item.Selection!.SelectedSections, item => item.CompletedSections)
+            : includePauseIntervals
+                ? await studySessionRepository.FirstOrDefaultAsync(
+                    item => item.Id == sessionId && item.StudentId == studentResult.Value.Id,
+                    item => item.Selection!.SelectedSections, item => item.CompletedSections,
+                    item => item.PauseIntervals)
                 : await studySessionRepository.FirstOrDefaultAsync(
                     item => item.Id == sessionId && item.StudentId == studentResult.Value.Id,
                     item => item.Selection!.SelectedSections, item => item.CompletedSections);
