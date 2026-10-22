@@ -39,7 +39,7 @@ public sealed class GetMyClaimedChildSetupQueryHandler(
         }
 
         ChildSetupDraft? draft = await draftRepository.FirstOrDefaultAsync(
-            item => item.ClaimedByStudentId == student.Id,
+            item => item.ClaimedByStudentId == student.Id && item.Status == ChildSetupStatus.Claimed,
             item => item.Subjects);
 
         if (draft is null)

@@ -251,6 +251,7 @@ public sealed class StudySessionMaterialReplacementTests
                     ? new InMemoryRepository<Student>(student)
                     : new InMemoryRepository<Student>(student, currentStudent),
                 new InMemoryRepository<StudySession>(session),
+                new InMemoryRepository<StudySessionPauseInterval>(),
                 materials,
                 selections,
                 new InMemoryRepository<StudySessionSelectedSection>(),
@@ -262,7 +263,8 @@ public sealed class StudySessionMaterialReplacementTests
                 new StubCurrentUser(currentUserId),
                 new InMemoryRepository<StudySessionBehaviorAnalysisJob>(),
                 unitOfWork,
-                Options.Create(new StudySessionImageUploadOptions()));
+                Options.Create(new StudySessionImageUploadOptions()),
+                TimeProvider.System);
 
             return new Fixture(handler, session, material, selection, materials, selections, images, fileStore,
                 imageFileStore, unitOfWork);

@@ -3,6 +3,7 @@ using System.Text;
 using FocusLens.Application.ChildSetup;
 using FocusLens.Application.UnitTests.Access;
 using FocusLens.Contracts.ChildSetup;
+using FocusLens.Domain;
 using FocusLens.Domain.ChildSetup;
 using FocusLens.Domain.Common.Results;
 
@@ -14,15 +15,8 @@ public sealed class GetChildSetupInvitationQueryHandlerTests
     public async Task Get_WithValidToken_ReturnsInvitationPreview()
     {
         const string token = "valid-child-setup-token";
-        ChildSetupInvitation invitation = new(
-            Guid.NewGuid(),
-            "CHILD@EXAMPLE.COM",
-            Hash(token),
-            DateTimeOffset.UtcNow.AddDays(1));
-
-        GetChildSetupInvitationQueryHandler handler = new(
-            new InMemoryRepository<ChildSetupInvitation>(invitation),
-            TimeProvider.System);
+        ChildSetupInvitation invitation = CreateEmailInvitation(token);
+        GetChildSetupInvitationQueryHandler handler = CreateHandler(invitation);
 
         Result<ChildSetupInvitationDetailsResponse> result = await handler.Handle(
             new GetChildSetupInvitationQuery(token),
@@ -45,10 +39,7 @@ public sealed class GetChildSetupInvitationQueryHandlerTests
             null,
             Hash(token),
             DateTimeOffset.UtcNow.AddDays(1));
-
-        GetChildSetupInvitationQueryHandler handler = new(
-            new InMemoryRepository<ChildSetupInvitation>(invitation),
-            TimeProvider.System);
+        GetChildSetupInvitationQueryHandler handler = CreateHandler(invitation);
 
         Result<ChildSetupInvitationDetailsResponse> result = await handler.Handle(
             new GetChildSetupInvitationQuery(token),
@@ -63,15 +54,8 @@ public sealed class GetChildSetupInvitationQueryHandlerTests
     [Fact]
     public async Task Get_WithUnknownToken_ReturnsNotFound()
     {
-        ChildSetupInvitation invitation = new(
-            Guid.NewGuid(),
-            "CHILD@EXAMPLE.COM",
-            Hash("different-token"),
-            DateTimeOffset.UtcNow.AddDays(1));
-
-        GetChildSetupInvitationQueryHandler handler = new(
-            new InMemoryRepository<ChildSetupInvitation>(invitation),
-            TimeProvider.System);
+        ChildSetupInvitation invitation = CreateEmailInvitation("different-token");
+        GetChildSetupInvitationQueryHandler handler = CreateHandler(invitation);
 
         Result<ChildSetupInvitationDetailsResponse> result = await handler.Handle(
             new GetChildSetupInvitationQuery("unknown-token"),
@@ -90,10 +74,7 @@ public sealed class GetChildSetupInvitationQueryHandlerTests
             "CHILD@EXAMPLE.COM",
             Hash(token),
             DateTimeOffset.UtcNow.AddMinutes(-1));
-
-        GetChildSetupInvitationQueryHandler handler = new(
-            new InMemoryRepository<ChildSetupInvitation>(invitation),
-            TimeProvider.System);
+        GetChildSetupInvitationQueryHandler handler = CreateHandler(invitation);
 
         Result<ChildSetupInvitationDetailsResponse> result = await handler.Handle(
             new GetChildSetupInvitationQuery(token),
@@ -104,19 +85,56 @@ public sealed class GetChildSetupInvitationQueryHandlerTests
     }
 
     [Fact]
-    public async Task Get_WithClaimedInvitation_ReturnsUnavailable()
+    public async Task Get_WithClaimedInvitationBySameStudent_ReturnsInvitationForResume()
     {
         const string token = "claimed-token";
+        Guid userId = Guid.NewGuid();
+        Student student = new(userId);
+        ChildSetupDraft draft = new(Guid.NewGuid());
+        draft.MarkInvited();
+        draft.MarkClaimed(student.Id);
         ChildSetupInvitation invitation = new(
-            Guid.NewGuid(),
+            draft.Id,
             "CHILD@EXAMPLE.COM",
             Hash(token),
             DateTimeOffset.UtcNow.AddDays(1));
         invitation.Claim(DateTimeOffset.UtcNow);
+        GetChildSetupInvitationQueryHandler handler = CreateHandler(
+            invitation,
+            new InMemoryRepository<Student>(student),
+            new InMemoryRepository<ChildSetupDraft>(draft),
+            new FakeCurrentUser(userId));
 
-        GetChildSetupInvitationQueryHandler handler = new(
-            new InMemoryRepository<ChildSetupInvitation>(invitation),
-            TimeProvider.System);
+        Result<ChildSetupInvitationDetailsResponse> result = await handler.Handle(
+            new GetChildSetupInvitationQuery(token),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal("Claimed", result.Value.Status);
+    }
+
+    [Fact]
+    public async Task Get_WithClaimedInvitationByDifferentStudent_ReturnsUnavailable()
+    {
+        const string token = "claimed-by-someone-else-token";
+        Guid currentUserId = Guid.NewGuid();
+        Student currentStudent = new(currentUserId);
+        Student originalStudent = new(Guid.NewGuid());
+        ChildSetupDraft draft = new(Guid.NewGuid());
+        draft.MarkInvited();
+        draft.MarkClaimed(originalStudent.Id);
+        ChildSetupInvitation invitation = new(
+            draft.Id,
+            ChildSetupInvitationType.Link,
+            null,
+            Hash(token),
+            DateTimeOffset.UtcNow.AddDays(1));
+        invitation.Claim(DateTimeOffset.UtcNow);
+        GetChildSetupInvitationQueryHandler handler = CreateHandler(
+            invitation,
+            new InMemoryRepository<Student>(currentStudent),
+            new InMemoryRepository<ChildSetupDraft>(draft),
+            new FakeCurrentUser(currentUserId));
 
         Result<ChildSetupInvitationDetailsResponse> result = await handler.Handle(
             new GetChildSetupInvitationQuery(token),
@@ -126,9 +144,55 @@ public sealed class GetChildSetupInvitationQueryHandlerTests
         Assert.Equal("ChildSetupInvitation.Unavailable", result.TopError.Code);
     }
 
-    private static string Hash(string token)
+    [Fact]
+    public async Task Get_WithActivatedInvitation_ReturnsUnavailable()
     {
-        return Convert.ToHexString(
-            SHA256.HashData(Encoding.UTF8.GetBytes(token)));
+        const string token = "activated-token";
+        Guid userId = Guid.NewGuid();
+        Student student = new(userId);
+        ChildSetupDraft draft = new(Guid.NewGuid());
+        draft.MarkInvited();
+        draft.MarkClaimed(student.Id);
+        draft.MarkActivated();
+        ChildSetupInvitation invitation = new(
+            draft.Id,
+            ChildSetupInvitationType.Link,
+            null,
+            Hash(token),
+            DateTimeOffset.UtcNow.AddDays(1));
+        invitation.Claim(DateTimeOffset.UtcNow);
+        GetChildSetupInvitationQueryHandler handler = CreateHandler(
+            invitation,
+            new InMemoryRepository<Student>(student),
+            new InMemoryRepository<ChildSetupDraft>(draft),
+            new FakeCurrentUser(userId));
+
+        Result<ChildSetupInvitationDetailsResponse> result = await handler.Handle(
+            new GetChildSetupInvitationQuery(token),
+            CancellationToken.None);
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal("ChildSetupInvitation.Unavailable", result.TopError.Code);
     }
+
+    private static GetChildSetupInvitationQueryHandler CreateHandler(
+        ChildSetupInvitation invitation,
+        InMemoryRepository<Student>? students = null,
+        InMemoryRepository<ChildSetupDraft>? drafts = null,
+        FakeCurrentUser? currentUser = null) =>
+        new(
+            new InMemoryRepository<ChildSetupInvitation>(invitation),
+            students ?? new InMemoryRepository<Student>(),
+            drafts ?? new InMemoryRepository<ChildSetupDraft>(),
+            currentUser ?? new FakeCurrentUser(Guid.NewGuid()),
+            TimeProvider.System);
+
+    private static ChildSetupInvitation CreateEmailInvitation(string token) => new(
+        Guid.NewGuid(),
+        "CHILD@EXAMPLE.COM",
+        Hash(token),
+        DateTimeOffset.UtcNow.AddDays(1));
+
+    private static string Hash(string token) =>
+        Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(token)));
 }

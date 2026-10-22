@@ -183,12 +183,13 @@ public sealed class ClaimChildSetupInvitationCommandHandlerTests
     }
 
     [Fact]
-    public async Task Claim_WithAlreadyClaimedInvitation_ReturnsConflict()
+    public async Task Claim_WithAlreadyClaimedInvitationBySameStudent_IsIdempotent()
     {
         const string token = "claimed-child-token";
         Guid userId = Guid.NewGuid();
         Student student = new(userId);
         ChildSetupDraft draft = CreateInvitedDraft(Guid.NewGuid());
+        draft.MarkClaimed(student.Id);
         ChildSetupInvitation invitation = new(
             draft.Id,
             "CHILD@EXAMPLE.COM",
@@ -196,12 +197,53 @@ public sealed class ClaimChildSetupInvitationCommandHandlerTests
             DateTimeOffset.UtcNow.AddDays(1)
         );
         invitation.Claim(DateTimeOffset.UtcNow);
+        FakeUnitOfWork unitOfWork = new();
 
         ClaimChildSetupInvitationCommandHandler handler = new(
             new InMemoryRepository<Student>(student),
             new InMemoryRepository<ChildSetupInvitation>(invitation),
             new InMemoryRepository<ChildSetupDraft>(draft),
-            new FakeCurrentUser(userId, "child@example.com"),
+            new FakeCurrentUser(userId, "changed@example.com"),
+            unitOfWork,
+            TimeProvider.System
+        );
+
+        Result<ClaimChildSetupInvitationResponse> result = await handler.Handle(
+            new ClaimChildSetupInvitationCommand(token),
+            CancellationToken.None
+        );
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(draft.Id, result.Value.DraftId);
+        Assert.Equal("Claimed", result.Value.DraftStatus);
+        Assert.Equal("Claimed", result.Value.InvitationStatus);
+        Assert.Equal(student.Id, draft.ClaimedByStudentId);
+        Assert.Equal(0, unitOfWork.SaveChangesCalls);
+    }
+
+    [Fact]
+    public async Task Claim_WithAlreadyClaimedInvitationByAnotherStudent_RemainsUnavailable()
+    {
+        const string token = "claimed-by-another-student-token";
+        Guid currentUserId = Guid.NewGuid();
+        Student currentStudent = new(currentUserId);
+        Student originalStudent = new(Guid.NewGuid());
+        ChildSetupDraft draft = CreateInvitedDraft(Guid.NewGuid());
+        draft.MarkClaimed(originalStudent.Id);
+        ChildSetupInvitation invitation = new(
+            draft.Id,
+            ChildSetupInvitationType.Link,
+            null,
+            Hash(token),
+            DateTimeOffset.UtcNow.AddDays(1)
+        );
+        invitation.Claim(DateTimeOffset.UtcNow);
+
+        ClaimChildSetupInvitationCommandHandler handler = new(
+            new InMemoryRepository<Student>(currentStudent),
+            new InMemoryRepository<ChildSetupInvitation>(invitation),
+            new InMemoryRepository<ChildSetupDraft>(draft),
+            new FakeCurrentUser(currentUserId),
             new FakeUnitOfWork(),
             TimeProvider.System
         );
@@ -213,7 +255,7 @@ public sealed class ClaimChildSetupInvitationCommandHandlerTests
 
         Assert.False(result.IsSuccess);
         Assert.Equal("ChildSetupInvitation.NotFound", result.TopError.Code);
-        Assert.Equal(ChildSetupStatus.Invited, draft.Status);
+        Assert.Equal(originalStudent.Id, draft.ClaimedByStudentId);
     }
 
     [Fact]

@@ -397,6 +397,48 @@ public sealed class ActivateChildSetupCommandHandlerTests
             student.StudyTimeGoal.Period);
     }
 
+    [Fact]
+    public async Task Activate_SelectsClaimedDraftWhenAnOlderActivatedDraftExists()
+    {
+        Guid studentUserId = Guid.NewGuid();
+        Student student = new(studentUserId);
+        ChildSetupDraft previouslyActivatedDraft = new(Guid.NewGuid());
+        previouslyActivatedDraft.MarkInvited();
+        previouslyActivatedDraft.MarkClaimed(student.Id);
+        previouslyActivatedDraft.MarkActivated();
+
+        ChildSetupDraft currentClaimedDraft = new(Guid.NewGuid());
+        currentClaimedDraft.MarkInvited();
+        currentClaimedDraft.MarkClaimed(student.Id);
+
+        ApplicationUser user = new()
+        {
+            Id = studentUserId,
+            Email = "student@example.com",
+            UserName = "student@example.com",
+            FirstName = "Student",
+            LastName = "Name"
+        };
+
+        student.SetPrivateProperty("User", user);
+
+        ActivateChildSetupCommandHandler handler = new(
+            new InMemoryRepository<Student>(student),
+            new InMemoryRepository<ChildSetupDraft>(previouslyActivatedDraft, currentClaimedDraft),
+            new InMemoryRepository<ParentStudentRelationship>(),
+            new FakeCurrentUser(studentUserId),
+            new TestIdentityService(user),
+            new FakeUnitOfWork());
+
+        Result<StudentDetailsResponse> result = await handler.Handle(
+            new ActivateChildSetupCommand(),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(ChildSetupStatus.Activated, previouslyActivatedDraft.Status);
+        Assert.Equal(ChildSetupStatus.Activated, currentClaimedDraft.Status);
+    }
+
     private sealed class TestIdentityService(ApplicationUser user) : IIdentityService
     {
         public Task<ApplicationUser?> FindByIdAsync(Guid userId) =>

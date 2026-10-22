@@ -54,12 +54,28 @@ public sealed class ActivateChildSetupCommandHandler(
         }
 
         ChildSetupDraft? draft = await childSetupDraftRepository.FirstOrDefaultAsync(
-            item => item.ClaimedByStudentId == student.Id,
+            item => item.ClaimedByStudentId == student.Id && item.Status == ChildSetupStatus.Claimed,
             item => item.Subjects
         );
 
         if (draft is null)
         {
+            // Preserve the existing response when activation is retried after the
+            // student's only claimed setup has already been activated. This lookup
+            // is a fallback only, so an older activated draft cannot shadow a newer
+            // draft whose status is Claimed.
+            ChildSetupDraft? activatedDraft = await childSetupDraftRepository.FirstOrDefaultAsync(
+                item => item.ClaimedByStudentId == student.Id && item.Status == ChildSetupStatus.Activated
+            );
+
+            if (activatedDraft is not null)
+            {
+                return Error.Conflict(
+                    "ChildSetup.NotReadyForActivation",
+                    "Only a claimed child setup can be activated."
+                );
+            }
+
             return Error.NotFound(
                 "ChildSetup.NotFound",
                 "The current student does not have a claimed child setup."
