@@ -18,6 +18,11 @@ public sealed record SetStudySessionSubjectCommand(Guid SessionId, SetStudySessi
 
 public sealed record SetStudySessionDurationCommand(Guid SessionId, SetStudySessionDurationRequest Request)
     : IRequest<Result<Success>>;
+public sealed record ExtendStudySessionDurationCommand(Guid SessionId, int Minutes) : IRequest<Result<Success>>;
+public sealed record EnableStudySessionSlowPaceCommand(Guid SessionId) : IRequest<Result<Success>>;
+public sealed record EnableStudySessionIncreasedAssessmentFrequencyCommand(Guid SessionId) : IRequest<Result<Success>>;
+public sealed record StartStudySessionBreakCommand(Guid SessionId) : IRequest<Result<StudySessionResponse>>;
+public sealed record CheckInPaperStudySessionCommand(Guid SessionId) : IRequest<Result<StudySessionResponse>>;
 
 public sealed record SetStudySessionSelectionCommand(Guid SessionId, SetStudySessionSelectionRequest Request)
     : IRequest<Result<StudySessionSelectionResponse>>;

@@ -51,4 +51,6 @@ public sealed record StudySessionResultResponse(
     int QuestionCount,
     int CorrectAnswers,
     int TotalAttempts,
-    int StreakDays);
+    int StreakDays,
+    IReadOnlyCollection<string>? CompletedSectionNames = null,
+    IReadOnlyCollection<DateOnly>? ActiveDates = null);

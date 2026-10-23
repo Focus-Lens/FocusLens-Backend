@@ -31,10 +31,14 @@ public sealed class StudySession : AuditableEntity
     public Guid? SelectedSubjectId { get; private set; }
 
     public int? FocusDurationMinutes { get; private set; }
+    public int ExtendedDurationMinutes { get; private set; }
+    public bool IsSlowPaceEnabled { get; private set; }
+    public bool IsIncreasedAssessmentFrequencyEnabled { get; private set; }
 
     public DateTimeOffset? StartedAtUtc { get; private set; }
 
     public DateTimeOffset? PausedAtUtc { get; private set; }
+    public DateTimeOffset? BreakEndsAtUtc { get; private set; }
 
     public int AccumulatedPausedSeconds { get; private set; }
 
@@ -133,6 +137,68 @@ public sealed class StudySession : AuditableEntity
         FocusDurationMinutes = focusDurationMinutes;
         MarkDraft();
         return Result.Success;
+    }
+
+    public Result<Success> ExtendDuration(int minutes)
+    {
+        if (Status is not (StudySessionStatus.Active or StudySessionStatus.Paused)) return StudySessionErrors.NotInProgress;
+        if (minutes <= 0) return StudySessionErrors.DurationInvalid;
+        ExtendedDurationMinutes += minutes;
+        return Result.Success;
+    }
+
+    public Result<Success> EnableSlowPace()
+    {
+        if (Status is not (StudySessionStatus.Active or StudySessionStatus.Paused)) return StudySessionErrors.NotInProgress;
+        IsSlowPaceEnabled = true;
+        return Result.Success;
+    }
+
+    public Result<Success> EnableIncreasedAssessmentFrequency()
+    {
+        if (Status is not (StudySessionStatus.Active or StudySessionStatus.Paused)) return StudySessionErrors.NotInProgress;
+        IsIncreasedAssessmentFrequencyEnabled = true;
+        return Result.Success;
+    }
+
+    public TimeSpan GetRequiredSectionActiveDuration(
+        int estimatedDurationMinutes,
+        int completedChallengeCount = 0)
+    {
+        if (estimatedDurationMinutes <= 0 || completedChallengeCount < 0)
+        {
+            return TimeSpan.Zero;
+        }
+
+        // Slow pace intentionally gives the learner 25% more active study
+        // time before the next adaptive check-in. This applies in paper mode
+        // directly and in digital mode once the learner reaches the section
+        // boundary.
+        double multiplier = IsSlowPaceEnabled ? 1.25 : 1.0;
+        // More frequent check-ins occur halfway through the normal section
+        // cadence. When combined with slow pace, both interventions apply.
+        if (IsIncreasedAssessmentFrequencyEnabled)
+        {
+            multiplier *= 0.5;
+        }
+        return TimeSpan.FromMinutes(
+            estimatedDurationMinutes * multiplier * (completedChallengeCount + 1));
+    }
+
+    public int GetDigitalChallengeTriggerPage(int fromPage, int toPage, int completedChallengeCount = 0)
+    {
+        if (fromPage <= 0 || toPage < fromPage)
+        {
+            throw new ArgumentOutOfRangeException(nameof(fromPage));
+        }
+
+        if (!IsIncreasedAssessmentFrequencyEnabled || completedChallengeCount > 0)
+        {
+            return toPage;
+        }
+
+        int pageCount = toPage - fromPage + 1;
+        return fromPage + (int)Math.Ceiling(pageCount / 2.0) - 1;
     }
 
     public Result<Success> SetStudyMaterial(StudyMaterial? material)
@@ -275,6 +341,15 @@ public sealed class StudySession : AuditableEntity
         return Result.Success;
     }
 
+    public Result<Success> StartBreak(DateTimeOffset startedAtUtc, TimeSpan duration)
+    {
+        if (duration <= TimeSpan.Zero) return StudySessionErrors.DurationInvalid;
+        Result<Success> pause = Pause(startedAtUtc);
+        if (pause.IsError) return pause;
+        BreakEndsAtUtc = startedAtUtc.Add(duration);
+        return Result.Success;
+    }
+
     public Result<Success> Resume(DateTimeOffset resumedAtUtc)
     {
         if (Status != StudySessionStatus.Paused || PausedAtUtc is null)
@@ -286,6 +361,7 @@ public sealed class StudySession : AuditableEntity
         CloseOpenPauseInterval(resumedAtUtc);
         Status = StudySessionStatus.Active;
         PausedAtUtc = null;
+        BreakEndsAtUtc = null;
         return Result.Success;
     }
 
@@ -384,9 +460,9 @@ public sealed class StudySession : AuditableEntity
     public TimeSpan GetRemainingDuration(DateTimeOffset utcNow)
     {
         TimeSpan elapsed = GetElapsedDuration(utcNow);
-        int durationMinutes = EstimatedStudyTimeMinutes > 0
+        int durationMinutes = (EstimatedStudyTimeMinutes > 0
             ? EstimatedStudyTimeMinutes
-            : FocusDurationMinutes ?? 0;
+            : FocusDurationMinutes ?? 0) + ExtendedDurationMinutes;
 
         if (durationMinutes <= 0)
         {
@@ -400,11 +476,54 @@ public sealed class StudySession : AuditableEntity
     public TimeSpan GetOvertimeDuration(DateTimeOffset utcNow)
     {
         TimeSpan elapsed = GetElapsedDuration(utcNow);
-        int durationMinutes = EstimatedStudyTimeMinutes > 0
+        int durationMinutes = (EstimatedStudyTimeMinutes > 0
             ? EstimatedStudyTimeMinutes
-            : FocusDurationMinutes ?? 0;
+            : FocusDurationMinutes ?? 0) + ExtendedDurationMinutes;
         TimeSpan overtime = elapsed - TimeSpan.FromMinutes(durationMinutes);
         return durationMinutes > 0 && overtime > TimeSpan.Zero ? overtime : TimeSpan.Zero;
+    }
+
+    /// <summary>
+    /// Returns the amount of active study time after a section began.  It is
+    /// deliberately based on the recorded pause intervals rather than the
+    /// session-wide accumulated pause total, because a section can begin
+    /// after earlier pauses have already occurred.
+    /// </summary>
+    public TimeSpan GetActiveDurationSince(DateTimeOffset startedAtUtc, DateTimeOffset utcNow)
+    {
+        if (StartedAtUtc is null || Status == StudySessionStatus.Cancelled)
+        {
+            return TimeSpan.Zero;
+        }
+
+        DateTimeOffset effectiveNow = Status switch
+        {
+            StudySessionStatus.Paused when PausedAtUtc is not null => PausedAtUtc.Value,
+            StudySessionStatus.Completed when CompletedAtUtc is not null => CompletedAtUtc.Value,
+            _ => utcNow
+        };
+
+        if (effectiveNow <= startedAtUtc)
+        {
+            return TimeSpan.Zero;
+        }
+
+        TimeSpan paused = TimeSpan.Zero;
+        foreach (StudySessionPauseInterval interval in _pauseIntervals)
+        {
+            DateTimeOffset intervalStart = interval.StartedAtUtc;
+            DateTimeOffset intervalEnd = interval.EndedAtUtc ?? effectiveNow;
+            DateTimeOffset overlapStart = intervalStart > startedAtUtc ? intervalStart : startedAtUtc;
+            DateTimeOffset overlapEnd = intervalEnd < effectiveNow ? intervalEnd : effectiveNow;
+
+            if (overlapEnd > overlapStart)
+            {
+                paused += overlapEnd - overlapStart;
+            }
+        }
+
+        TimeSpan active = effectiveNow - startedAtUtc - paused;
+        return active > TimeSpan.Zero ? active : TimeSpan.Zero;
     }
 
     private TimeSpan GetElapsedDuration(DateTimeOffset utcNow)

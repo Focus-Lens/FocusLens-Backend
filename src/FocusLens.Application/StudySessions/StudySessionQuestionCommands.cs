@@ -19,3 +19,6 @@ public sealed record PostponeStudySessionQuestionCommand(
     Guid SessionId,
     Guid QuestionId)
     : IRequest<Result<PostponeStudySessionQuestionResponse>>;
+
+public sealed record MakeStudySessionReassessmentAvailableCommand(Guid SessionId)
+    : IRequest<Result<Success>>;

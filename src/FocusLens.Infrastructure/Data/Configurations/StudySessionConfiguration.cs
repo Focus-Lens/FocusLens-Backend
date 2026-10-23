@@ -21,7 +21,11 @@ public sealed class StudySessionConfiguration : IEntityTypeConfiguration<StudySe
         builder.Property(session => session.Status).HasConversion<string>().HasMaxLength(20).IsRequired();
         builder.Property(session => session.StartedAtUtc);
         builder.Property(session => session.FocusDurationMinutes);
+        builder.Property(session => session.ExtendedDurationMinutes).IsRequired();
+        builder.Property(session => session.IsSlowPaceEnabled).IsRequired();
+        builder.Property(session => session.IsIncreasedAssessmentFrequencyEnabled).IsRequired();
         builder.Property(session => session.PausedAtUtc);
+        builder.Property(session => session.BreakEndsAtUtc);
         builder.Property(session => session.AccumulatedPausedSeconds).IsRequired();
         builder.Property(session => session.CompletedAtUtc);
         builder.Property(session => session.CancelledAtUtc);

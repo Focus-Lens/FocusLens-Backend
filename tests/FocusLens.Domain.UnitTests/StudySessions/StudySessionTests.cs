@@ -162,6 +162,53 @@ public class StudySessionTests
     }
 
     [Fact]
+    public void ActiveDurationSince_ExcludesOnlyPausesThatOverlapTheSection()
+    {
+        StudySession session = CreateReadyDigitalSession();
+        DateTimeOffset startedAt = new(2026, 9, 7, 10, 0, 0, TimeSpan.Zero);
+
+        Assert.True(session.Start(startedAt).IsSuccess);
+        Assert.True(session.Pause(startedAt.AddMinutes(2)).IsSuccess);
+        Assert.True(session.Resume(startedAt.AddMinutes(7)).IsSuccess);
+
+        DateTimeOffset sectionStartedAt = startedAt.AddMinutes(8);
+        Assert.Equal(TimeSpan.FromMinutes(7),
+            session.GetActiveDurationSince(sectionStartedAt, startedAt.AddMinutes(15)));
+
+        Assert.True(session.Pause(startedAt.AddMinutes(15)).IsSuccess);
+        Assert.Equal(TimeSpan.FromMinutes(7),
+            session.GetActiveDurationSince(sectionStartedAt, startedAt.AddMinutes(30)));
+    }
+
+    [Fact]
+    public void SlowPace_ExtendsTheRequiredActiveTimeForTheNextCheckIn()
+    {
+        StudySession session = CreateReadyDigitalSession();
+        DateTimeOffset startedAt = new(2026, 9, 7, 10, 0, 0, TimeSpan.Zero);
+
+        Assert.True(session.Start(startedAt).IsSuccess);
+        Assert.Equal(TimeSpan.FromMinutes(8), session.GetRequiredSectionActiveDuration(8));
+
+        Assert.True(session.EnableSlowPace().IsSuccess);
+        Assert.Equal(TimeSpan.FromMinutes(10), session.GetRequiredSectionActiveDuration(8));
+    }
+
+    [Fact]
+    public void IncreasedAssessmentFrequency_HalvesTheNextCheckInCadence()
+    {
+        StudySession session = CreateReadyDigitalSession();
+        DateTimeOffset startedAt = new(2026, 9, 7, 10, 0, 0, TimeSpan.Zero);
+
+        Assert.True(session.Start(startedAt).IsSuccess);
+        Assert.True(session.EnableIncreasedAssessmentFrequency().IsSuccess);
+
+        Assert.Equal(TimeSpan.FromMinutes(4), session.GetRequiredSectionActiveDuration(8));
+        Assert.Equal(TimeSpan.FromMinutes(8), session.GetRequiredSectionActiveDuration(8, 1));
+        Assert.Equal(5, session.GetDigitalChallengeTriggerPage(1, 10));
+        Assert.Equal(10, session.GetDigitalChallengeTriggerPage(1, 10, completedChallengeCount: 1));
+    }
+
+    [Fact]
     public void SelectedSection_LeavingItsPageRange_MakesChallengeAvailable()
     {
         StudySession session = CreateReadyDigitalSession();
@@ -175,6 +222,45 @@ public class StudySessionTests
         Assert.True(section.IsChallengeAvailable);
         Assert.Null(section.CompletedAtUtc);
         Assert.Equal(15, section.EstimatedDurationMinutes);
+    }
+
+    [Fact]
+    public void SelectedSection_ResolvedChallenge_CanPresentAnotherCheckpoint()
+    {
+        StudySession session = CreateReadyDigitalSession();
+        StudySessionSelectedSection section = session.Selection!.SelectedSections.Single();
+        DateTimeOffset now = new(2026, 9, 7, 10, 0, 0, TimeSpan.Zero);
+
+        Assert.True(section.Start(now).IsSuccess);
+        Assert.True(section.MakeChallengeAvailable(now).IsSuccess);
+        Assert.True(section.ResolveChallenge().IsSuccess);
+
+        Assert.Equal(1, section.CompletedChallengeCount);
+        Assert.False(section.IsChallengeAvailable);
+        Assert.True(section.MakeChallengeAvailable(now.AddMinutes(5)).IsSuccess);
+        Assert.True(section.IsChallengeAvailable);
+    }
+
+    [Fact]
+    public void IncreasedAssessmentFrequency_SecondCheckpointWaitsForTheNextInterval()
+    {
+        StudySession session = CreateReadyDigitalSession();
+        StudySessionSelectedSection section = session.Selection!.SelectedSections.Single();
+        DateTimeOffset startedAt = new(2026, 9, 7, 10, 0, 0, TimeSpan.Zero);
+
+        Assert.True(session.Start(startedAt).IsSuccess);
+        Assert.True(session.EnableIncreasedAssessmentFrequency().IsSuccess);
+        Assert.True(section.Start(startedAt).IsSuccess);
+        Assert.True(section.MakeChallengeAvailable(startedAt.AddMinutes(4)).IsSuccess);
+        Assert.True(section.ResolveChallenge().IsSuccess);
+
+        TimeSpan secondThreshold = session.GetRequiredSectionActiveDuration(
+            section.EstimatedDurationMinutes,
+            section.CompletedChallengeCount);
+
+        Assert.Equal(TimeSpan.FromMinutes(15), secondThreshold);
+        Assert.True(session.GetActiveDurationSince(startedAt, startedAt.AddMinutes(4)) < secondThreshold);
+        Assert.True(session.GetActiveDurationSince(startedAt, startedAt.AddMinutes(15)) >= secondThreshold);
     }
 
     [Fact]

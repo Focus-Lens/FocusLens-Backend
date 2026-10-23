@@ -17,7 +17,11 @@ public sealed record StudySessionResponse(
     Guid? SelectedSubjectId,
     int? FocusDurationMinutes,
     int EstimatedStudyTimeMinutes,
-    int OvertimeSeconds = 0);
+    int OvertimeSeconds = 0,
+    int ExtendedDurationMinutes = 0,
+    bool IsSlowPaceEnabled = false,
+    bool IsIncreasedAssessmentFrequencyEnabled = false,
+    DateTimeOffset? BreakEndsAtUtc = null);
 
 public sealed record StudyMaterialResponse(
     Guid Id,
@@ -54,3 +58,5 @@ public sealed record StudySessionImageResponse(
 
 public sealed record StudySessionImagesUploadResponse(
     IReadOnlyCollection<StudySessionImageResponse> Images);
+
+public sealed record StudySessionPrivateFileResponse(byte[] Content, string ContentType, string FileName);

@@ -24,6 +24,7 @@ public sealed class StudySessionQuestion : Entity
         string explanation,
         int estimatedTimeMinutes,
         int order,
+        bool isReassessment,
         IReadOnlyCollection<string> options)
         : base(Guid.CreateVersion7())
     {
@@ -39,6 +40,7 @@ public sealed class StudySessionQuestion : Entity
         Explanation = explanation;
         EstimatedTimeMinutes = estimatedTimeMinutes;
         Order = order;
+        IsReassessment = isReassessment;
 
         for (int index = 0; index < options.Count; index++)
         {
@@ -76,6 +78,8 @@ public sealed class StudySessionQuestion : Entity
 
     public int Order { get; private set; }
 
+    public bool IsReassessment { get; private set; }
+
     public IReadOnlyCollection<StudySessionQuestionOption> Options =>
         _options.AsReadOnly();
 
@@ -98,7 +102,8 @@ public sealed class StudySessionQuestion : Entity
         string? difficulty,
         string? explanation,
         int estimatedTimeMinutes,
-        int order)
+        int order,
+        bool isReassessment = false)
     {
         if (studySessionId == Guid.Empty)
         {
@@ -220,6 +225,7 @@ public sealed class StudySessionQuestion : Entity
             explanation.Trim(),
             estimatedTimeMinutes,
             order,
+            isReassessment,
             optionValues);
     }
 }

@@ -18,6 +18,7 @@ public sealed class StudySessionSelectedSectionConfiguration : IEntityTypeConfig
         builder.Property(section => section.ChallengeAvailableAtUtc);
         builder.Property(section => section.ChallengeDeferredUntilUtc);
         builder.Property(section => section.ChallengePostponedAtUtc);
+        builder.Property(section => section.CompletedChallengeCount).IsRequired();
         builder.Property(section => section.CompletedAtUtc);
         builder.HasIndex(section => new { section.StudySessionSelectionId, section.StudyMaterialSectionId })
             .IsUnique();

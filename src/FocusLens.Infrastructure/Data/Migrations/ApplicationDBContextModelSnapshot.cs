@@ -17,7 +17,7 @@ namespace FocusLens.Infrastructure.Data.Migrations
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "10.0.11")
+                .HasAnnotation("ProductVersion", "10.0.12")
                 .HasAnnotation("Relational:MaxIdentifierLength", 128);
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
@@ -961,6 +961,9 @@ namespace FocusLens.Infrastructure.Data.Migrations
                     b.Property<int>("AccumulatedPausedSeconds")
                         .HasColumnType("int");
 
+                    b.Property<DateTimeOffset?>("BreakEndsAtUtc")
+                        .HasColumnType("datetimeoffset");
+
                     b.Property<DateTimeOffset?>("CancelledAtUtc")
                         .HasColumnType("datetimeoffset");
 
@@ -976,8 +979,17 @@ namespace FocusLens.Infrastructure.Data.Migrations
                     b.Property<int?>("CurrentPage")
                         .HasColumnType("int");
 
+                    b.Property<int>("ExtendedDurationMinutes")
+                        .HasColumnType("int");
+
                     b.Property<int?>("FocusDurationMinutes")
                         .HasColumnType("int");
+
+                    b.Property<bool>("IsIncreasedAssessmentFrequencyEnabled")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("IsSlowPaceEnabled")
+                        .HasColumnType("bit");
 
                     b.Property<DateTimeOffset?>("LastActivityAtUtc")
                         .HasColumnType("datetimeoffset");
@@ -993,17 +1005,18 @@ namespace FocusLens.Infrastructure.Data.Migrations
                         .HasMaxLength(20)
                         .HasColumnType("nvarchar(20)");
 
-                    b.Property<string>("SessionType")
-                        .IsRequired()
-                        .HasMaxLength(30)
-                        .HasDefaultValue("StudySession")
-                        .HasColumnType("nvarchar(30)");
-
                     b.Property<DateTimeOffset?>("PausedAtUtc")
                         .HasColumnType("datetimeoffset");
 
                     b.Property<Guid?>("SelectedSubjectId")
                         .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("SessionType")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)")
+                        .HasDefaultValue("StudySession");
 
                     b.Property<DateTimeOffset?>("StartedAtUtc")
                         .HasColumnType("datetimeoffset");
@@ -1162,9 +1175,6 @@ namespace FocusLens.Infrastructure.Data.Migrations
                     b.Property<bool>("IsFinal")
                         .HasColumnType("bit");
 
-                    b.Property<double?>("WindowActiveTimeSeconds")
-                        .HasColumnType("float");
-
                     b.Property<string>("LastModifiedBy")
                         .HasColumnType("nvarchar(max)");
 
@@ -1188,6 +1198,9 @@ namespace FocusLens.Infrastructure.Data.Migrations
                     b.Property<string>("UnderstandingTrend")
                         .HasMaxLength(20)
                         .HasColumnType("nvarchar(20)");
+
+                    b.Property<double?>("WindowActiveTimeSeconds")
+                        .HasColumnType("float");
 
                     b.Property<DateTimeOffset>("WindowEndUtc")
                         .HasColumnType("datetimeoffset");
@@ -1342,6 +1355,9 @@ namespace FocusLens.Infrastructure.Data.Migrations
                     b.Property<DateTimeOffset?>("ExplanationShownAtUtc")
                         .HasColumnType("datetimeoffset");
 
+                    b.Property<bool>("IsReassessment")
+                        .HasColumnType("bit");
+
                     b.Property<int>("Order")
                         .HasColumnType("int");
 
@@ -1443,6 +1459,9 @@ namespace FocusLens.Infrastructure.Data.Migrations
 
                     b.Property<DateTimeOffset?>("CompletedAtUtc")
                         .HasColumnType("datetimeoffset");
+
+                    b.Property<int>("CompletedChallengeCount")
+                        .HasColumnType("int");
 
                     b.Property<int>("EstimatedDurationMinutes")
                         .HasColumnType("int");

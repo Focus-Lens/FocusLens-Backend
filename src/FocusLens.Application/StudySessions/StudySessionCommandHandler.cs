@@ -36,6 +36,11 @@ public sealed class StudySessionCommandHandler(
         IRequestHandler<SetStudySessionTypeCommand, Result<Success>>,
         IRequestHandler<SetStudySessionSubjectCommand, Result<Success>>,
         IRequestHandler<SetStudySessionDurationCommand, Result<Success>>,
+        IRequestHandler<ExtendStudySessionDurationCommand, Result<Success>>,
+        IRequestHandler<EnableStudySessionSlowPaceCommand, Result<Success>>,
+        IRequestHandler<EnableStudySessionIncreasedAssessmentFrequencyCommand, Result<Success>>,
+        IRequestHandler<StartStudySessionBreakCommand, Result<StudySessionResponse>>,
+        IRequestHandler<CheckInPaperStudySessionCommand, Result<StudySessionResponse>>,
         IRequestHandler<SetStudySessionSelectionCommand, Result<StudySessionSelectionResponse>>,
         IRequestHandler<UpdateStudySessionSelectionCommand, Result<StudySessionSelectionResponse>>,
         IRequestHandler<ChangeStudySessionMaterialCommand, Result<StudyMaterialResponse>>,
@@ -48,6 +53,106 @@ public sealed class StudySessionCommandHandler(
         IRequestHandler<ReuseStudySessionCommand, Result<StudySessionResponse>>,
         IRequestHandler<UpdateStudySessionProgressCommand, Result<StudySessionResponse>>
 {
+    public async Task<Result<Success>> Handle(ExtendStudySessionDurationCommand request, CancellationToken cancellationToken)
+    {
+        Result<StudySession> session = await GetSessionAsync(request.SessionId);
+        return session.IsError ? session.TopError : await SaveSessionAsync(session.Value.ExtendDuration(request.Minutes));
+    }
+
+    public async Task<Result<Success>> Handle(EnableStudySessionSlowPaceCommand request, CancellationToken cancellationToken)
+    {
+        Result<StudySession> session = await GetSessionAsync(request.SessionId);
+        return session.IsError ? session.TopError : await SaveSessionAsync(session.Value.EnableSlowPace());
+    }
+
+    public async Task<Result<Success>> Handle(EnableStudySessionIncreasedAssessmentFrequencyCommand request,
+        CancellationToken cancellationToken)
+    {
+        Result<StudySession> session = await GetSessionAsync(request.SessionId);
+        return session.IsError
+            ? session.TopError
+            : await SaveSessionAsync(session.Value.EnableIncreasedAssessmentFrequency());
+    }
+
+    public async Task<Result<StudySessionResponse>> Handle(StartStudySessionBreakCommand request, CancellationToken cancellationToken)
+    {
+        Result<StudySession> session = await GetSessionAsync(request.SessionId, includePauseIntervals: true);
+        if (session.IsError) return session.TopError;
+        HashSet<Guid> existingPauseIntervalIds = session.Value.PauseIntervals
+            .Select(interval => interval.Id)
+            .ToHashSet();
+        DateTimeOffset now = timeProvider.GetUtcNow();
+        Result<Success> result = session.Value.StartBreak(now, TimeSpan.FromMinutes(5));
+        if (result.IsError) return result.TopError;
+        foreach (StudySessionPauseInterval interval in session.Value.PauseIntervals
+                     .Where(interval => !existingPauseIntervalIds.Contains(interval.Id)))
+        {
+            pauseIntervalRepository.Add(interval);
+        }
+        await unitOfWork.SaveChangesAsync();
+        return session.Value.ToResponse(now);
+    }
+
+    public async Task<Result<StudySessionResponse>> Handle(
+        CheckInPaperStudySessionCommand request,
+        CancellationToken cancellationToken)
+    {
+        Result<StudySession> sessionResult = await GetSessionAsync(
+            request.SessionId,
+            includeSelection: true,
+            includePauseIntervals: true);
+        if (sessionResult.IsError)
+        {
+            return sessionResult.TopError;
+        }
+
+        StudySession session = sessionResult.Value;
+        if (session.Mode != DomainStudySessionMode.Paper)
+        {
+            return Error.Validation(
+                "StudySessions.PaperCheckInOnly",
+                "Paper session check-in is only available in paper mode.");
+        }
+
+        if (session.Status != StudySessionStatus.Active || session.Selection is null)
+        {
+            return StudySessionErrors.NotActive;
+        }
+
+        StudySessionSelectedSection? currentSection = await selectedSectionRepository.FirstOrDefaultAsync(section =>
+            section.StudySessionSelectionId == session.Selection.Id &&
+            section.StartedAtUtc != null &&
+            section.CompletedAtUtc == null);
+        if (currentSection is null)
+        {
+            return Error.Conflict(
+                "StudySessionQuestions.ChallengeUnavailable",
+                "There is no active selected section to check in.");
+        }
+
+        DateTimeOffset now = timeProvider.GetUtcNow();
+        Result<Success> activityResult = session.UpdateProgress(null, now);
+        if (activityResult.IsError)
+        {
+            return activityResult.TopError;
+        }
+
+        if (!currentSection.IsChallengeAvailable &&
+            session.GetActiveDurationSince(currentSection.StartedAtUtc!.Value, now) >=
+            session.GetRequiredSectionActiveDuration(
+                currentSection.EstimatedDurationMinutes,
+                currentSection.CompletedChallengeCount))
+        {
+            Result<Success> availableResult = currentSection.MakeChallengeAvailable(now);
+            if (availableResult.IsError)
+            {
+                return availableResult.TopError;
+            }
+        }
+
+        await unitOfWork.SaveChangesAsync();
+        return session.ToResponse(now);
+    }
     public async Task<Result<StudyMaterialResponse>> Handle(ChangeStudySessionMaterialCommand request,
         CancellationToken cancellationToken)
     {
@@ -498,7 +603,8 @@ public sealed class StudySessionCommandHandler(
         Result<StudySession> sessionResult = await GetSessionAsync(
             request.SessionId,
             includeMaterial: true,
-            includeSelection: true);
+            includeSelection: true,
+            includePauseIntervals: true);
         if (sessionResult.IsError)
         {
             return sessionResult.TopError;
@@ -509,7 +615,8 @@ public sealed class StudySessionCommandHandler(
         StudySessionSelectedSection? currentSection = null;
         StudyMaterialSection? activeMaterialSection = null;
 
-        if (session.Status == StudySessionStatus.Active && session.Selection is not null)
+        if (session.Mode == DomainStudySessionMode.Digital &&
+            session.Status == StudySessionStatus.Active && session.Selection is not null)
         {
             currentSection = await selectedSectionRepository.FirstOrDefaultAsync(section =>
                 section.StudySessionSelectionId == session.Selection.Id &&
@@ -546,15 +653,24 @@ public sealed class StudySessionCommandHandler(
             return progressResult.TopError;
         }
 
-        if (session.Status == StudySessionStatus.Active &&
+        if (session.Mode == DomainStudySessionMode.Digital &&
+            session.Status == StudySessionStatus.Active &&
             request.Request.CurrentPage is int currentPage &&
             session.Selection is not null)
         {
             if (currentSection is not null && !currentSection.IsChallengeAvailable)
             {
-                if (currentPage > activeMaterialSection!.ToPage ||
-                    (currentPage == activeMaterialSection.ToPage &&
-                     currentPage == session.Selection.ToPage))
+                int challengeTriggerPage = session.GetDigitalChallengeTriggerPage(
+                    activeMaterialSection!.FromPage,
+                    activeMaterialSection.ToPage,
+                    currentSection.CompletedChallengeCount);
+                bool reachedSectionBoundary = currentPage >= challengeTriggerPage;
+                bool pacingRequirementMet = !session.IsSlowPaceEnabled ||
+                    session.GetActiveDurationSince(currentSection.StartedAtUtc!.Value, now) >=
+                    session.GetRequiredSectionActiveDuration(
+                        currentSection.EstimatedDurationMinutes,
+                        currentSection.CompletedChallengeCount);
+                if (reachedSectionBoundary && pacingRequirementMet)
                 {
                     Result<Success> challengeResult = currentSection.MakeChallengeAvailable(now);
                     if (challengeResult.IsError)

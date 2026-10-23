@@ -36,6 +36,8 @@ public sealed class StudySessionSelectedSection : Entity
 
     public DateTimeOffset? ChallengePostponedAtUtc { get; private set; }
 
+    public int CompletedChallengeCount { get; private set; }
+
     public DateTimeOffset? CompletedAtUtc { get; private set; }
 
     public bool IsChallengeAvailable =>
@@ -76,6 +78,22 @@ public sealed class StudySessionSelectedSection : Entity
         }
 
         ChallengeAvailableAtUtc = availableAtUtc;
+        return Result.Success;
+    }
+
+    public Result<Success> ResolveChallenge()
+    {
+        if (!IsChallengeAvailable)
+        {
+            return Error.Conflict(
+                "StudySessionSelectedSections.ChallengeUnavailable",
+                "Only an available challenge can be resolved.");
+        }
+
+        CompletedChallengeCount++;
+        ChallengeAvailableAtUtc = null;
+        ChallengeDeferredUntilUtc = null;
+        ChallengePostponedAtUtc = null;
         return Result.Success;
     }
 

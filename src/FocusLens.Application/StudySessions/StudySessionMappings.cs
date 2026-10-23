@@ -27,7 +27,11 @@ internal static class StudySessionMappings
             session.SelectedSubjectId,
             session.FocusDurationMinutes,
             session.EstimatedStudyTimeMinutes,
-            (int)Math.Floor(session.GetOvertimeDuration(utcNow).TotalSeconds));
+            (int)Math.Floor(session.GetOvertimeDuration(utcNow).TotalSeconds),
+            session.ExtendedDurationMinutes,
+            session.IsSlowPaceEnabled,
+            session.IsIncreasedAssessmentFrequencyEnabled,
+            session.BreakEndsAtUtc);
     }
 
     public static StudyMaterialResponse ToResponse(this StudyMaterial material)

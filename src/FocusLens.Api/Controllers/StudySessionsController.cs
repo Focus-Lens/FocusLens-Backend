@@ -34,6 +34,20 @@ public sealed class StudySessionsController(ISender sender) : ApiController
         return session is null ? NotFound() : Ok(session);
     }
 
+    [HttpGet("{sessionId:guid}/material")]
+    public async Task<IActionResult> GetDerivedMaterial(Guid sessionId, CancellationToken cancellationToken)
+    {
+        StudySessionPrivateFileResponse? file = await sender.Send(new GetStudySessionDerivedMaterialQuery(sessionId), cancellationToken);
+        return file is null ? NotFound() : File(file.Content, file.ContentType, file.FileName);
+    }
+
+    [HttpGet("{sessionId:guid}/images/{imageId:guid}")]
+    public async Task<IActionResult> GetImage(Guid sessionId, Guid imageId, CancellationToken cancellationToken)
+    {
+        StudySessionPrivateFileResponse? file = await sender.Send(new GetStudySessionImageQuery(sessionId, imageId), cancellationToken);
+        return file is null ? NotFound() : File(file.Content, file.ContentType, file.FileName);
+    }
+
     [HttpPut("{sessionId:guid}/mode")]
     public async Task<IActionResult> SetMode(Guid sessionId, [FromBody] SetStudySessionModeRequest request,
         CancellationToken cancellationToken)
@@ -69,6 +83,28 @@ public sealed class StudySessionsController(ISender sender) : ApiController
     {
         Result<Success> result = await sender.Send(new SetStudySessionDurationCommand(sessionId, request),
             cancellationToken);
+        return result.Match(_ => NoContent(), Problem);
+    }
+
+    [HttpPost("{sessionId:guid}/duration/extend")]
+    public async Task<IActionResult> ExtendDuration(Guid sessionId, [FromBody] int minutes, CancellationToken cancellationToken)
+    {
+        Result<Success> result = await sender.Send(new ExtendStudySessionDurationCommand(sessionId, minutes), cancellationToken);
+        return result.Match(_ => NoContent(), Problem);
+    }
+
+    [HttpPost("{sessionId:guid}/pace/slow")]
+    public async Task<IActionResult> SlowPace(Guid sessionId, CancellationToken cancellationToken)
+    {
+        Result<Success> result = await sender.Send(new EnableStudySessionSlowPaceCommand(sessionId), cancellationToken);
+        return result.Match(_ => NoContent(), Problem);
+    }
+
+    [HttpPost("{sessionId:guid}/assessment-frequency/increase")]
+    public async Task<IActionResult> IncreaseAssessmentFrequency(Guid sessionId, CancellationToken cancellationToken)
+    {
+        Result<Success> result = await sender.Send(
+            new EnableStudySessionIncreasedAssessmentFrequencyCommand(sessionId), cancellationToken);
         return result.Match(_ => NoContent(), Problem);
     }
 
@@ -201,12 +237,28 @@ public sealed class StudySessionsController(ISender sender) : ApiController
         );
     }
 
+    [HttpPost("{sessionId:guid}/breaks")]
+    public async Task<IActionResult> StartBreak(Guid sessionId, CancellationToken cancellationToken) =>
+        ToActionResult(await sender.Send(new StartStudySessionBreakCommand(sessionId), cancellationToken));
+
+    [HttpPost("{sessionId:guid}/paper/check-in")]
+    public async Task<IActionResult> CheckInPaperSession(Guid sessionId, CancellationToken cancellationToken) =>
+        ToActionResult(await sender.Send(new CheckInPaperStudySessionCommand(sessionId), cancellationToken));
+
     [HttpPost("{sessionId:guid}/resume")]
     public async Task<IActionResult> Resume(Guid sessionId, CancellationToken cancellationToken)
     {
         return ToActionResult(
             await sender.Send(new ResumeStudySessionCommand(sessionId), cancellationToken)
         );
+    }
+
+    [HttpPost("{sessionId:guid}/reassess")]
+    public async Task<IActionResult> Reassess(Guid sessionId, CancellationToken cancellationToken)
+    {
+        Result<Success> result = await sender.Send(
+            new MakeStudySessionReassessmentAvailableCommand(sessionId), cancellationToken);
+        return result.Match(_ => NoContent(), Problem);
     }
 
     [HttpPost("{sessionId:guid}/end")]

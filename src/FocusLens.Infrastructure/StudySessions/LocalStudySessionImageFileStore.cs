@@ -50,6 +50,12 @@ public sealed class LocalStudySessionImageFileStore(
         return Task.CompletedTask;
     }
 
+    public Task<Stream> OpenReadAsync(string storageReference, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        return Task.FromResult<Stream>(File.Open(ToFullPath(storageReference), FileMode.Open, FileAccess.Read, FileShare.Read));
+    }
+
     private string ToFullPath(string storageReference)
     {
         string normalizedReference = storageReference.Replace('/', Path.DirectorySeparatorChar);

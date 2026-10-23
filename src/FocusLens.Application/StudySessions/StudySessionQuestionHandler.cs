@@ -15,6 +15,7 @@ public sealed class StudySessionQuestionHandler(
     IBaseRepository<StudySessionQuestion> questionRepository,
     IBaseRepository<StudySessionQuestionAnswer> answerRepository,
     IBaseRepository<StudySessionSelectedSection> selectedSectionRepository,
+    IBaseRepository<StudyMaterialSection> materialSectionRepository,
     ICurrentUser currentUser,
     IFocusLensAiClient aiClient,
     IBaseRepository<StudySessionBehaviorAnalysisJob> behaviorAnalysisJobRepository,
@@ -26,8 +27,80 @@ public sealed class StudySessionQuestionHandler(
         IRequestHandler<GenerateStudySessionQuestionExplanationCommand,
             Result<StudySessionQuestionExplanationResponse>>,
         IRequestHandler<PostponeStudySessionQuestionCommand, Result<PostponeStudySessionQuestionResponse>>,
+        IRequestHandler<MakeStudySessionReassessmentAvailableCommand, Result<Success>>,
         IRequestHandler<GetStudySessionResultQuery, StudySessionResultResponse?>
 {
+    public async Task<Result<Success>> Handle(
+        MakeStudySessionReassessmentAvailableCommand request,
+        CancellationToken cancellationToken)
+    {
+        StudySession? session = await GetOwnedSessionAsync(request.SessionId, includeSelection: true);
+        if (session is null)
+        {
+            return Error.NotFound("StudySessions.NotFound", "The study session was not found.");
+        }
+
+        if (session.Status != StudySessionStatus.Active || session.Selection is null)
+        {
+            return StudySessionErrors.NotActive;
+        }
+
+        StudySessionSelectedSection? currentSection = await selectedSectionRepository.FirstOrDefaultAsync(section =>
+            section.StudySessionSelectionId == session.Selection.Id &&
+            section.StartedAtUtc != null && section.CompletedAtUtc == null);
+
+        if (currentSection is null)
+        {
+            return Error.Conflict("StudySessionQuestions.ChallengeUnavailable",
+                "There is no active section available for reassessment.");
+        }
+
+        DateTimeOffset now = timeProvider.GetUtcNow();
+        if (!currentSection.IsChallengeAvailableAt(now))
+        {
+            return Error.Conflict(
+                "StudySessionQuestions.ChallengeUnavailable",
+                "Reassessment is available only after the current section challenge is due.");
+        }
+
+        List<StudySessionQuestion> sessionQuestions = (await questionRepository.GetAllAsync(question =>
+            question.StudySessionId == session.Id)).ToList();
+        if (sessionQuestions.Any(question => question.StudyMaterialSectionId == currentSection.StudyMaterialSectionId &&
+                                             question.IsReassessment))
+            return Result.Success;
+
+        StudySessionQuestion? source = sessionQuestions.FirstOrDefault(question =>
+            question.StudyMaterialSectionId == currentSection.StudyMaterialSectionId && !question.IsReassessment);
+        if (source is null || session.Selection?.AiExtractedText is not { Length: > 0 } content)
+            return Error.Validation("StudySessionQuestions.ReassessmentUnavailable", "Learning content is unavailable for reassessment.");
+
+        List<StudySessionQuestionAnswer> sourceAnswers = (await answerRepository.GetAllAsync(answer =>
+            answer.StudySessionQuestionId == source.Id)).ToList();
+        if (sourceAnswers.Any(answer => answer.IsCorrect) ||
+            sourceAnswers.Count(answer => !answer.IsCorrect) < 2 ||
+            source.ExplanationShownAtUtc is null)
+        {
+            return Error.Validation(
+                "StudySessionQuestions.ReassessmentNotEligible",
+                "Reassessment requires two incorrect attempts and the adaptive explanation for the current question.");
+        }
+
+        int nextOrder = sessionQuestions.Select(question => question.Order).DefaultIfEmpty().Max() + 1;
+        AiMcqGenerationResult generated = await aiClient.GenerateMcqAsync(source.AiSectionId, source.AiSectionTitle,
+            source.AiConceptId, source.AiConceptName, content, 1, cancellationToken);
+        AiMcqQuestion? item = generated.Questions.FirstOrDefault();
+        if (item is null) return Error.Validation("StudySessionQuestions.ReassessmentGenerationFailed", "A reassessment question could not be generated.");
+        Result<StudySessionQuestion> created = StudySessionQuestion.Create(session.Id, currentSection.StudyMaterialSectionId,
+            source.AiSectionId, source.AiSectionTitle, source.AiConceptId, source.AiConceptName, item.Question,
+            item.Options, item.CorrectAnswer, item.Difficulty, item.Explanation, Math.Max(1, item.EstimatedTimeMinutes), nextOrder,
+            isReassessment: true);
+        if (created.IsError) return created.TopError;
+        questionRepository.Add(created.Value);
+
+        await unitOfWork.SaveChangesAsync();
+        return Result.Success;
+    }
+
     public async Task<Result<StudySessionQuestionExplanationResponse>> Handle(
         GenerateStudySessionQuestionExplanationCommand request,
         CancellationToken cancellationToken)
@@ -180,9 +253,12 @@ public sealed class StudySessionQuestionHandler(
                 .ToHashSet();
 
         StudySessionQuestion? currentQuestion =
-            questions.FirstOrDefault(question =>
-                !correctlyAnswered.Contains(question.Id) &&
-                question.StudyMaterialSectionId == currentSection.StudyMaterialSectionId);
+            questions
+                .Where(question => !correctlyAnswered.Contains(question.Id) &&
+                                   question.StudyMaterialSectionId == currentSection.StudyMaterialSectionId)
+                .OrderByDescending(question => question.IsReassessment)
+                .ThenBy(question => question.Order)
+                .FirstOrDefault();
 
         if (currentQuestion is null)
         {
@@ -282,6 +358,12 @@ public sealed class StudySessionQuestionHandler(
 
         int correctAnswers = answers.Count(answer => answer.IsCorrect);
 
+        Guid[] completedSectionIds = session.CompletedSections.Select(item => item.StudyMaterialSectionId).ToArray();
+        IReadOnlyCollection<string> completedSectionNames = completedSectionIds.Length == 0 ? [] :
+            (await materialSectionRepository.GetAllAsync(item => completedSectionIds.Contains(item.Id)))
+            .OrderBy(item => item.FromPage).Select(item => item.Name).ToArray();
+        IReadOnlyCollection<DateOnly> activeDates = completedDates.OrderByDescending(item => item).Take(7).Order().ToArray();
+
         return new StudySessionResultResponse(
             session.Id,
             session.Status.ToString(),
@@ -296,7 +378,9 @@ public sealed class StudySessionQuestionHandler(
             questions.Count,
             correctAnswers,
             answers.Count,
-            streakDays);
+            streakDays,
+            completedSectionNames,
+            activeDates);
     }
 
     public async Task<Result<PostponeStudySessionQuestionResponse>> Handle(
@@ -504,11 +588,71 @@ public sealed class StudySessionQuestionHandler(
 
             successfulQuestionIds.Add(question.Id);
 
-            bool currentSectionCompleted =
-                questions
-                    .Where(item =>
-                        item.StudyMaterialSectionId == currentSection.StudyMaterialSectionId)
-                    .All(item => successfulQuestionIds.Contains(item.Id));
+            List<StudySessionQuestion> currentSectionQuestions = questions
+                .Where(item => item.StudyMaterialSectionId == currentSection.StudyMaterialSectionId)
+                .ToList();
+
+            if (session.IsIncreasedAssessmentFrequencyEnabled &&
+                currentSection.CompletedChallengeCount == 0 &&
+                currentSectionQuestions.Count == 1)
+            {
+                StudySessionQuestion sourceQuestion = currentSectionQuestions[0];
+                AiMcqGenerationResult generated = await aiClient.GenerateMcqAsync(
+                    sourceQuestion.AiSectionId,
+                    sourceQuestion.AiSectionTitle,
+                    sourceQuestion.AiConceptId,
+                    sourceQuestion.AiConceptName,
+                    content,
+                    1,
+                    cancellationToken);
+                AiMcqQuestion? generatedQuestion = generated.Questions.FirstOrDefault();
+
+                if (generatedQuestion is null)
+                {
+                    return Error.Validation(
+                        "StudySessionQuestions.FrequencyQuestionGenerationFailed",
+                        "An additional assessment question could not be generated.");
+                }
+
+                Result<StudySessionQuestion> additionalQuestionResult = StudySessionQuestion.Create(
+                    session.Id,
+                    currentSection.StudyMaterialSectionId,
+                    sourceQuestion.AiSectionId,
+                    sourceQuestion.AiSectionTitle,
+                    sourceQuestion.AiConceptId,
+                    sourceQuestion.AiConceptName,
+                    generatedQuestion.Question,
+                    generatedQuestion.Options,
+                    generatedQuestion.CorrectAnswer,
+                    generatedQuestion.Difficulty,
+                    generatedQuestion.Explanation,
+                    Math.Max(1, generatedQuestion.EstimatedTimeMinutes),
+                    questions.Select(item => item.Order).DefaultIfEmpty().Max() + 1);
+
+                if (additionalQuestionResult.IsError)
+                {
+                    return additionalQuestionResult.TopError;
+                }
+
+                questionRepository.Add(additionalQuestionResult.Value);
+                questions.Add(additionalQuestionResult.Value);
+
+                Result<Success> resolveChallengeResult = currentSection.ResolveChallenge();
+                if (resolveChallengeResult.IsError)
+                {
+                    return resolveChallengeResult.TopError;
+                }
+
+                currentSectionQuestions.Add(additionalQuestionResult.Value);
+            }
+
+            // A reassessment is a new measure of the same section's
+            // understanding. Once it is answered correctly, it replaces the
+            // failed original question for section-completion purposes.
+            bool reassessmentSucceeded = currentSectionQuestions.Any(item =>
+                item.IsReassessment && successfulQuestionIds.Contains(item.Id));
+            bool currentSectionCompleted = reassessmentSucceeded ||
+                currentSectionQuestions.All(item => successfulQuestionIds.Contains(item.Id));
 
             if (currentSectionCompleted)
             {
@@ -584,8 +728,16 @@ public sealed class StudySessionQuestionHandler(
 
             await unitOfWork.SaveChangesAsync();
 
-            StudySessionQuestion? nextQuestion =
-                questions.FirstOrDefault(item => !successfulQuestionIds.Contains(item.Id));
+            HashSet<Guid> reassessmentCompletedSectionIds = questions
+                .Where(item => item.IsReassessment && successfulQuestionIds.Contains(item.Id) &&
+                               item.StudyMaterialSectionId is not null)
+                .Select(item => item.StudyMaterialSectionId!.Value)
+                .ToHashSet();
+
+            StudySessionQuestion? nextQuestion = questions.FirstOrDefault(item =>
+                !successfulQuestionIds.Contains(item.Id) &&
+                (item.IsReassessment || item.StudyMaterialSectionId is null ||
+                 !reassessmentCompletedSectionIds.Contains(item.StudyMaterialSectionId.Value)));
 
             return new StudySessionQuestionAnswerResponse(
                 question.Id,

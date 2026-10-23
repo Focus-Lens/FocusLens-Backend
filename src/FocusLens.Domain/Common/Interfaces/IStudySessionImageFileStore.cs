@@ -9,4 +9,5 @@ public interface IStudySessionImageFileStore
         CancellationToken cancellationToken);
 
     Task DeleteAsync(string storageReference, CancellationToken cancellationToken);
+    Task<Stream> OpenReadAsync(string storageReference, CancellationToken cancellationToken);
 }

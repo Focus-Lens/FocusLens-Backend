@@ -292,6 +292,7 @@ public sealed class StudySessionMaterialReplacementTests
             DeletedReferences.Add(storageReference);
             return Task.CompletedTask;
         }
+
     }
 
     private sealed class RecordingImageFileStore : IStudySessionImageFileStore
@@ -325,6 +326,9 @@ public sealed class StudySessionMaterialReplacementTests
             DeletedReferences.Add(storageReference);
             return Task.CompletedTask;
         }
+
+        public Task<Stream> OpenReadAsync(string storageReference, CancellationToken cancellationToken) =>
+            Task.FromResult<Stream>(new MemoryStream());
     }
 
     private sealed class StubPdfProcessor : IStudyMaterialPdfProcessor
