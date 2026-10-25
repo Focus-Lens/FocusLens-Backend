@@ -3,12 +3,9 @@ namespace FocusLens.Contracts.StudySessions;
 public sealed record CreateStudySessionRequest(
     StudySessionMode Mode,
     Guid SubjectId,
-    int FocusDurationMinutes,
-    StudySessionType SessionType = StudySessionType.StudySession);
+    int FocusDurationMinutes);
 
 public sealed record SetStudySessionModeRequest(StudySessionMode Mode);
-
-public sealed record SetStudySessionTypeRequest(StudySessionType SessionType);
 
 public sealed record SetStudySessionSubjectRequest(Guid SubjectId);
 

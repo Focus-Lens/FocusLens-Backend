@@ -18,13 +18,6 @@ public sealed class HomeController(ISender sender) : ControllerBase
         return response is null ? NotFound() : Ok(response);
     }
 
-    [HttpGet("streak")]
-    public async Task<IActionResult> GetStreak(CancellationToken cancellationToken)
-    {
-        StudyStreakResponse? response = await sender.Send(new GetStudyStreakQuery(), cancellationToken);
-        return response is null ? NotFound() : Ok(response);
-    }
-
     [HttpGet("sessions-by-day")]
     public async Task<IActionResult> GetSessionsByDay(CancellationToken cancellationToken)
     {

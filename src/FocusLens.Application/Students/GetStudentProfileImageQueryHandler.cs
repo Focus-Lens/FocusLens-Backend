@@ -10,14 +10,14 @@ public sealed class GetStudentProfileImageQueryHandler(
     IBaseRepository<Student> studentRepository,
     IProfileImageFileStore fileStore,
     ICurrentUser currentUser)
-    : IRequestHandler<GetStudentProfileImageQuery, Result<StudentProfileImageFile>>
+    : IRequestHandler<GetStudentProfileImageQuery, Result<StudentProfileImageResult>>
 {
     private static readonly Dictionary<string, string> ContentTypes = new(StringComparer.OrdinalIgnoreCase)
     {
         [".jpg"] = "image/jpeg", [".jpeg"] = "image/jpeg", [".png"] = "image/png", [".webp"] = "image/webp"
     };
 
-    public async Task<Result<StudentProfileImageFile>> Handle(
+    public async Task<Result<StudentProfileImageResult>> Handle(
         GetStudentProfileImageQuery request,
         CancellationToken cancellationToken)
     {
@@ -39,9 +39,7 @@ public sealed class GetStudentProfileImageQueryHandler(
 
         if (string.IsNullOrWhiteSpace(student.ProfileImageStorageReference))
         {
-            return Error.NotFound(
-                "Students.ProfileImageNotFound",
-                "The student profile image could not be found.");
+            return new StudentProfileImageResult(null);
         }
 
         string extension = Path.GetExtension(student.ProfileImageStorageReference);
@@ -59,7 +57,7 @@ public sealed class GetStudentProfileImageQueryHandler(
                 student.ProfileImageStorageReference,
                 cancellationToken);
 
-            return new StudentProfileImageFile(content, contentType);
+            return new StudentProfileImageResult(new StudentProfileImageFile(content, contentType));
         }
         catch (FileNotFoundException)
         {

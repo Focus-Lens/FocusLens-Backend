@@ -4,4 +4,4 @@ using MediatR;
 
 namespace FocusLens.Application.Students;
 
-public sealed record RemoveStudentProfileImageCommand : IRequest<Result<StudentDetailsResponse>>;
+public sealed record RemoveStudentProfileImageCommand : IRequest<Result<Success>>;

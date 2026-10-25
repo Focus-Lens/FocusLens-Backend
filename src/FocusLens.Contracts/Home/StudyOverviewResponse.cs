@@ -4,4 +4,7 @@ public sealed record StudyOverviewResponse(
     int StreakDays,
     int SessionsToday,
     int? FocusTimeMinutes,
-    int? WeeklyGoalMinutes);
+    string? WeeklyGoalTime,
+    string WeeklyStudiedTime,
+    decimal WeeklyGoalPercentage,
+    bool HasStartedSession);

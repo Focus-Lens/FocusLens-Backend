@@ -165,6 +165,85 @@ public class StudentsApiTests
     }
 
     [Fact]
+    public async Task UpdateProfile_UpdatesUserAndStudentFields()
+    {
+        Guid userId = Guid.NewGuid();
+        await using CustomWebApplicationFactory factory = new();
+        await factory.SeedAsync(db =>
+        {
+            SeedStudentIdentity(db, userId);
+            db.Students.Add(new Student(userId));
+            return Task.CompletedTask;
+        });
+
+        using HttpClient client = CreateStudentClient(factory, userId);
+        using StringContent content = new(
+            """{"firstName":"Dina","lastName":"Mohamed","phoneNumber":"+201012345678","dateOfBirth":"2009-08-16","grade":"Other","customGrade":"University Student"}""",
+            Encoding.UTF8,
+            "application/json");
+
+        HttpResponseMessage response = await client.PutAsync("/api/students/me/profile", content);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        using JsonDocument document = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        Assert.Equal("Dina", document.RootElement.GetProperty("firstName").GetString());
+        Assert.Equal("Other", document.RootElement.GetProperty("grade").GetString());
+        Assert.Equal("University Student", document.RootElement.GetProperty("customGrade").GetString());
+    }
+
+    [Fact]
+    public async Task UpdateProfile_WithCustomGradeForPredefinedGrade_ReturnsBadRequestWithoutChanges()
+    {
+        Guid userId = Guid.NewGuid();
+        await using CustomWebApplicationFactory factory = new();
+        await factory.SeedAsync(db =>
+        {
+            SeedStudentIdentity(db, userId);
+            db.Students.Add(new Student(userId));
+            return Task.CompletedTask;
+        });
+
+        using HttpClient client = CreateStudentClient(factory, userId);
+        using StringContent content = new(
+            """{"firstName":"Changed","lastName":"Name","grade":"Grade10","customGrade":"Invalid"}""",
+            Encoding.UTF8,
+            "application/json");
+
+        HttpResponseMessage response = await client.PutAsync("/api/students/me/profile", content);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        JsonElement profile = await GetProfileAsync(client);
+        Assert.NotEqual("Changed", profile.GetProperty("firstName").GetString());
+    }
+
+    [Fact]
+    public async Task ReplaceSubjects_KeepsRequestedSubjectsAndRemovesTheRest()
+    {
+        Guid userId = Guid.NewGuid();
+        Student student = new(userId);
+        StudentSubject math = StudentSubject.Predefined(StudentSubjectType.Math);
+        StudentSubject biology = StudentSubject.Predefined(StudentSubjectType.Biology);
+        student.ReplaceSubjects([math, biology]);
+        await using CustomWebApplicationFactory factory = new();
+        await factory.SeedAsync(db =>
+        {
+            SeedStudentIdentity(db, userId);
+            db.Students.Add(student);
+            return Task.CompletedTask;
+        });
+
+        using HttpClient client = CreateStudentClient(factory, userId);
+        using StringContent content = new($$"""{"subjectIds":["{{math.Id}}"]}""", Encoding.UTF8, "application/json");
+
+        HttpResponseMessage response = await client.PutAsync("/api/students/me/subjects", content);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        using JsonDocument document = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        Assert.Single(document.RootElement.EnumerateArray());
+        Assert.Equal(math.Id, document.RootElement[0].GetProperty("id").GetGuid());
+    }
+
+    [Fact]
     public async Task UpdatePreferences_WhenDateOfBirthIsProvided_UpdatesAndReturnsDateOfBirth()
     {
         Guid userId = Guid.NewGuid();

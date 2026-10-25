@@ -27,21 +27,24 @@ public sealed class StudySessionSetupApiTests
     }
 
     [Fact]
-    public async Task SetSessionType_ReturnsNoContentAndPersistsSelection()
+    public async Task Create_WithoutSessionType_DefaultsToStudySession()
     {
         await using CustomWebApplicationFactory factory = new();
-        (Guid userId, StudySession session, _) = await SeedSessionAsync(factory);
+        (Guid userId, _, StudentSubject subject) = await SeedSessionAsync(factory);
         using HttpClient client = CreateStudentClient(factory, userId);
 
-        HttpResponseMessage response = await client.PutAsync(
-            $"/api/study-sessions/{session.Id}/type",
-            JsonContent("""{"sessionType":"Practice"}"""));
+        HttpResponseMessage response = await client.PostAsync(
+            "/api/study-sessions",
+            JsonContent($$"""{"mode":"Digital","subjectId":"{{subject.Id}}","focusDurationMinutes":25}"""));
 
-        await AssertNoContentAsync(response);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        using JsonDocument document = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        Guid sessionId = document.RootElement.GetProperty("id").GetGuid();
+        Assert.Equal("StudySession", document.RootElement.GetProperty("sessionType").GetString());
         using IServiceScope scope = factory.Services.CreateScope();
         ApplicationDbContext dbContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-        Assert.Equal(StudySessionType.Practice,
-            dbContext.StudySessions.Single(item => item.Id == session.Id).SessionType);
+        Assert.Equal(StudySessionType.StudySession,
+            dbContext.StudySessions.Single(item => item.Id == sessionId).SessionType);
     }
 
     [Fact]

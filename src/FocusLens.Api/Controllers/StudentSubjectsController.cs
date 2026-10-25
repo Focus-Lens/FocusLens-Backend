@@ -27,4 +27,16 @@ public sealed class StudentSubjectsController(ISender sender) : ApiController
 
         return result.IsSuccess ? Ok(result.Value) : Problem(result.Errors);
     }
+
+    [HttpPut]
+    public async Task<IActionResult> Replace(
+        [FromBody] ReplaceStudentSubjectsRequest request,
+        CancellationToken cancellationToken)
+    {
+        Result<IReadOnlyCollection<StudentSubjectResponse>> result = await sender.Send(
+            new ReplaceStudentSubjectsCommand(request),
+            cancellationToken);
+
+        return result.Match(Ok, Problem);
+    }
 }

@@ -1,8 +1,11 @@
 using FocusLens.Application.Common.Interfaces;
+using FocusLens.Application.Common.Utilities;
 using FocusLens.Contracts.Home;
 using FocusLens.Domain;
 using FocusLens.Domain.Common.Interfaces;
+using FocusLens.Domain.Students;
 using FocusLens.Domain.StudySessions;
+using FocusLens.Application.Parents;
 using MediatR;
 using ICurrentUser = FocusLens.Application.Common.Interfaces.ICurrentUser;
 
@@ -12,15 +15,16 @@ public sealed class HomeQueryHandler(
     IBaseRepository<Student> studentRepository,
     IBaseRepository<StudySession> studySessionRepository,
     ICurrentUser currentUser,
-    IStudentLocalTime studentLocalTime)
+    IStudentLocalTime studentLocalTime,
+    TimeProvider timeProvider)
     : IRequestHandler<GetStudyOverviewQuery, StudyOverviewResponse?>,
-        IRequestHandler<GetStudyStreakQuery, StudyStreakResponse?>,
         IRequestHandler<GetSessionsByDayQuery, SessionsByDayResponse?>
 {
     public async Task<SessionsByDayResponse?> Handle(GetSessionsByDayQuery request,
         CancellationToken cancellationToken)
     {
-        (Student Student, IReadOnlyCollection<DateOnly> SessionDates)? data = await GetSessionDatesAsync();
+        (Student Student, IReadOnlyCollection<StudySession> Sessions, IReadOnlyCollection<DateOnly> SessionDates)? data =
+            await GetSessionDatesAsync();
         if (data is null)
         {
             return null;
@@ -36,30 +40,48 @@ public sealed class HomeQueryHandler(
     public async Task<StudyOverviewResponse?> Handle(GetStudyOverviewQuery request,
         CancellationToken cancellationToken)
     {
-        (Student Student, IReadOnlyCollection<DateOnly> SessionDates)? data = await GetSessionDatesAsync();
+        (Student Student, IReadOnlyCollection<StudySession> Sessions, IReadOnlyCollection<DateOnly> SessionDates)? data =
+            await GetSessionDatesAsync(includePauseIntervals: true);
         if (data is null)
         {
             return null;
         }
 
         DateOnly today = studentLocalTime.GetToday(data.Value.Student);
+        DateOnly weekStart = WeekStartCalculator.GetWeekStart(today,
+            data.Value.Student.WeekStartsOn ?? DayOfWeek.Saturday);
+        StudySession[] completedSessions = data.Value.Sessions
+            .Where(session => session.Status == StudySessionStatus.Completed &&
+                              session.CompletedAtUtc is not null &&
+                              session.CompletedAtUtc > session.StartedAtUtc)
+            .ToArray();
+        int focusTimeMinutes = ParentDashboardHelpers.GetActualStudyMinutesForDates(
+            completedSessions, weekStart, today, timeProvider.GetUtcNow(), data.Value.Student, studentLocalTime);
+        StudyTimeGoal? goal = data.Value.Student.StudyTimeGoal;
+        StudyTimeGoal? weeklyGoal = goal?.Period == StudyTimeGoalPeriod.Weekly && goal.IsActiveOn(today)
+            ? goal
+            : null;
+        int weeklyStudiedMinutes = weeklyGoal is null
+            ? 0
+            : ParentDashboardHelpers.GetActualStudyMinutesForDates(
+                completedSessions, weeklyGoal.StartDate!.Value, today, timeProvider.GetUtcNow(),
+                data.Value.Student, studentLocalTime);
+        decimal weeklyGoalPercentage = weeklyGoal is null || weeklyGoal.TargetMinutes <= 0
+            ? 0
+            : Math.Round(weeklyStudiedMinutes * 100m / weeklyGoal.TargetMinutes, 2);
+
         return new StudyOverviewResponse(
             GetStreakDays(data.Value.SessionDates, today),
             data.Value.SessionDates.Count(date => date == today),
-            null,
-            null);
+            focusTimeMinutes,
+            weeklyGoal is null ? null : FormatCompactMinutes(weeklyGoal.TargetMinutes),
+            FormatCompactMinutes(weeklyStudiedMinutes),
+            weeklyGoalPercentage,
+            data.Value.Sessions.Count > 0);
     }
 
-    public async Task<StudyStreakResponse?> Handle(GetStudyStreakQuery request, CancellationToken cancellationToken)
-    {
-        (Student Student, IReadOnlyCollection<DateOnly> SessionDates)? data = await GetSessionDatesAsync();
-        return data is null
-            ? null
-            : new StudyStreakResponse(GetStreakDays(data.Value.SessionDates,
-                studentLocalTime.GetToday(data.Value.Student)));
-    }
-
-    private async Task<(Student Student, IReadOnlyCollection<DateOnly> SessionDates)?> GetSessionDatesAsync()
+    private async Task<(Student Student, IReadOnlyCollection<StudySession> Sessions,
+        IReadOnlyCollection<DateOnly> SessionDates)?> GetSessionDatesAsync(bool includePauseIntervals = false)
     {
         if (currentUser.UserId is not Guid userId || userId == Guid.Empty)
         {
@@ -72,10 +94,14 @@ public sealed class HomeQueryHandler(
             return null;
         }
 
-        IEnumerable<StudySession> sessions =
-            await studySessionRepository.GetAllAsync(item =>
+        IEnumerable<StudySession> sessions = includePauseIntervals
+            ? await studySessionRepository.GetAllAsync(item =>
+                item.StudentId == student.Id && item.StartedAtUtc != null,
+                item => item.PauseIntervals)
+            : await studySessionRepository.GetAllAsync(item =>
                 item.StudentId == student.Id && item.StartedAtUtc != null);
-        return (student, sessions
+        StudySession[] sessionArray = sessions.ToArray();
+        return (student, sessionArray, sessionArray
             .Select(item => studentLocalTime.GetLocalDate(item.StartedAtUtc!.Value, student))
             .ToArray());
     }
@@ -93,5 +119,18 @@ public sealed class HomeQueryHandler(
         }
 
         return streak;
+    }
+
+    private static string FormatCompactMinutes(int minutes)
+    {
+        int nonNegativeMinutes = Math.Max(0, minutes);
+        int hours = nonNegativeMinutes / 60;
+        int remainingMinutes = nonNegativeMinutes % 60;
+
+        return hours == 0
+            ? $"{remainingMinutes}m"
+            : remainingMinutes == 0
+                ? $"{hours}h"
+                : $"{hours}h {remainingMinutes}m";
     }
 }

@@ -98,19 +98,6 @@ public sealed class StudySession : AuditableEntity
         return Result.Success;
     }
 
-    public Result<Success> SetSessionType(StudySessionType sessionType)
-    {
-        Result<Success> configurable = EnsureConfigurable();
-        if (configurable.IsError || !Enum.IsDefined(sessionType))
-        {
-            return configurable.IsError ? configurable : StudySessionErrors.InvalidSessionType;
-        }
-
-        SessionType = sessionType;
-        MarkDraft();
-        return Result.Success;
-    }
-
     public Result<Success> SetSubject(StudentSubject? subject) => SetSubjectId(subject?.Id ?? Guid.Empty);
 
     public Result<Success> SetSubjectId(Guid subjectId)

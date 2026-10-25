@@ -1,4 +1,3 @@
-using FocusLens.Application.Common.Mappings;
 using FocusLens.Contracts.Students;
 using FocusLens.Domain;
 using FocusLens.Domain.Common.Interfaces;
@@ -13,13 +12,13 @@ public sealed class StudentProfileImageCommandHandler(
     IProfileImageFileStore fileStore,
     ICurrentUser currentUser,
     IUnitOfWork unitOfWork)
-    : IRequestHandler<UpdateStudentProfileImageCommand, Result<StudentDetailsResponse>>,
-        IRequestHandler<RemoveStudentProfileImageCommand, Result<StudentDetailsResponse>>
+    : IRequestHandler<UpdateStudentProfileImageCommand, Result<StudentProfileImageResponse>>,
+        IRequestHandler<RemoveStudentProfileImageCommand, Result<Success>>
 {
     private static readonly HashSet<string> AllowedExtensions =
         [".jpg", ".jpeg", ".png", ".webp"];
 
-    public async Task<Result<StudentDetailsResponse>> Handle(
+    public async Task<Result<Success>> Handle(
         RemoveStudentProfileImageCommand request,
         CancellationToken cancellationToken)
     {
@@ -38,10 +37,10 @@ public sealed class StudentProfileImageCommandHandler(
             await fileStore.DeleteAsync(previousReference, cancellationToken);
         }
 
-        return studentResult.Value.ToDetailsResponse();
+        return Result.Success;
     }
 
-    public async Task<Result<StudentDetailsResponse>> Handle(
+    public async Task<Result<StudentProfileImageResponse>> Handle(
         UpdateStudentProfileImageCommand request,
         CancellationToken cancellationToken)
     {
@@ -82,7 +81,7 @@ public sealed class StudentProfileImageCommandHandler(
             await fileStore.DeleteAsync(previousReference, cancellationToken);
         }
 
-        return studentResult.Value.ToDetailsResponse();
+        return new StudentProfileImageResponse(reference);
     }
 
     private async Task<Result<Student>> GetStudentAsync()

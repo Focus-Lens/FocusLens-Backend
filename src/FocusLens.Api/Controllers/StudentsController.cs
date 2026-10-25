@@ -80,21 +80,35 @@ public sealed class StudentsController(ISender sender) : ApiController
         return Problem(result.Errors);
     }
 
+    [HttpPut("me/profile")]
+    public async Task<IActionResult> UpdateProfile(
+        [FromBody] UpdateStudentProfileRequest request,
+        CancellationToken cancellationToken)
+    {
+        Result<StudentDetailsResponse> result = await sender.Send(
+            new UpdateStudentProfileCommand(request),
+            cancellationToken);
+
+        return result.Match(Ok, Problem);
+    }
+
     [HttpGet("me/profile-image")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
     public async Task<IActionResult> GetProfileImage(CancellationToken cancellationToken)
     {
-        Result<StudentProfileImageFile> result = await sender.Send(
+        Result<StudentProfileImageResult> result = await sender.Send(
             new GetStudentProfileImageQuery(),
             cancellationToken);
 
         return result.Match(
-            image => File(image.Content, image.ContentType),
+            image => image.File is null ? Ok(null) : File(image.File.Content, image.File.ContentType),
             Problem);
     }
 
     [HttpPut("me/profile-image")]
     [Consumes("multipart/form-data")]
     [RequestSizeLimit(10 * 1024 * 1024)]
+    [ProducesResponseType(typeof(StudentProfileImageResponse), StatusCodes.Status200OK)]
     public async Task<IActionResult> UpdateProfileImage(
         [FromForm] IFormFile file,
         CancellationToken cancellationToken)
@@ -106,7 +120,7 @@ public sealed class StudentsController(ISender sender) : ApiController
             ]);
         }
 
-        Result<StudentDetailsResponse> result = await sender.Send(
+        Result<StudentProfileImageResponse> result = await sender.Send(
             new UpdateStudentProfileImageCommand(
                 file.FileName,
                 file.Length,
@@ -117,13 +131,14 @@ public sealed class StudentsController(ISender sender) : ApiController
     }
 
     [HttpDelete("me/profile-image")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
     public async Task<IActionResult> RemoveProfileImage(CancellationToken cancellationToken)
     {
-        Result<StudentDetailsResponse> result = await sender.Send(
+        Result<Success> result = await sender.Send(
             new RemoveStudentProfileImageCommand(),
             cancellationToken);
 
-        return result.Match(Ok, Problem);
+        return result.Match(_ => NoContent(), Problem);
     }
 
     [HttpDelete("me/study-history")]

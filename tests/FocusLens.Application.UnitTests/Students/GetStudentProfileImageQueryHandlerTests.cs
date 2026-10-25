@@ -20,18 +20,18 @@ public sealed class GetStudentProfileImageQueryHandlerTests
             fileStore,
             new FakeCurrentUser(student.UserId));
 
-        Result<StudentProfileImageFile> result = await handler.Handle(
+        Result<StudentProfileImageResult> result = await handler.Handle(
             new GetStudentProfileImageQuery(),
             CancellationToken.None);
 
         Assert.True(result.IsSuccess);
-        Assert.Equal("image/png", result.Value.ContentType);
-        Assert.Same(fileStore.OpenedStream, result.Value.Content);
+        Assert.Equal("image/png", result.Value.File!.ContentType);
+        Assert.Same(fileStore.OpenedStream, result.Value.File.Content);
         Assert.Equal("images/profile.png", fileStore.OpenedReference);
     }
 
     [Fact]
-    public async Task Handle_WhenImageReferenceIsMissing_ReturnsNotFound()
+    public async Task Handle_WhenImageReferenceIsMissing_ReturnsNull()
     {
         Student student = new(Guid.NewGuid());
         RecordingImageFileStore fileStore = new();
@@ -41,13 +41,12 @@ public sealed class GetStudentProfileImageQueryHandlerTests
             fileStore,
             new FakeCurrentUser(student.UserId));
 
-        Result<StudentProfileImageFile> result = await handler.Handle(
+        Result<StudentProfileImageResult> result = await handler.Handle(
             new GetStudentProfileImageQuery(),
             CancellationToken.None);
 
-        Assert.False(result.IsSuccess);
-        Assert.Equal(ErrorKind.NotFound, result.TopError.Type);
-        Assert.Equal("Students.ProfileImageNotFound", result.TopError.Code);
+        Assert.True(result.IsSuccess);
+        Assert.Null(result.Value.File);
         Assert.Null(fileStore.OpenedReference);
     }
 
@@ -62,7 +61,7 @@ public sealed class GetStudentProfileImageQueryHandlerTests
             fileStore,
             new FakeCurrentUser(currentUserId));
 
-        Result<StudentProfileImageFile> result = await handler.Handle(
+        Result<StudentProfileImageResult> result = await handler.Handle(
             new GetStudentProfileImageQuery(),
             CancellationToken.None);
 
@@ -84,7 +83,7 @@ public sealed class GetStudentProfileImageQueryHandlerTests
             fileStore,
             new FakeCurrentUser(student.UserId));
 
-        Result<StudentProfileImageFile> result = await handler.Handle(
+        Result<StudentProfileImageResult> result = await handler.Handle(
             new GetStudentProfileImageQuery(),
             CancellationToken.None);
 

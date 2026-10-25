@@ -8,4 +8,4 @@ public sealed record UpdateStudentProfileImageCommand(
     string FileName,
     long FileSizeBytes,
     Func<CancellationToken, Task<Stream>> OpenReadAsync)
-    : IRequest<Result<StudentDetailsResponse>>;
+    : IRequest<Result<StudentProfileImageResponse>>;
