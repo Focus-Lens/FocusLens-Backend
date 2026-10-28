@@ -166,6 +166,37 @@ public sealed class StudySessionSetupApiTests
     }
 
     [Fact]
+    public async Task PaperSession_TimerExpiry_EndUnlocksAssessmentInsteadOfCancelling()
+    {
+        DateTimeOffset now = new(2026, 10, 28, 12, 0, 0, TimeSpan.Zero);
+        await using CustomWebApplicationFactory factory = new(now);
+        (Guid userId, StudySession session, _) = await SeedSessionAsync(
+            factory,
+            readyToStart: true,
+            mode: StudySessionMode.Paper,
+            startedAtUtc: now.AddMinutes(-10));
+        using HttpClient client = CreateStudentClient(factory, userId);
+
+        using HttpResponseMessage response = await client.PostAsync(
+            $"/api/study-sessions/{session.Id}/end", null);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        using JsonDocument responseDocument = JsonDocument.Parse(
+            await response.Content.ReadAsStringAsync());
+        Assert.Equal("Active", responseDocument.RootElement.GetProperty("status").GetString());
+
+        using IServiceScope scope = factory.Services.CreateScope();
+        ApplicationDbContext db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        StudySession persisted = db.StudySessions.Single(item => item.Id == session.Id);
+        StudySessionSelectedSection selectedSection = db.Set<StudySessionSelectedSection>()
+            .Single(item => item.StudySessionSelectionId == session.Selection!.Id);
+
+        Assert.Equal(StudySessionStatus.Active, persisted.Status);
+        Assert.Null(persisted.CancelledAtUtc);
+        Assert.True(selectedSection.IsChallengeAvailable);
+    }
+
+    [Fact]
     public async Task UploadImages_WithMultipleValidImages_ReturnsMetadataAndDoesNotMarkSessionReady()
     {
         await using CustomWebApplicationFactory factory = new();
@@ -199,13 +230,15 @@ public sealed class StudySessionSetupApiTests
 
     private static async Task<(Guid UserId, StudySession Session, StudentSubject Subject)> SeedSessionAsync(
         CustomWebApplicationFactory factory,
-        bool readyToStart = false)
+        bool readyToStart = false,
+        StudySessionMode mode = StudySessionMode.Digital,
+        DateTimeOffset? startedAtUtc = null)
     {
         Guid userId = Guid.NewGuid();
         StudentSubject subject = StudentSubject.Predefined(StudentSubjectType.Math);
         Student student = new(userId);
         student.ReplaceSubjects([subject]);
-        StudySession session = StudySession.Create(student.Id, StudySessionMode.Digital).Value;
+        StudySession session = StudySession.Create(student.Id, mode).Value;
 
         await factory.SeedAsync(db =>
         {
@@ -237,6 +270,13 @@ public sealed class StudySessionSetupApiTests
 
                 Assert.True(session.SetSelection(selection).IsSuccess);
                 Assert.True(session.SetSelectedSections([section]).IsSuccess);
+
+                if (startedAtUtc is not null)
+                {
+                    Assert.True(session.MarkReady().IsSuccess);
+                    Assert.True(session.Start(startedAtUtc.Value).IsSuccess);
+                    Assert.True(selection.SelectedSections.Single().Start(startedAtUtc.Value).IsSuccess);
+                }
 
                 db.StudyMaterials.Add(material);
                 db.StudyMaterialSections.Add(section);

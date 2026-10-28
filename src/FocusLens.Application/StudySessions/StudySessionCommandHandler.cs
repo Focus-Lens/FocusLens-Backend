@@ -214,6 +214,7 @@ public sealed class StudySessionCommandHandler(
             await GetSessionAsync(
                 request.SessionId,
                 includeMaterial: true,
+                includeSelection: true,
                 includePauseIntervals: true);
 
         if (sessionResult.IsError)
@@ -223,6 +224,17 @@ public sealed class StudySessionCommandHandler(
 
         StudySession session = sessionResult.Value;
         DateTimeOffset now = timeProvider.GetUtcNow();
+
+        // A paper-session timer reaching zero is a checkpoint, not an
+        // instruction to discard the session. Keep the session active and
+        // unlock its assessment so the normal question-answer flow decides
+        // whether it can be completed successfully. Explicitly ending
+        // before the planned duration still retains the cancellation meaning.
+        if (session.Mode == DomainStudySessionMode.Paper &&
+            session.GetRemainingDuration(now) == TimeSpan.Zero)
+        {
+            return await UnlockPaperAssessmentAsync(session, now);
+        }
 
         Result<Success> endResult = session.End(now);
 
@@ -242,6 +254,49 @@ public sealed class StudySessionCommandHandler(
         }
 
         behaviorAnalysisJobRepository.Add(jobResult.Value);
+
+        await unitOfWork.SaveChangesAsync();
+
+        return session.ToResponse(now);
+    }
+
+    private async Task<Result<StudySessionResponse>> UnlockPaperAssessmentAsync(
+        StudySession session,
+        DateTimeOffset now)
+    {
+        if (session.Selection is null)
+        {
+            return Error.Conflict(
+                "StudySessions.PaperAssessmentRequired",
+                "The paper-session timer has ended, but no assessment is configured for this session.");
+        }
+
+        StudySessionSelectedSection? currentSection = await selectedSectionRepository.FirstOrDefaultAsync(section =>
+            section.StudySessionSelectionId == session.Selection.Id &&
+            section.StartedAtUtc != null &&
+            section.CompletedAtUtc == null);
+
+        if (currentSection is null)
+        {
+            return Error.Conflict(
+                "StudySessions.PaperAssessmentRequired",
+                "The paper-session timer has ended. Complete the required assessment before ending the session.");
+        }
+
+        Result<Success> activityResult = session.UpdateProgress(null, now);
+        if (activityResult.IsError)
+        {
+            return activityResult.TopError;
+        }
+
+        if (!currentSection.IsChallengeAvailable)
+        {
+            Result<Success> availableResult = currentSection.MakeChallengeAvailable(now);
+            if (availableResult.IsError)
+            {
+                return availableResult.TopError;
+            }
+        }
 
         await unitOfWork.SaveChangesAsync();
 
