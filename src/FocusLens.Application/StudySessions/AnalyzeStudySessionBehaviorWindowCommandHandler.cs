@@ -183,8 +183,8 @@ public sealed class AnalyzeStudySessionBehaviorWindowCommandHandler(
         BehaviorWindowTimelineItem window) =>
         Guid.TryParse(response.SessionId, out Guid returnedSessionId) && returnedSessionId == sessionId &&
         response.WindowIndex == window.WindowIndex && response.IsFinal == window.IsFinal &&
-        response.WindowFocusScore is not < 0 or > 100 &&
-        response.WindowUnderstandingScore is not < 0 or > 100 &&
+        response.WindowFocusScore is >= 0 and <= 100 &&
+        response.WindowUnderstandingScore is >= 0 and <= 100 &&
         response.WindowActiveTimeSeconds is double activeSeconds &&
         double.IsFinite(activeSeconds) && activeSeconds >= 0 &&
         !string.IsNullOrWhiteSpace(response.WindowState) && !string.IsNullOrWhiteSpace(response.Trend) &&

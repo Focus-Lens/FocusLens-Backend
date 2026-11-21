@@ -213,8 +213,8 @@ public sealed class StudySessionFinalBehaviorAnalysisService(
         returnedSessionId == sessionId &&
         response.WindowIndex == window.WindowIndex &&
         response.IsFinal == window.IsFinal &&
-        response.WindowFocusScore is not < 0 or > 100 &&
-        response.WindowUnderstandingScore is not < 0 or > 100 &&
+        response.WindowFocusScore is >= 0 and <= 100 &&
+        response.WindowUnderstandingScore is >= 0 and <= 100 &&
         !string.IsNullOrWhiteSpace(response.WindowState) &&
         !string.IsNullOrWhiteSpace(response.Trend) &&
         !string.IsNullOrWhiteSpace(response.RawAction) &&
