@@ -6,6 +6,8 @@ using FocusLens.Domain.Common.Interfaces;
 using FocusLens.Domain.Common.Results;
 using FocusLens.Domain.StudySessions;
 using MediatR;
+using DomainEventType = FocusLens.Domain.StudySessions.StudySessionBehaviorEventType;
+using DomainStudySessionMode = FocusLens.Domain.StudySessions.StudySessionMode;
 
 namespace FocusLens.Application.StudySessions;
 
@@ -18,6 +20,7 @@ public sealed class StudySessionQuestionHandler(
     IBaseRepository<StudyMaterialSection> materialSectionRepository,
     ICurrentUser currentUser,
     IFocusLensAiClient aiClient,
+    IBaseRepository<StudySessionBehaviorEvent> behaviorEventRepository,
     IBaseRepository<StudySessionBehaviorAnalysisJob> behaviorAnalysisJobRepository,
     IUnitOfWork unitOfWork,
     TimeProvider timeProvider,
@@ -281,6 +284,13 @@ public sealed class StudySessionQuestionHandler(
         int number =
             questions.FindIndex(question => question.Id == currentQuestion.Id) + 1;
 
+        string[] options = currentQuestion.Options
+            .OrderBy(option => option.Order)
+            .Select(option => option.Text)
+            .ToArray();
+        int correctOptionIndex = Array.FindIndex(options, option =>
+            string.Equals(option, currentQuestion.CorrectAnswer, StringComparison.OrdinalIgnoreCase));
+
         return new StudySessionCurrentQuestionResponse(
             true,
             new StudySessionCurrentQuestionDetails(
@@ -290,11 +300,9 @@ public sealed class StudySessionQuestionHandler(
                 currentQuestion.AiSectionTitle,
                 currentQuestion.AiConceptName,
                 currentQuestion.Question,
-                currentQuestion.Options
-                    .OrderBy(option => option.Order)
-                    .Select(option => option.Text)
-                    .ToArray(),
-                currentQuestion.EstimatedTimeMinutes));
+                options,
+                currentQuestion.EstimatedTimeMinutes,
+                correctOptionIndex));
     }
 
     public async Task<StudySessionResultResponse?> Handle(
@@ -541,14 +549,7 @@ public sealed class StudySessionQuestionHandler(
             question.CorrectAnswer,
             StringComparison.OrdinalIgnoreCase);
 
-        AiAnswerEvaluationResult evaluation = await aiClient.EvaluateAnswerAsync(
-            question.Question,
-            selectedAnswer,
-            question.CorrectAnswer,
-            question.AiSectionId,
-            question.AiConceptId,
-            content,
-            cancellationToken);
+        string learningSignal = isCorrect ? "understood" : "needs_review";
 
         int attemptNumber = existingAnswers.Count + 1;
 
@@ -557,13 +558,44 @@ public sealed class StudySessionQuestionHandler(
                 question.Id,
                 selectedAnswer,
                 isCorrect,
-                evaluation.LearningSignal,
+                learningSignal,
                 attemptNumber,
                 now);
 
         if (answerResult.IsError)
         {
             return answerResult.TopError;
+        }
+
+        if (request.Request.TappedAtUtc is DateTimeOffset tappedAtUtc)
+        {
+            if (session.StartedAtUtc is not { } startedAtUtc || tappedAtUtc < startedAtUtc || tappedAtUtc > now)
+            {
+                return Error.Validation(
+                    "StudySessionBehaviorEvents.TimestampInvalid",
+                    "The answer tap time must be within the started session timeline.");
+            }
+
+            Result<StudySessionBehaviorEvent> eventResult = StudySessionBehaviorEvent.Create(
+                session.Id,
+                currentSection.StudyMaterialSectionId,
+                question.Id,
+                DomainEventType.QuestionAnswered,
+                tappedAtUtc,
+                scrollSpeedAvgPxPerSec: null,
+                scrollDirectionChanges: null,
+                contentProgressionPct: null,
+                interactionCount: null,
+                backgroundCount: null,
+                backgroundDurationSeconds: null,
+                attemptNumber: attemptNumber);
+
+            if (eventResult.IsError)
+            {
+                return eventResult.TopError;
+            }
+
+            behaviorEventRepository.Add(eventResult.Value);
         }
 
         answerRepository.Add(answerResult.Value);
@@ -676,11 +708,13 @@ public sealed class StudySessionQuestionHandler(
                 }
             }
 
-            bool completed = selectedSections.All(section => section.CompletedAtUtc is not null);
+            bool assessmentsComplete = selectedSections.All(section => section.CompletedAtUtc is not null);
+            bool timerExpired = session.GetRemainingDuration(now) == TimeSpan.Zero;
+            bool completed = assessmentsComplete && timerExpired;
 
             StudySessionSelectedSection? nextSection = null;
 
-            if (!completed && currentSectionCompleted)
+            if (!assessmentsComplete && currentSectionCompleted)
             {
                 nextSection = selectedSections.FirstOrDefault(section => section.Order > currentSection.Order &&
                                                                          section.StartedAtUtc is null &&
@@ -694,6 +728,20 @@ public sealed class StudySessionQuestionHandler(
                     if (nextSectionStartResult.IsError)
                     {
                         return nextSectionStartResult.TopError;
+                    }
+                }
+            }
+
+            // After Digital timer expiry, unlock the remaining challenges in sequence.
+            if (timerExpired && !assessmentsComplete && session.Mode == DomainStudySessionMode.Digital)
+            {
+                StudySessionSelectedSection? pendingSection = currentSectionCompleted ? nextSection : currentSection;
+                if (pendingSection is not null && !pendingSection.IsChallengeAvailable)
+                {
+                    Result<Success> unlockResult = pendingSection.MakeChallengeAvailable(now);
+                    if (unlockResult.IsError)
+                    {
+                        return unlockResult.TopError;
                     }
                 }
             }
@@ -742,7 +790,7 @@ public sealed class StudySessionQuestionHandler(
             return new StudySessionQuestionAnswerResponse(
                 question.Id,
                 true,
-                evaluation.LearningSignal,
+                learningSignal,
                 question.CorrectAnswer,
                 question.Explanation,
                 false,
@@ -766,7 +814,7 @@ public sealed class StudySessionQuestionHandler(
         return new StudySessionQuestionAnswerResponse(
             question.Id,
             false,
-            evaluation.LearningSignal,
+            learningSignal,
             question.CorrectAnswer,
             null,
             !requiresExplanation,

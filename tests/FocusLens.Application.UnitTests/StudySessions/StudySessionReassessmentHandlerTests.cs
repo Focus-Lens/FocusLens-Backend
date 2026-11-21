@@ -39,6 +39,22 @@ public sealed class StudySessionReassessmentHandlerTests
         StudySessionQuestion reassessment = Assert.Single(fixture.Questions.GetAll().Where(question => question.IsReassessment));
         Assert.NotNull(current?.Question);
         Assert.Equal(reassessment.Id, current.Question!.Id);
+        Assert.Equal("C", current.Question.Options.ElementAt(current.Question.CorrectOptionIndex));
+    }
+
+    [Fact]
+    public async Task IncorrectAnswer_ReturnsNeedsReviewWithoutAiEvaluation()
+    {
+        Fixture fixture = Fixture.Create(challengeAvailable: true, reassessmentEligible: false);
+        StudySessionQuestion question = Assert.Single(fixture.Questions.GetAll());
+
+        var answer = await fixture.Handler.Handle(new SubmitStudySessionQuestionAnswerCommand(
+            fixture.Session.Id, question.Id, new("B")), CancellationToken.None);
+
+        Assert.True(answer.IsSuccess);
+        Assert.False(answer.Value.IsCorrect);
+        Assert.Equal("needs_review", answer.Value.LearningSignal);
+        Assert.True(answer.Value.CanRetry);
     }
 
     [Fact]
@@ -49,15 +65,65 @@ public sealed class StudySessionReassessmentHandlerTests
             new MakeStudySessionReassessmentAvailableCommand(fixture.Session.Id), CancellationToken.None)).IsSuccess);
 
         StudySessionQuestion reassessment = Assert.Single(fixture.Questions.GetAll().Where(question => question.IsReassessment));
+        DateTimeOffset tappedAtUtc = fixture.Clock.GetUtcNow();
         var answer = await fixture.Handler.Handle(new SubmitStudySessionQuestionAnswerCommand(
-            fixture.Session.Id, reassessment.Id, new("A")), CancellationToken.None);
+            fixture.Session.Id, reassessment.Id, new(" c ", tappedAtUtc)), CancellationToken.None);
         var current = await fixture.Handler.Handle(
             new GetCurrentStudySessionQuestionQuery(fixture.Session.Id), CancellationToken.None);
 
         Assert.True(answer.IsSuccess);
+        Assert.True(answer.Value.IsCorrect);
+        Assert.Equal("understood", answer.Value.LearningSignal);
+        Assert.False(answer.Value.SessionCompleted);
+        Assert.Equal(StudySessionStatus.Active, fixture.Session.Status);
+        Assert.NotNull(fixture.SelectedSection.CompletedAtUtc);
+        Assert.NotNull(current);
+        Assert.False(current.ChallengeAvailable);
+        Assert.Null(current.Question);
+        StudySessionBehaviorEvent answerEvent = Assert.Single(fixture.BehaviorEvents.GetAll());
+        Assert.Equal(StudySessionBehaviorEventType.QuestionAnswered, answerEvent.EventType);
+        Assert.Equal(reassessment.Id, answerEvent.StudySessionQuestionId);
+        Assert.Equal(answer.Value.AttemptNumber, answerEvent.AttemptNumber);
+        Assert.Equal(tappedAtUtc, answerEvent.OccurredAtUtc);
+
+        fixture.Clock.Advance(fixture.Session.GetRemainingDuration(fixture.Clock.GetUtcNow()));
+        var end = await fixture.ProgressHandler.Handle(
+            new EndStudySessionCommand(fixture.Session.Id), CancellationToken.None);
+
+        Assert.True(end.IsSuccess);
+        Assert.Equal(StudySessionStatus.Completed, fixture.Session.Status);
+        Assert.Single(fixture.AnalysisJobs.GetAll());
+    }
+
+    [Theory]
+    [InlineData(StudySessionMode.Digital)]
+    [InlineData(StudySessionMode.Paper)]
+    public async Task TimerExpiresBeforeAssessment_UnlocksQuestionAndCompletesAfterCorrectAnswer(StudySessionMode mode)
+    {
+        Fixture fixture = Fixture.Create(challengeAvailable: false, reassessmentEligible: false, mode: mode);
+        StudySessionQuestion question = Assert.Single(fixture.Questions.GetAll());
+        fixture.Clock.Advance(fixture.Session.GetRemainingDuration(fixture.Clock.GetUtcNow()));
+
+        var end = await fixture.ProgressHandler.Handle(
+            new EndStudySessionCommand(fixture.Session.Id), CancellationToken.None);
+        var current = await fixture.Handler.Handle(
+            new GetCurrentStudySessionQuestionQuery(fixture.Session.Id), CancellationToken.None);
+
+        Assert.True(end.IsSuccess);
+        Assert.Equal(StudySessionStatus.Active, fixture.Session.Status);
+        Assert.Equal(question.Id, current?.Question?.Id);
+        Assert.Empty(fixture.AnalysisJobs.GetAll());
+
+        var answer = await fixture.Handler.Handle(new SubmitStudySessionQuestionAnswerCommand(
+            fixture.Session.Id, question.Id, new("A")), CancellationToken.None);
+        Assert.True(answer.IsSuccess);
         Assert.True(answer.Value.SessionCompleted);
         Assert.Equal(StudySessionStatus.Completed, fixture.Session.Status);
-        Assert.Null(current);
+
+        var repeatedEnd = await fixture.ProgressHandler.Handle(
+            new EndStudySessionCommand(fixture.Session.Id), CancellationToken.None);
+        Assert.True(repeatedEnd.IsSuccess);
+        Assert.Single(fixture.AnalysisJobs.GetAll());
     }
 
     [Fact]
@@ -109,18 +175,22 @@ public sealed class StudySessionReassessmentHandlerTests
         StudySessionCommandHandler ProgressHandler,
         StudySession Session,
         InMemoryRepository<StudySessionQuestion> Questions,
-        StudySessionSelectedSection SelectedSection)
+        StudySessionSelectedSection SelectedSection,
+        InMemoryRepository<StudySessionBehaviorEvent> BehaviorEvents,
+        InMemoryRepository<StudySessionBehaviorAnalysisJob> AnalysisJobs,
+        TestClock Clock)
     {
         public static Fixture Create(
             bool challengeAvailable,
             bool reassessmentEligible,
-            bool increasedAssessmentFrequency = false)
+            bool increasedAssessmentFrequency = false,
+            StudySessionMode mode = StudySessionMode.Digital)
         {
             Guid userId = Guid.NewGuid();
             Student student = new(userId);
             StudentSubject subject = StudentSubject.Predefined(StudentSubjectType.Math);
             student.ReplaceSubjects([subject]);
-            StudySession session = StudySession.Create(student.Id, StudySessionMode.Digital).Value;
+            StudySession session = StudySession.Create(student.Id, mode).Value;
             StudyMaterial material = StudyMaterial.Create(student.Id, "lesson.pdf", 4, 4,
                 "materials/lesson.pdf", StudyMaterialSource.Upload).Value;
             StudyMaterialSection materialSection = StudyMaterialSection.Create(material.Id, "Cells", 8, 1, 4).Value;
@@ -135,6 +205,7 @@ public sealed class StudySessionReassessmentHandlerTests
             Assert.True(session.MarkReady().IsSuccess);
 
             DateTimeOffset now = DateTimeOffset.UtcNow;
+            TestClock clock = new(now);
             Assert.True(session.Start(now).IsSuccess);
             if (increasedAssessmentFrequency)
             {
@@ -168,6 +239,8 @@ public sealed class StudySessionReassessmentHandlerTests
                     StudySessionQuestionAnswer.Create(original.Id, "C", false, null, 2, now).Value)
                 : new InMemoryRepository<StudySessionQuestionAnswer>();
 
+            InMemoryRepository<StudySessionBehaviorEvent> behaviorEvents = new();
+            InMemoryRepository<StudySessionBehaviorAnalysisJob> analysisJobs = new();
             StudySessionQuestionHandler handler = new(
                 new InMemoryRepository<Student>(student),
                 new InMemoryRepository<StudySession>(session),
@@ -177,9 +250,10 @@ public sealed class StudySessionReassessmentHandlerTests
                 new InMemoryRepository<StudyMaterialSection>(materialSection),
                 new FakeCurrentUser(userId),
                 new ReassessmentAiClient(),
-                new InMemoryRepository<StudySessionBehaviorAnalysisJob>(),
+                behaviorEvents,
+                analysisJobs,
                 new FakeUnitOfWork(),
-                TimeProvider.System);
+                clock);
 
             StudySessionCommandHandler progressHandler = new(
                 new InMemoryRepository<Student>(student),
@@ -194,13 +268,21 @@ public sealed class StudySessionReassessmentHandlerTests
                 new TestImageFileStore(),
                 new TestPdfProcessor(),
                 new FakeCurrentUser(userId),
-                new InMemoryRepository<StudySessionBehaviorAnalysisJob>(),
+                analysisJobs,
                 new FakeUnitOfWork(),
                 Options.Create(new StudySessionImageUploadOptions()),
-                TimeProvider.System);
+                clock);
 
-            return new Fixture(handler, progressHandler, session, questions, selectedSection);
+            return new Fixture(handler, progressHandler, session, questions, selectedSection, behaviorEvents,
+                analysisJobs, clock);
         }
+    }
+
+    private sealed class TestClock(DateTimeOffset utcNow) : TimeProvider
+    {
+        public override DateTimeOffset GetUtcNow() => utcNow;
+
+        public void Advance(TimeSpan duration) => utcNow += duration;
     }
 
     private sealed class TestMaterialFileStore : IStudyMaterialFileStore
@@ -238,13 +320,13 @@ public sealed class StudySessionReassessmentHandlerTests
         public Task<AiMcqGenerationResult> GenerateMcqAsync(string sectionId, string sectionTitle, string conceptId,
             string conceptName, string content, int numberOfQuestions, CancellationToken cancellationToken) =>
             Task.FromResult(new AiMcqGenerationResult([
-                new AiMcqQuestion("Reassessment?", ["A", "B", "C", "D"], "A", sectionId, sectionTitle,
+                new AiMcqQuestion("Reassessment?", ["A", "B", "C", "D"], "C", sectionId, sectionTitle,
                     conceptId, conceptName, "easy", "Explanation", 1)
             ]));
 
         public Task<AiAnswerEvaluationResult> EvaluateAnswerAsync(string question, string selectedAnswer,
             string correctAnswer, string sectionId, string conceptId, string content, CancellationToken cancellationToken) =>
-            Task.FromResult(new AiAnswerEvaluationResult(true, sectionId, conceptId, "understood"));
+            throw new InvalidOperationException("Multiple-choice grading should not call AI.");
 
         public Task<AiExplanationResult> GenerateExplanationAsync(string sectionId, string sectionTitle,
             string conceptId, string conceptName, string content, CancellationToken cancellationToken) => throw new NotImplementedException();

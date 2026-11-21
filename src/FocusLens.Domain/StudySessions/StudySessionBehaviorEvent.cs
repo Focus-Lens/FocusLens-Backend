@@ -18,7 +18,8 @@ public sealed class StudySessionBehaviorEvent : AuditableEntity
         double? contentProgressionPct,
         int? interactionCount,
         int? backgroundCount,
-        double? backgroundDurationSeconds)
+        double? backgroundDurationSeconds,
+        int? attemptNumber)
         : base(Guid.CreateVersion7())
     {
         StudySessionId = studySessionId;
@@ -32,6 +33,7 @@ public sealed class StudySessionBehaviorEvent : AuditableEntity
         InteractionCount = interactionCount;
         BackgroundCount = backgroundCount;
         BackgroundDurationSeconds = backgroundDurationSeconds;
+        AttemptNumber = attemptNumber;
     }
 
     public Guid StudySessionId { get; private set; }
@@ -45,6 +47,7 @@ public sealed class StudySessionBehaviorEvent : AuditableEntity
     public int? InteractionCount { get; private set; }
     public int? BackgroundCount { get; private set; }
     public double? BackgroundDurationSeconds { get; private set; }
+    public int? AttemptNumber { get; private set; }
 
     public static Result<StudySessionBehaviorEvent> Create(
         Guid studySessionId,
@@ -57,7 +60,8 @@ public sealed class StudySessionBehaviorEvent : AuditableEntity
         double? contentProgressionPct,
         int? interactionCount,
         int? backgroundCount,
-        double? backgroundDurationSeconds)
+        double? backgroundDurationSeconds,
+        int? attemptNumber = null)
     {
         if (studySessionId == Guid.Empty)
         {
@@ -67,6 +71,14 @@ public sealed class StudySessionBehaviorEvent : AuditableEntity
         if (!Enum.IsDefined(eventType))
         {
             return Error.Validation("StudySessionBehaviorEvents.EventTypeInvalid", "Behavior event type is invalid.");
+        }
+
+        if (attemptNumber.HasValue &&
+            (attemptNumber <= 0 || eventType != StudySessionBehaviorEventType.QuestionAnswered ||
+             studySessionQuestionId is null || studySessionQuestionId == Guid.Empty))
+        {
+            return Error.Validation("StudySessionBehaviorEvents.AttemptInvalid",
+                "An attempt number must be positive and belong to a question answer event.");
         }
 
         if (scrollSpeedAvgPxPerSec < 0 || scrollDirectionChanges < 0 ||
@@ -80,6 +92,6 @@ public sealed class StudySessionBehaviorEvent : AuditableEntity
         return new StudySessionBehaviorEvent(
             studySessionId, studyMaterialSectionId, studySessionQuestionId, eventType, occurredAtUtc,
             scrollSpeedAvgPxPerSec, scrollDirectionChanges, contentProgressionPct, interactionCount,
-            backgroundCount, backgroundDurationSeconds);
+            backgroundCount, backgroundDurationSeconds, attemptNumber);
     }
 }

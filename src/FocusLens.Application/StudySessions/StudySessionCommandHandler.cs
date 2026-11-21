@@ -1,3 +1,4 @@
+using FocusLens.Application.Notifications;
 using FocusLens.Contracts.StudySessions;
 using FocusLens.Domain;
 using FocusLens.Domain.Common.Interfaces;
@@ -9,6 +10,7 @@ using Microsoft.Extensions.Options;
 using ICurrentUser = FocusLens.Application.Common.Interfaces.ICurrentUser;
 using DomainStudyMaterialSource = FocusLens.Domain.StudySessions.StudyMaterialSource;
 using DomainStudySessionMode = FocusLens.Domain.StudySessions.StudySessionMode;
+using DomainStudySessionStatus = FocusLens.Domain.StudySessions.StudySessionStatus;
 using DomainStudySessionType = FocusLens.Domain.StudySessions.StudySessionType;
 using StudyMaterialSource = FocusLens.Contracts.StudySessions.StudyMaterialSource;
 
@@ -30,7 +32,8 @@ public sealed class StudySessionCommandHandler(
     IBaseRepository<StudySessionBehaviorAnalysisJob> behaviorAnalysisJobRepository,
     IUnitOfWork unitOfWork,
     IOptions<StudySessionImageUploadOptions> imageUploadOptions,
-    TimeProvider timeProvider = null!)
+    TimeProvider timeProvider = null!,
+    StudyNotificationService? studyNotificationService = null)
     : IRequestHandler<CreateStudySessionCommand, Result<StudySessionResponse>>,
         IRequestHandler<SetStudySessionModeCommand, Result<Success>>,
         IRequestHandler<SetStudySessionSubjectCommand, Result<Success>>,
@@ -225,18 +228,24 @@ public sealed class StudySessionCommandHandler(
         StudySession session = sessionResult.Value;
         DateTimeOffset now = timeProvider.GetUtcNow();
 
-        // A paper-session timer reaching zero is a checkpoint, not an
-        // instruction to discard the session. Keep the session active and
-        // unlock its assessment so the normal question-answer flow decides
-        // whether it can be completed successfully. Explicitly ending
-        // before the planned duration still retains the cancellation meaning.
-        if (session.Mode == DomainStudySessionMode.Paper &&
-            session.GetRemainingDuration(now) == TimeSpan.Zero)
+        if (session.Status == DomainStudySessionStatus.Completed)
         {
-            return await UnlockPaperAssessmentAsync(session, now);
+            return session.ToResponse(now);
         }
 
-        Result<Success> endResult = session.End(now);
+        // Timer expiry completes the session only if the assessments are done.
+        // An explicit end before expiry still cancels the session.
+        bool timerExpired = session.StartedAtUtc is not null &&
+            session.Status is (DomainStudySessionStatus.Active or DomainStudySessionStatus.Paused) &&
+            session.GetRemainingDuration(now) == TimeSpan.Zero;
+        bool assessmentsComplete = session.Selection?.SelectedSections is { Count: > 0 } sections &&
+            sections.All(section => section.CompletedAtUtc is not null);
+        if (timerExpired && !assessmentsComplete)
+        {
+            return await UnlockPendingAssessmentAsync(session, now);
+        }
+
+        Result<Success> endResult = timerExpired ? session.CompleteSuccessfully(now) : session.End(now);
 
         if (endResult.IsError)
         {
@@ -255,20 +264,28 @@ public sealed class StudySessionCommandHandler(
 
         behaviorAnalysisJobRepository.Add(jobResult.Value);
 
+        if (timerExpired && studyNotificationService is not null)
+        {
+            await studyNotificationService.NotifySessionCompletedAsync(session.Id, session.StudentId);
+        }
+
         await unitOfWork.SaveChangesAsync();
 
         return session.ToResponse(now);
     }
 
-    private async Task<Result<StudySessionResponse>> UnlockPaperAssessmentAsync(
+    private async Task<Result<StudySessionResponse>> UnlockPendingAssessmentAsync(
         StudySession session,
         DateTimeOffset now)
     {
+        string assessmentRequiredCode = session.Mode == DomainStudySessionMode.Paper
+            ? "StudySessions.PaperAssessmentRequired"
+            : "StudySessions.DigitalAssessmentRequired";
         if (session.Selection is null)
         {
             return Error.Conflict(
-                "StudySessions.PaperAssessmentRequired",
-                "The paper-session timer has ended, but no assessment is configured for this session.");
+                assessmentRequiredCode,
+                "The study-session timer has ended, but no assessment is configured for this session.");
         }
 
         StudySessionSelectedSection? currentSection = await selectedSectionRepository.FirstOrDefaultAsync(section =>
@@ -279,8 +296,8 @@ public sealed class StudySessionCommandHandler(
         if (currentSection is null)
         {
             return Error.Conflict(
-                "StudySessions.PaperAssessmentRequired",
-                "The paper-session timer has ended. Complete the required assessment before ending the session.");
+                assessmentRequiredCode,
+                "The study-session timer has ended. Complete the required assessment before ending the session.");
         }
 
         Result<Success> activityResult = session.UpdateProgress(null, now);

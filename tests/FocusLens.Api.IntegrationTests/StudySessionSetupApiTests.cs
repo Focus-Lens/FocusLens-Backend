@@ -228,11 +228,44 @@ public sealed class StudySessionSetupApiTests
         Assert.Null(persisted.StudyMaterialId);
     }
 
+    [Theory]
+    [InlineData(false, StudySessionStatus.Active)]
+    [InlineData(true, StudySessionStatus.Completed)]
+    public async Task DigitalSession_TimerExpiry_RequiresCompletedAssessment(
+        bool assessmentComplete, StudySessionStatus expectedStatus)
+    {
+        DateTimeOffset now = new(2026, 10, 28, 12, 0, 0, TimeSpan.Zero);
+        await using CustomWebApplicationFactory factory = new(now);
+        (Guid userId, StudySession session, _) = await SeedSessionAsync(
+            factory, readyToStart: true, startedAtUtc: now.AddMinutes(-10),
+            assessmentCompletedAtUtc: assessmentComplete ? now.AddMinutes(-1) : null);
+        using HttpClient client = CreateStudentClient(factory, userId);
+
+        using HttpResponseMessage response = await client.PostAsync(
+            $"/api/study-sessions/{session.Id}/end", null);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        using JsonDocument body = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        Assert.Equal(expectedStatus.ToString(), body.RootElement.GetProperty("status").GetString());
+
+        using IServiceScope scope = factory.Services.CreateScope();
+        ApplicationDbContext db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        StudySession persisted = db.StudySessions.Single(item => item.Id == session.Id);
+        Assert.Equal(expectedStatus, persisted.Status);
+        Assert.Null(persisted.CancelledAtUtc);
+        if (!assessmentComplete)
+        {
+            Assert.True(db.Set<StudySessionSelectedSection>()
+                .Single(item => item.StudySessionSelectionId == session.Selection!.Id).IsChallengeAvailable);
+        }
+    }
+
     private static async Task<(Guid UserId, StudySession Session, StudentSubject Subject)> SeedSessionAsync(
         CustomWebApplicationFactory factory,
         bool readyToStart = false,
         StudySessionMode mode = StudySessionMode.Digital,
-        DateTimeOffset? startedAtUtc = null)
+        DateTimeOffset? startedAtUtc = null,
+        DateTimeOffset? assessmentCompletedAtUtc = null)
     {
         Guid userId = Guid.NewGuid();
         StudentSubject subject = StudentSubject.Predefined(StudentSubjectType.Math);
@@ -276,6 +309,13 @@ public sealed class StudySessionSetupApiTests
                     Assert.True(session.MarkReady().IsSuccess);
                     Assert.True(session.Start(startedAtUtc.Value).IsSuccess);
                     Assert.True(selection.SelectedSections.Single().Start(startedAtUtc.Value).IsSuccess);
+                    if (assessmentCompletedAtUtc is { } completedAt)
+                    {
+                        StudySessionSelectedSection selectedSection = selection.SelectedSections.Single();
+                        Assert.True(selectedSection.MakeChallengeAvailable(completedAt).IsSuccess);
+                        Assert.True(selectedSection.Complete(completedAt).IsSuccess);
+                        Assert.True(session.MarkSectionCompleted(section.Id).IsSuccess);
+                    }
                 }
 
                 db.StudyMaterials.Add(material);

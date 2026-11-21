@@ -28,17 +28,11 @@ public sealed class BehaviorWindowBuilder
             .OrderBy(item => item.OccurredAtUtc)
             .ToArray();
 
-        StudySessionBehaviorEvent[] windowEvents = allEvents
-            .Where(item =>
-                item.OccurredAtUtc >= windowStartUtc && item.OccurredAtUtc < windowEndUtc
-            )
-            .ToArray();
-
         BehaviorSection[] sections = BuildSections(
-            windowEvents,
             allEvents,
             windowStartUtc,
             windowEndUtc,
+            isFinal,
             sessionQuestions,
             sessionAnswers
         );
@@ -56,10 +50,10 @@ public sealed class BehaviorWindowBuilder
     }
 
     private static BehaviorSection[] BuildSections(
-        IReadOnlyCollection<StudySessionBehaviorEvent> windowEvents,
         IReadOnlyCollection<StudySessionBehaviorEvent> allEvents,
         DateTimeOffset windowStartUtc,
         DateTimeOffset windowEndUtc,
+        bool isFinal,
         IReadOnlyCollection<StudySessionQuestion> questions,
         IReadOnlyCollection<StudySessionQuestionAnswer> answers
     )
@@ -79,9 +73,15 @@ public sealed class BehaviorWindowBuilder
                 continue;
             }
 
-            if (item.OccurredAtUtc >= windowEndUtc)
+            if (item.OccurredAtUtc > windowEndUtc ||
+                (item.OccurredAtUtc == windowEndUtc && !isFinal))
             {
                 break;
+            }
+
+            if (item.OccurredAtUtc == windowEndUtc && item.AttemptNumber is null)
+            {
+                continue;
             }
 
             if (item.StudyMaterialSectionId.HasValue)
@@ -230,7 +230,9 @@ public sealed class BehaviorWindowBuilder
         StudySessionQuestionAnswer? answer = answers
             .Where(item =>
                 item.StudySessionQuestionId == questionId
-                && item.AnsweredAtUtc <= answeredEvent.OccurredAtUtc
+                && (answeredEvent.AttemptNumber is int attemptNumber
+                    ? item.AttemptNumber == attemptNumber
+                    : item.AnsweredAtUtc <= answeredEvent.OccurredAtUtc)
             )
             .OrderByDescending(item => item.AnsweredAtUtc)
             .ThenByDescending(item => item.AttemptNumber)

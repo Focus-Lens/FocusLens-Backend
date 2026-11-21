@@ -51,8 +51,12 @@ public sealed class BehaviorWindowBuilderTests
         Assert.Equal(2, resultA.InteractionCount);
     }
 
-    [Fact]
-    public void Build_UsesPersistedAnswer_AndPriorQuestionShown_ForMicroChallenge()
+    [Theory]
+    [InlineData(null, false)]
+    [InlineData(2, false)]
+    [InlineData(2, true)]
+    public void Build_UsesPersistedAnswer_AndPriorQuestionShown_ForMicroChallenge(
+        int? attemptNumber, bool tapAtFinalBoundary)
     {
         Guid sessionId = Guid.NewGuid();
         Guid sectionId = Guid.NewGuid();
@@ -79,14 +83,18 @@ public sealed class BehaviorWindowBuilderTests
             "4",
             true,
             null,
-            1,
-            answeredAt).Value;
+            attemptNumber ?? 1,
+            attemptNumber.HasValue ? answeredAt.AddSeconds(2) : answeredAt).Value;
+
+        StudySessionQuestionAnswer priorAttempt = StudySessionQuestionAnswer.Create(
+            question.Id, "3", false, null, 1, answeredAt.AddSeconds(-2)).Value;
 
         StudySessionBehaviorEvent[] events =
         [
             CreateEvent(sessionId, sectionId, question.Id, StudySessionBehaviorEventType.QuestionShown,
                 questionShownAt),
-            CreateEvent(sessionId, sectionId, question.Id, StudySessionBehaviorEventType.QuestionAnswered, answeredAt)
+            CreateEvent(sessionId, sectionId, question.Id, StudySessionBehaviorEventType.QuestionAnswered,
+                answeredAt, attemptNumber: attemptNumber)
         ];
 
         BehaviorWindowBuilder builder = new();
@@ -95,11 +103,11 @@ public sealed class BehaviorWindowBuilderTests
             sessionId,
             0,
             questionShownAt,
-            answeredAt.AddSeconds(1),
+            tapAtFinalBoundary ? answeredAt : answeredAt.AddSeconds(1),
             true,
             events,
             [question],
-            [answer],
+            attemptNumber.HasValue ? [priorAttempt, answer] : [answer],
             Array.Empty<BehaviorWindowHistoryItem>());
 
         BehaviorSection section = Assert.Single(result.Sections);
@@ -269,7 +277,8 @@ public sealed class BehaviorWindowBuilderTests
         double? progression = null,
         int? interactionCount = null,
         int? backgroundCount = null,
-        double? backgroundSeconds = null)
+        double? backgroundSeconds = null,
+        int? attemptNumber = null)
     {
         return StudySessionBehaviorEvent.Create(
             sessionId,
@@ -282,6 +291,7 @@ public sealed class BehaviorWindowBuilderTests
             progression,
             interactionCount,
             backgroundCount,
-            backgroundSeconds).Value;
+            backgroundSeconds,
+            attemptNumber).Value;
     }
 }

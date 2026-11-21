@@ -1,6 +1,6 @@
 # FocusLens Backend
 
-FocusLens is a .NET 10 REST API for a student-focus application. It supports student and parent accounts, email verification, JWT authentication, password resets, Google sign-in, student onboarding, and parent-to-student access.
+FocusLens is a .NET 11 REST API for a student-focus application. It supports student and parent accounts, email verification, JWT authentication, password resets, Google sign-in, student onboarding, and parent-to-student access.
 
 ## Architecture
 
@@ -15,7 +15,7 @@ The solution follows Clean Architecture and CQRS:
 
 ## Technology
 
-- .NET 10 / ASP.NET Core
+- .NET 11 / ASP.NET Core
 - Entity Framework Core with SQL Server
 - ASP.NET Core Identity
 - MediatR, FluentValidation, Serilog, Scalar, MailKit, and xUnit
@@ -25,7 +25,7 @@ The solution follows Clean Architecture and CQRS:
 
 ### Prerequisites
 
-- .NET 10 SDK
+- .NET 11 SDK
 - SQL Server reachable from the API
 
 ### Configuration

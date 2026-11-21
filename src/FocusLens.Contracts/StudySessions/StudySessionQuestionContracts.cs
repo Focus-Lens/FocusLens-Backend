@@ -1,7 +1,8 @@
 namespace FocusLens.Contracts.StudySessions;
 
 public sealed record SubmitStudySessionQuestionAnswerRequest(
-    string SelectedAnswer);
+    string SelectedAnswer,
+    DateTimeOffset? TappedAtUtc = null);
 
 public sealed record StudySessionCurrentQuestionResponse(
     bool ChallengeAvailable,
@@ -16,7 +17,8 @@ public sealed record StudySessionCurrentQuestionDetails(
     string ConceptName,
     string Question,
     IReadOnlyCollection<string> Options,
-    int EstimatedTimeMinutes);
+    int EstimatedTimeMinutes,
+    int CorrectOptionIndex);
 
 public sealed record StudySessionQuestionAnswerResponse(
     Guid QuestionId,

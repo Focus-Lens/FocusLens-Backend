@@ -67,7 +67,7 @@ public sealed class StudySessionAiHandler(
         {
             return Error.Validation(
                 "StudySessionAi.AnalysisEmpty",
-                "AI analysis did not return any sections.");
+                "No study sections were found. Select pages that contain lesson content and analyze again.");
         }
 
         if (string.IsNullOrWhiteSpace(result.ExtractedText))

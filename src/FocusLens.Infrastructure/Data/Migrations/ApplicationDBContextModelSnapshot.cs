@@ -1088,6 +1088,9 @@ namespace FocusLens.Infrastructure.Data.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<int?>("AttemptNumber")
+                        .HasColumnType("int");
+
                     b.Property<int?>("BackgroundCount")
                         .HasColumnType("int");
 
