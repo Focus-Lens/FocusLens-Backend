@@ -28,6 +28,16 @@ public sealed class CustomWebApplicationFactory
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.UseEnvironment("Testing");
+        // The host validates configuration before ConfigureServices can replace
+        // SQL Server and SMTP. Use test-only settings even in a clean checkout.
+        builder.UseSetting("ConnectionStrings:DefaultConnection", "Server=localhost;Database=FocusLensTests;Integrated Security=true");
+        builder.UseSetting("MailSettings:Host", "localhost");
+        builder.UseSetting("InvitationSettings:BaseUrl", "https://focuslens.test");
+        builder.UseSetting("InvitationSettings:StudentParentInvitationBaseUrl", "https://focuslens.test/invitations/parent");
+        builder.UseSetting("InvitationSettings:ChildSetupInvitationBaseUrl", "https://focuslens.test/child-setup");
+        builder.UseSetting("Registration:EmailVerificationCodeLifetimeMinutes", "10");
+        builder.UseSetting("StudyMaterialStorage:RootPath", Path.Combine(Path.GetTempPath(), _databaseName, "study-materials"));
+        builder.UseSetting("GoogleAuth:ClientId", "focuslens-test-client");
         builder.UseSetting("Jwt:Secret", "FocusLens.IntegrationTests.Jwt.Secret.2026.1234567890abcdef");
         builder.UseSetting("Jwt:Issuer", "FocusLens.Api");
         builder.UseSetting("Jwt:Audience", "FocusLens.Client");
