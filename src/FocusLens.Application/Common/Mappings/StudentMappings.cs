@@ -16,7 +16,13 @@ internal static class StudentMappings
             student.PreferredName,
             student.User.FirstName,
             student.User.LastName,
+            string.IsNullOrWhiteSpace(student.PreferredName)
+                ? $"{student.User.FirstName} {student.User.LastName}".Trim()
+                : student.PreferredName,
             student.Grade is null ? null : StudentEnumMapper.ToContract(student.Grade.Value),
+            string.IsNullOrWhiteSpace(student.ProfileImageStorageReference)
+                ? null
+                : $"/api/access/students/{student.Id}/profile-image",
             student
                 .Subjects.Select(subject => new StudentSubjectResponse(
                     subject.Id,

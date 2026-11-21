@@ -6,5 +6,6 @@ public sealed record ParentResponse(
     string FirstName,
     string LastName,
     DayOfWeek? WeekStartsOn,
-    bool WeekStartSelectionRequired
+    bool WeekStartSelectionRequired,
+    Guid? ActiveChildId
 );

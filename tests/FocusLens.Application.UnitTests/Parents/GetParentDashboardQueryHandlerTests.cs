@@ -110,6 +110,45 @@ public sealed class GetParentDashboardQueryHandlerTests
             day => day.Date == new DateOnly(2026, 9, 20) && day.StudyMinutes == "30 minutes");
     }
 
+    [Fact]
+    public async Task Dashboard_UsesParentsWeekStartForEachConnectedStudent_WhenStudentSettingsDifferOrAreMissing()
+    {
+        Parent parent = new(Guid.NewGuid());
+        parent.SetWeekStartsOn(DayOfWeek.Saturday);
+        Student missingPreference = new(Guid.NewGuid());
+        Student mondayPreference = new(Guid.NewGuid());
+        Student sundayPreference = new(Guid.NewGuid());
+        mondayPreference.SetWeekStartsOn(DayOfWeek.Monday);
+        sundayPreference.SetWeekStartsOn(DayOfWeek.Sunday);
+        foreach (Student student in new[] { missingPreference, mondayPreference, sundayPreference })
+        {
+            student.SetTimeZoneId("Africa/Cairo");
+            student.SetParentSharingPreferences(true, true);
+        }
+
+        ParentStudentRelationship[] relationships =
+        [
+            Active(parent, missingPreference), Active(parent, mondayPreference), Active(parent, sundayPreference)
+        ];
+        GetParentDashboardQueryHandler handler = new(
+            new InMemoryRepository<Parent>(parent),
+            new InMemoryRepository<ParentStudentRelationship>(relationships),
+            new InMemoryRepository<Student>(missingPreference, mondayPreference, sundayPreference),
+            new InMemoryRepository<StudyGoalProposal>(), new InMemoryRepository<StudySession>(),
+            new InMemoryRepository<StudySessionBehaviorWindow>(), new InMemoryRepository<StudentWeek>(),
+            new FakeCurrentUser(parent.UserId), new FixedTimeProvider(Now));
+
+        foreach (Student student in new[] { missingPreference, mondayPreference, sundayPreference })
+        {
+            Result<ParentDashboardResponse> result = await handler.Handle(
+                new GetParentDashboardQuery(student.Id), CancellationToken.None);
+
+            Assert.True(result.IsSuccess);
+            Assert.Equal(DayOfWeek.Saturday, result.Value.Week.StartsOn.DayOfWeek);
+            Assert.Equal(new DateOnly(2026, 9, 19), result.Value.Week.StartsOn);
+        }
+    }
+
     private static GetParentDashboardQueryHandler DashboardHandler(TestContext context, IEnumerable<StudentWeek> weeks,
         IEnumerable<StudySession> sessions) =>
         DashboardHandler(context, new InMemoryRepository<StudentWeek>(weeks.ToArray()), sessions);
@@ -141,6 +180,13 @@ public sealed class GetParentDashboardQueryHandlerTests
         ParentStudentRelationship relationship = new(parent.Id, student.Id);
         relationship.Accept();
         return new TestContext(parent, student, relationship);
+    }
+
+    private static ParentStudentRelationship Active(Parent parent, Student student)
+    {
+        ParentStudentRelationship relationship = new(parent.Id, student.Id);
+        relationship.Accept();
+        return relationship;
     }
 
     private static StudySession Completed(Guid studentId, DateTimeOffset started, int minutes)

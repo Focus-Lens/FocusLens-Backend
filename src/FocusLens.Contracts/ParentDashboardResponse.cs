@@ -43,7 +43,8 @@ public sealed record ParentOverviewWeekResponse(DateOnly StartsOn, DateOnly Ends
 
 public sealed record ParentOverviewWeeksResponse(IReadOnlyCollection<ParentOverviewWeekResponse> Weeks);
 
-public sealed record UpdateParentOverviewWeekRequest(DateOnly? WeekStart);
+/// <summary>The parent-calendar week to display.</summary>
+public sealed record UpdateParentOverviewWeekRequest(DateOnly? StartsOn);
 
 public sealed record ParentDashboardWeeklyStudyPulseDayResponse(
     DateOnly Date,

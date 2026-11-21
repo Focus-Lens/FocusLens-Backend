@@ -52,6 +52,9 @@ public sealed class GetMyStudentsQueryHandler(
                 student => student.User);
 
         return students
+            .OrderBy(student => student.User.FirstName)
+            .ThenBy(student => student.User.LastName)
+            .ThenBy(student => student.Id)
             .Select(student => student.ToParentSummaryResponse())
             .ToList();
     }

@@ -72,6 +72,35 @@ public class RevokeRelationshipCommandHandlerTests
     }
 
     [Fact]
+    public async Task Handle_WhenRevokingSelectedStudent_FallsBackToAnotherActiveStudent()
+    {
+        Guid parentUserId = Guid.NewGuid();
+        Parent parent = new(parentUserId);
+        Student selectedStudent = new(Guid.NewGuid());
+        Student replacementStudent = new(Guid.NewGuid());
+        ParentStudentRelationship selected = new(parent.Id, selectedStudent.Id);
+        ParentStudentRelationship replacement = new(parent.Id, replacementStudent.Id);
+        selected.SetPrivateProperty("Parent", parent);
+        selected.SetPrivateProperty("Student", selectedStudent);
+        replacement.SetPrivateProperty("Parent", parent);
+        replacement.SetPrivateProperty("Student", replacementStudent);
+        selected.Accept();
+        replacement.Accept();
+        parent.SetActiveChildId(selectedStudent.Id);
+
+        RevokeRelationshipCommandHandler handler = new(
+            new InMemoryRepository<ParentStudentRelationship>(selected, replacement),
+            new FakeCurrentUser(parentUserId),
+            new FakeUnitOfWork());
+
+        Result<Deleted> result = await handler.Handle(
+            new RevokeRelationshipCommand(selected.Id), CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(replacementStudent.Id, parent.ActiveChildId);
+    }
+
+    [Fact]
     public async Task Handle_WithUnrelatedUser_ReturnsForbidden()
     {
         Guid parentUserId = Guid.NewGuid();

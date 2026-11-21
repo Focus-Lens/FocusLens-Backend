@@ -1,4 +1,5 @@
 using FocusLens.Application.Access;
+using FocusLens.Application.Students;
 using FocusLens.Contracts.Access;
 using FocusLens.Contracts.Students;
 using FocusLens.Domain.Common.Results;
@@ -166,6 +167,20 @@ public sealed class AccessController(ISender sender) : ApiController
         return student is null
             ? NotFound()
             : Ok(student);
+    }
+
+    [HttpGet("students/{studentId:guid}/profile-image")]
+    [Authorize(Roles = "Parent")]
+    public async Task<IActionResult> GetStudentProfileImage(
+        Guid studentId,
+        CancellationToken cancellationToken)
+    {
+        Result<StudentProfileImageResult> result = await sender.Send(
+            new GetStudentProfileImageForParentQuery(studentId), cancellationToken);
+
+        return result.Match(
+            image => image.File is null ? Ok(null) : File(image.File.Content, image.File.ContentType),
+            Problem);
     }
 
     [HttpGet("parents")]

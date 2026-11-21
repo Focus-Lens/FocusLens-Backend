@@ -7,7 +7,9 @@ public sealed record ParentStudentSummaryResponse(
     string? PreferredName,
     string FirstName,
     string LastName,
+    string DisplayName,
     StudentGrade? Grade,
+    string? ProfileImageUrl,
     IReadOnlyCollection<StudentSubjectResponse> Subjects,
     bool OnboardingCompleted
 );

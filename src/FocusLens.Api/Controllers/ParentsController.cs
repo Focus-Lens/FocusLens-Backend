@@ -25,6 +25,16 @@ public sealed class ParentsController(ISender sender) : ApiController
         return parent is null ? NotFound() : Ok(parent);
     }
 
+    [HttpPut("me/active-child")]
+    public async Task<IActionResult> UpdateActiveChild(
+        UpdateActiveChildRequest request,
+        CancellationToken cancellationToken)
+    {
+        Result<ActiveChildResponse> result = await sender.Send(
+            new UpdateActiveChildCommand(request.StudentId), cancellationToken);
+        return result.Match(Ok, Problem);
+    }
+
     [HttpGet("me/settings")]
     public async Task<IActionResult> GetSettings(CancellationToken cancellationToken)
     {
@@ -79,8 +89,15 @@ public sealed class ParentsController(ISender sender) : ApiController
     public async Task<IActionResult> SetOverviewWeek(Guid studentId, UpdateParentOverviewWeekRequest request,
         CancellationToken cancellationToken)
     {
+        if (request is null || request.StartsOn is not DateOnly startsOn)
+        {
+            return Problem([
+                Error.Validation("ParentOverviewWeek.StartsOnRequired", "StartsOn is required.")
+            ]);
+        }
+
         Result<ParentOverviewWeekResponse> result =
-            await sender.Send(new SetParentOverviewWeekCommand(studentId, request.WeekStart), cancellationToken);
+            await sender.Send(new SetParentOverviewWeekCommand(studentId, startsOn), cancellationToken);
         return result.Match(Ok, Problem);
     }
 

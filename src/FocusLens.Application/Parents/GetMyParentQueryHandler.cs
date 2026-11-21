@@ -8,6 +8,8 @@ namespace FocusLens.Application.Parents;
 
 public sealed class GetMyParentQueryHandler(
     IBaseRepository<Parent> parentRepository,
+    IBaseRepository<FocusLens.Domain.Access.ParentStudentRelationship> relationshipRepository,
+    IUnitOfWork unitOfWork,
     ICurrentUser currentUser)
     : IRequestHandler<GetMyParentQuery, ParentResponse?>
 {
@@ -24,14 +26,24 @@ public sealed class GetMyParentQueryHandler(
             parent => parent.UserId == userId,
             parent => parent.User);
 
-        return parent is null
-            ? null
-            : new ParentResponse(
-                parent.Id,
-                parent.UserId,
-                parent.User.FirstName,
-                parent.User.LastName,
-                parent.WeekStartsOn,
-                parent.WeekStartsOn is null);
+        if (parent is null)
+        {
+            return null;
+        }
+
+        bool selectionChanged = await ActiveChildSelection.ResolveAsync(parent, relationshipRepository);
+        if (selectionChanged)
+        {
+            await unitOfWork.SaveChangesAsync();
+        }
+
+        return new ParentResponse(
+            parent.Id,
+            parent.UserId,
+            parent.User.FirstName,
+            parent.User.LastName,
+            parent.WeekStartsOn,
+            parent.WeekStartsOn is null,
+            parent.ActiveChildId);
     }
 }

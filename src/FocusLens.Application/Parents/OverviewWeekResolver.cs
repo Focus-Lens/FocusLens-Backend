@@ -13,20 +13,21 @@ internal static class OverviewWeekResolver
         ParentDashboardContext context, IStudentLocalTime studentLocalTime,
         IBaseRepository<StudentWeek> weekRepository, IUnitOfWork? unitOfWork = null)
     {
-        if (context.Student.WeekStartsOn is not DayOfWeek)
+        Result<DayOfWeek> weekStartsOnResult = GetParentWeekStartsOn(context);
+        if (weekStartsOnResult.IsError)
         {
-            return Error.Validation("ParentOverviewWeek.StudentWeekStartsOnRequired",
-                "The student must have a week start day configured.");
+            return weekStartsOnResult.Errors;
         }
 
         DateOnly? persistedStart = context.Relationship.SelectedOverviewWeekStart;
-        StudentWeek? selected = persistedStart is null
+        DateOnly? selectedStart = persistedStart is null
             ? null
-            : await weekRepository.FirstOrDefaultAsync(week =>
-                week.StudentId == context.Student.Id && week.StartsOn == persistedStart.Value);
-        if (persistedStart is not null && selected is null)
+            : ParentWeekdayOrder.GetWeekStart(persistedStart.Value, weekStartsOnResult.Value);
+        if (selectedStart != persistedStart)
         {
-            return Error.Validation("ParentOverviewWeek.NotFound", "The selected overview week no longer exists.");
+            // A selected date identifies a calendar period. When the parent changes
+            // their week-start preference, retain that period but rebase its start.
+            context.Relationship.SetSelectedOverviewWeekStart(selectedStart);
         }
 
         Result<StudentWeek> actualCurrentWeek = await ResolveActualCurrentWeekAsync(
@@ -36,33 +37,55 @@ internal static class OverviewWeekResolver
             return actualCurrentWeek.Errors;
         }
 
-        StudentWeek current = selected ?? actualCurrentWeek.Value;
+        DateOnly currentStart = selectedStart ?? actualCurrentWeek.Value.StartsOn;
         return new ParentOverviewWeekResponse(
-            current.StartsOn,
-            current.EndsOn,
-            current.StartsOn == actualCurrentWeek.Value.StartsOn && current.EndsOn == actualCurrentWeek.Value.EndsOn);
+            currentStart,
+            currentStart.AddDays(6),
+            currentStart == actualCurrentWeek.Value.StartsOn);
     }
 
     public static async Task<Result<StudentWeek>> ResolveActualCurrentWeekAsync(
         ParentDashboardContext context, IStudentLocalTime studentLocalTime,
         IBaseRepository<StudentWeek> weekRepository, IUnitOfWork? unitOfWork = null)
     {
-        if (context.Student.WeekStartsOn is not DayOfWeek weekStartsOn)
+        Result<DayOfWeek> weekStartsOnResult = GetParentWeekStartsOn(context);
+        if (weekStartsOnResult.IsError)
         {
-            return Error.Validation("ParentOverviewWeek.StudentWeekStartsOnRequired",
-                "The student must have a week start day configured.");
+            return weekStartsOnResult.Errors;
         }
 
-        // Historical records retain their original boundary when WeekStartsOn changes.
-        // Current/future creation therefore looks up only the boundary implied by the
-        // student's local calendar today, rather than any selected or overlapping week.
+        // Parent dashboard calendar boundaries are owned by the parent. The student's
+        // local date is retained only to make "today" correct for that student.
         DateOnly currentStart =
-            ParentWeekdayOrder.GetWeekStart(studentLocalTime.GetToday(context.Student), weekStartsOn);
+            ParentWeekdayOrder.GetWeekStart(studentLocalTime.GetToday(context.Student), weekStartsOnResult.Value);
+        return await GetOrCreateWeekAsync(context, currentStart, weekRepository, unitOfWork);
+    }
+
+    public static Result<DayOfWeek> GetParentWeekStartsOn(ParentDashboardContext context)
+    {
+        if (context.Parent.WeekStartsOn is not DayOfWeek weekStartsOn)
+        {
+            return Error.Validation("ParentOverviewWeek.ParentWeekStartsOnRequired",
+                "The parent must have a week start day configured.");
+        }
+
+        return weekStartsOn;
+    }
+
+    public static DateOnly NormalizeToParentWeekStart(DateOnly date, DayOfWeek weekStartsOn) =>
+        ParentWeekdayOrder.GetWeekStart(date, weekStartsOn);
+
+    private static async Task<StudentWeek> GetOrCreateWeekAsync(
+        ParentDashboardContext context,
+        DateOnly startsOn,
+        IBaseRepository<StudentWeek> weekRepository,
+        IUnitOfWork? unitOfWork)
+    {
         StudentWeek? current = await weekRepository.FirstOrDefaultAsync(week =>
-            week.StudentId == context.Student.Id && week.StartsOn == currentStart);
+            week.StudentId == context.Student.Id && week.StartsOn == startsOn);
         if (current is null)
         {
-            current = new StudentWeek(context.Student.Id, currentStart);
+            current = new StudentWeek(context.Student.Id, startsOn);
             weekRepository.Add(current);
             if (unitOfWork is not null)
             {

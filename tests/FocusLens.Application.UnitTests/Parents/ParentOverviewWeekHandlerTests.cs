@@ -29,7 +29,7 @@ public sealed class ParentOverviewWeekHandlerTests
     }
 
     [Fact]
-    public async Task SetOverviewWeek_AllowsExistingHistoricalWeekAfterWeekStartPreferenceChanges()
+    public async Task SetOverviewWeek_UsesParentWeekStartWhenStudentPreferenceDiffers()
     {
         TestContext context = CreateContext();
         StudentWeek historical = new(context.Student.Id, new DateOnly(2026, 9, 26));
@@ -50,7 +50,7 @@ public sealed class ParentOverviewWeekHandlerTests
     public async Task OverviewWeeks_KeepsCurrentWeekIndependentOfHistoricalSelections()
     {
         TestContext context = CreateContext();
-        StudentWeek firstHistorical = new(context.Student.Id, new DateOnly(2026, 9, 21));
+        StudentWeek firstHistorical = new(context.Student.Id, new DateOnly(2026, 9, 19));
         StudentWeek secondHistorical = new(context.Student.Id, new DateOnly(2026, 9, 26));
         StudentWeek actualCurrent = new(context.Student.Id, new DateOnly(2026, 10, 3));
         context.Weeks = new InMemoryRepository<StudentWeek>(firstHistorical, secondHistorical, actualCurrent);
@@ -120,6 +120,7 @@ public sealed class ParentOverviewWeekHandlerTests
     {
         Guid userId = Guid.NewGuid();
         Parent parent = new(userId);
+        parent.SetWeekStartsOn(DayOfWeek.Saturday);
         Student student = new(Guid.NewGuid());
         student.SetWeekStartsOn(DayOfWeek.Saturday);
         student.SetTimeZoneId("Africa/Cairo");
@@ -128,6 +129,79 @@ public sealed class ParentOverviewWeekHandlerTests
         TestContext context = new(parent, student, relationship, new InMemoryRepository<StudentWeek>(), null!, userId);
         context.Handler = CreateHandler(context);
         return context;
+    }
+
+    [Fact]
+    public async Task OverviewWeeks_UsesParentWeekStartForEveryConnectedStudent_WhenStudentSettingsDifferOrAreMissing()
+    {
+        Guid userId = Guid.NewGuid();
+        Parent parent = new(userId);
+        parent.SetWeekStartsOn(DayOfWeek.Saturday);
+        Student first = new(Guid.NewGuid());
+        Student second = new(Guid.NewGuid());
+        Student third = new(Guid.NewGuid());
+        second.SetWeekStartsOn(DayOfWeek.Monday);
+        third.SetWeekStartsOn(DayOfWeek.Sunday);
+        first.SetTimeZoneId("Africa/Cairo");
+        second.SetTimeZoneId("Africa/Cairo");
+        third.SetTimeZoneId("Africa/Cairo");
+        ParentStudentRelationship[] relationships =
+        [
+            Active(parent, first), Active(parent, second), Active(parent, third)
+        ];
+        InMemoryRepository<StudentWeek> weeks = new();
+        ParentOverviewWeekHandler handler = new(
+            new InMemoryRepository<Parent>(parent),
+            new InMemoryRepository<ParentStudentRelationship>(relationships),
+            new InMemoryRepository<Student>(first, second, third),
+            weeks,
+            new FakeCurrentUser(userId),
+            new FixedTimeProvider(new DateTimeOffset(2026, 10, 4, 12, 0, 0, TimeSpan.Zero)));
+
+        foreach (Student student in new[] { first, second, third })
+        {
+            Result<ParentOverviewWeeksResponse> result = await handler.Handle(
+                new GetParentOverviewWeeksQuery(student.Id), CancellationToken.None);
+
+            Assert.True(result.IsSuccess);
+            ParentOverviewWeekResponse current = Assert.Single(result.Value.Weeks);
+            Assert.Equal(DayOfWeek.Saturday, current.StartsOn.DayOfWeek);
+            Assert.Equal(new DateOnly(2026, 10, 3), current.StartsOn);
+        }
+    }
+
+    [Fact]
+    public async Task OverviewWeeks_MapsHistoricalStudentWeeksToParentCalendarWithoutDroppingThem()
+    {
+        TestContext context = CreateContext();
+        // These are legacy/student-calendar Monday boundaries. The parent calendar
+        // is Saturday, so they must remain navigable as Sep 19 and Sep 26.
+        StudentWeek firstHistorical = new(context.Student.Id, new DateOnly(2026, 9, 21));
+        StudentWeek secondHistorical = new(context.Student.Id, new DateOnly(2026, 9, 28));
+        context.Weeks = new InMemoryRepository<StudentWeek>(firstHistorical, secondHistorical);
+        context.Handler = CreateHandler(context);
+
+        Result<ParentOverviewWeeksResponse> weeks = await context.Handler.Handle(
+            new GetParentOverviewWeeksQuery(context.Student.Id), CancellationToken.None);
+        Result<ParentOverviewWeekResponse> selection = await context.Handler.Handle(
+            new SetParentOverviewWeekCommand(context.Student.Id, new DateOnly(2026, 9, 19)), CancellationToken.None);
+
+        Assert.True(weeks.IsSuccess);
+        Assert.Equal(
+            [new DateOnly(2026, 9, 19), new DateOnly(2026, 9, 26), new DateOnly(2026, 10, 3)],
+            weeks.Value.Weeks.Select(week => week.StartsOn));
+        Assert.True(selection.IsSuccess);
+        Assert.Equal(new DateOnly(2026, 9, 19), selection.Value.StartsOn);
+        Assert.Equal(new DateOnly(2026, 9, 19), context.Relationship.SelectedOverviewWeekStart);
+        Assert.Equal(new DateOnly(2026, 9, 21), firstHistorical.StartsOn);
+        Assert.Equal(new DateOnly(2026, 9, 28), secondHistorical.StartsOn);
+    }
+
+    private static ParentStudentRelationship Active(Parent parent, Student student)
+    {
+        ParentStudentRelationship relationship = new(parent.Id, student.Id);
+        relationship.Accept();
+        return relationship;
     }
 
     private static ParentOverviewWeekHandler CreateHandler(TestContext context, DateTimeOffset? now = null) => new(

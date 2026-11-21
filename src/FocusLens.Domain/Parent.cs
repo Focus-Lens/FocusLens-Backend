@@ -20,6 +20,12 @@ public class Parent : AuditableEntity
 
     public DayOfWeek? WeekStartsOn { get; private set; }
 
+    /// <summary>
+    ///     The parent's persisted dashboard selection. Authorization remains based on
+    ///     the active parent/student relationship for every student-scoped request.
+    /// </summary>
+    public Guid? ActiveChildId { get; private set; }
+
     public ApplicationUser User { get; private set; } = null!;
 
     public void SetWeekStartsOn(DayOfWeek weekStartsOn)
@@ -30,5 +36,15 @@ public class Parent : AuditableEntity
         }
 
         WeekStartsOn = weekStartsOn;
+    }
+
+    public void SetActiveChildId(Guid? studentId)
+    {
+        if (studentId == Guid.Empty)
+        {
+            throw new ArgumentException("Student ID cannot be empty.", nameof(studentId));
+        }
+
+        ActiveChildId = studentId;
     }
 }

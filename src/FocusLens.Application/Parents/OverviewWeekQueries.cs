@@ -45,12 +45,28 @@ public sealed class ParentOverviewWeekHandler(
             return current.Errors;
         }
 
-        StudentWeek[] weeks = (await weekRepository.GetAllAsync(week => week.StudentId == request.StudentId)).ToArray();
-        return new ParentOverviewWeeksResponse(weeks.OrderBy(week => week.StartsOn)
-            .Select(week => new ParentOverviewWeekResponse(
-                week.StartsOn,
-                week.EndsOn,
-                week.StartsOn == current.Value.StartsOn && week.EndsOn == current.Value.EndsOn))
+        Result<DayOfWeek> weekStartsOn = OverviewWeekResolver.GetParentWeekStartsOn(context.Value);
+        if (weekStartsOn.IsError)
+        {
+            return weekStartsOn.Errors;
+        }
+
+        // DateOnly.DayOfWeek is not translated by every provider. More importantly,
+        // stored StudentWeek records can use an older/student calendar boundary. Read
+        // all of this student's historical weeks, then project them into the parent's
+        // calendar in memory without mutating the underlying records.
+        DateOnly[] starts = (await weekRepository.GetAllAsync(week => week.StudentId == request.StudentId))
+            .Select(week => OverviewWeekResolver.NormalizeToParentWeekStart(week.StartsOn, weekStartsOn.Value))
+            .Append(current.Value.StartsOn)
+            .Distinct()
+            .OrderBy(start => start)
+            .ToArray();
+
+        return new ParentOverviewWeeksResponse(starts
+            .Select(start => new ParentOverviewWeekResponse(
+                start,
+                start.AddDays(6),
+                start == current.Value.StartsOn))
             .ToArray());
     }
 
@@ -65,8 +81,32 @@ public sealed class ParentOverviewWeekHandler(
 
         if (request.WeekStart is DateOnly weekStart)
         {
-            if (await weekRepository.FirstOrDefaultAsync(week =>
-                    week.StudentId == request.StudentId && week.StartsOn == weekStart) is null)
+            Result<DayOfWeek> parentWeekStartsOn = OverviewWeekResolver.GetParentWeekStartsOn(context.Value);
+            if (parentWeekStartsOn.IsError)
+            {
+                return parentWeekStartsOn.Errors;
+            }
+
+            if (weekStart != OverviewWeekResolver.NormalizeToParentWeekStart(weekStart, parentWeekStartsOn.Value))
+            {
+                return Error.Validation("ParentOverviewWeek.InvalidWeekStart",
+                    "The selected week must start on the parent's configured week start day.");
+            }
+
+            StudentWeek[] historicalWeeks = (await weekRepository.GetAllAsync(week =>
+                week.StudentId == request.StudentId)).ToArray();
+            Result<StudentWeek> current = await OverviewWeekResolver.ResolveActualCurrentWeekAsync(
+                context.Value, LocalTime(), weekRepository, unitOfWork);
+            if (current.IsError)
+            {
+                return current.Errors;
+            }
+
+            bool exists = historicalWeeks.Any(week =>
+                              OverviewWeekResolver.NormalizeToParentWeekStart(
+                                  week.StartsOn, parentWeekStartsOn.Value) == weekStart) ||
+                          current.Value.StartsOn == weekStart;
+            if (!exists)
             {
                 return Error.Validation("ParentOverviewWeek.NotFound", "The requested overview week does not exist.");
             }

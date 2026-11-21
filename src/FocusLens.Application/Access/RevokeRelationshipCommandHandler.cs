@@ -1,6 +1,7 @@
 using FocusLens.Domain.Access;
 using FocusLens.Domain.Common.Interfaces;
 using FocusLens.Domain.Common.Results;
+using FocusLens.Application.Parents;
 using MediatR;
 using ICurrentUser = FocusLens.Application.Common.Interfaces.ICurrentUser;
 
@@ -62,6 +63,7 @@ public sealed class RevokeRelationshipCommandHandler(
 
         relationship.Revoke();
         relationshipRepository.Update(relationship);
+        await ActiveChildSelection.ResolveAsync(relationship.Parent, relationshipRepository);
         await unitOfWork.SaveChangesAsync();
 
         return Result.Deleted;
