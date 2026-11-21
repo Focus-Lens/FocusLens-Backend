@@ -1,6 +1,8 @@
 name: Deploy backend to MonsterASP
 
 on:
+  push:
+    branches: [main]
   workflow_dispatch:
     inputs:
       mode:
@@ -48,10 +50,10 @@ jobs:
             --output "$env:RUNNER_TEMP/focuslens-publish" -p:UseAppHost=false
 
       - name: Sync with MonsterASP Web Deploy
-        if: inputs.mode != 'build-only'
+        if: github.event_name == 'push' || inputs.mode == 'preview' || inputs.mode == 'deploy'
         shell: pwsh
         env:
-          DEPLOY_MODE: ${{ inputs.mode }}
+          DEPLOY_MODE: ${{ github.event_name == 'push' && 'deploy' || inputs.mode }}
           WEBDEPLOY_SITE: ${{ secrets.WEBDEPLOY_SITE }}
           WEBDEPLOY_URL: ${{ secrets.WEBDEPLOY_URL }}
           WEBDEPLOY_USERNAME: ${{ secrets.WEBDEPLOY_USERNAME }}
@@ -108,7 +110,7 @@ jobs:
           if ($process.ExitCode -ne 0) { exit $process.ExitCode }
 
       - name: Check live health
-        if: inputs.mode == 'deploy'
+        if: github.event_name == 'push' || inputs.mode == 'deploy'
         shell: pwsh
         run: |
           for ($attempt = 1; $attempt -le 6; $attempt++) {

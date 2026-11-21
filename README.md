@@ -90,7 +90,7 @@ Tests cover refresh-token and relationship domain rules, access handlers, and AP
 
 ## Deploy to the existing MonsterASP site
 
-The [manual GitHub Actions workflow](.github/workflows/deploy-monsterasp.yml) builds and tests with the .NET 11 SDK on GitHub. It does not use MonsterASP's Git Deploy builder and does not run on push.
+The [GitHub Actions workflow](.github/workflows/deploy-monsterasp.yml) builds and tests with the .NET 11 SDK on every push to `main`. If the build and tests pass, it deploys through Web Deploy and checks the live health endpoint. It does not use MonsterASP's Git Deploy builder. Treat pushes to `main` as production releases; the API applies pending database migrations on startup. Use a separate branch for unfinished work. Manual `build-only`, `preview`, and `deploy` runs are still available.
 
 1. In GitHub, open **Actions → Deploy backend to MonsterASP → Run workflow** on `main` with **build-only** to verify the cloud build without credentials.
 2. In MonsterASP, open the website's **Deploy → Visual Studio access** and enable **WebDeploy**. In GitHub, under **Settings → Secrets and variables → Actions**, add these repository secrets from that card: `WEBDEPLOY_SITE` (Site), `WEBDEPLOY_URL` (the full HTTPS `msdeploy.axd?site=…` endpoint), `WEBDEPLOY_USERNAME` (Login), and `WEBDEPLOY_PASSWORD`. Do not paste their values into the workflow.
