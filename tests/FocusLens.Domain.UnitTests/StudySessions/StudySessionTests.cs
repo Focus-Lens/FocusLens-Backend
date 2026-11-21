@@ -100,7 +100,7 @@ public class StudySessionTests
         Assert.True(session.Resume(startedAt.AddMinutes(20)).IsSuccess);
 
         Assert.Equal(StudySessionStatus.Active, session.Status);
-        Assert.Equal(TimeSpan.Zero, session.GetRemainingDuration(startedAt.AddMinutes(25)));
+        Assert.Equal(TimeSpan.FromMinutes(10), session.GetRemainingDuration(startedAt.AddMinutes(25)));
     }
 
     [Fact]
@@ -130,26 +130,45 @@ public class StudySessionTests
         Assert.Equal(TimeSpan.Zero, session.GetRemainingDuration(startedAt.AddMinutes(25)));
     }
 
-    [Fact]
-    public void ActiveSession_WhenAiEstimatedTimeElapses_RemainsActiveAndReportsOvertime()
+    [Theory]
+    [InlineData(StudySessionMode.Digital, 20, 25, 20)]
+    [InlineData(StudySessionMode.Paper, 20, 25, 20)]
+    [InlineData(StudySessionMode.Digital, 25, 15, 25)]
+    [InlineData(StudySessionMode.Digital, null, 15, 15)]
+    public void Timer_UsesChosenDurationAndFallsBackToEstimate(
+        StudySessionMode mode, int? chosenMinutes, int estimateMinutes, int expectedMinutes)
     {
-        StudySession session = CreateReadyDigitalSession();
+        StudySession session = CreateReadySession(mode, chosenMinutes, estimateMinutes);
         DateTimeOffset startedAt = new(2026, 9, 7, 10, 0, 0, TimeSpan.Zero);
 
-        // The selected AI section is estimated at 15 minutes; the legacy
-        // focus-duration fallback is 25 minutes and must not control timing.
         Assert.True(session.Start(startedAt).IsSuccess);
 
-        DateTimeOffset afterEstimate = startedAt.AddMinutes(16);
+        DateTimeOffset expiry = startedAt.AddMinutes(expectedMinutes);
 
+        Assert.Equal(chosenMinutes, session.FocusDurationMinutes);
+        Assert.Equal(estimateMinutes, session.EstimatedStudyTimeMinutes);
         Assert.Equal(StudySessionStatus.Active, session.Status);
         Assert.Null(session.CompletedAtUtc);
-        Assert.Equal(TimeSpan.Zero, session.GetRemainingDuration(afterEstimate));
-        Assert.Equal(TimeSpan.FromMinutes(1), session.GetOvertimeDuration(afterEstimate));
+        Assert.Equal(TimeSpan.FromMinutes(1), session.GetRemainingDuration(expiry.AddMinutes(-1)));
+        Assert.Equal(TimeSpan.Zero, session.GetRemainingDuration(expiry));
+        Assert.Equal(TimeSpan.Zero, session.GetOvertimeDuration(expiry));
+        Assert.Equal(TimeSpan.FromMinutes(1), session.GetOvertimeDuration(expiry.AddMinutes(1)));
     }
 
     [Fact]
-    public void PausedSession_PreservesRemainingEstimatedTime()
+    public void ExtendingSession_AddsTimeToTheChosenDuration()
+    {
+        StudySession session = CreateReadySession(StudySessionMode.Digital, 20, 25);
+        DateTimeOffset startedAt = new(2026, 9, 7, 10, 0, 0, TimeSpan.Zero);
+        Assert.True(session.Start(startedAt).IsSuccess);
+        Assert.True(session.ExtendDuration(5).IsSuccess);
+
+        Assert.Equal(TimeSpan.FromMinutes(5), session.GetRemainingDuration(startedAt.AddMinutes(20)));
+        Assert.Equal(TimeSpan.FromMinutes(1), session.GetOvertimeDuration(startedAt.AddMinutes(26)));
+    }
+
+    [Fact]
+    public void PausedSession_PreservesRemainingFocusTime()
     {
         StudySession session = CreateReadyDigitalSession();
         DateTimeOffset startedAt = new(2026, 9, 7, 10, 0, 0, TimeSpan.Zero);
@@ -158,7 +177,7 @@ public class StudySessionTests
         session.Pause(startedAt.AddMinutes(10));
 
         Assert.Equal(StudySessionStatus.Paused, session.Status);
-        Assert.Equal(TimeSpan.FromMinutes(5), session.GetRemainingDuration(startedAt.AddHours(1)));
+        Assert.Equal(TimeSpan.FromMinutes(15), session.GetRemainingDuration(startedAt.AddHours(1)));
     }
 
     [Fact]
@@ -402,13 +421,19 @@ public class StudySessionTests
         Assert.Equal(replacement.Id, session.Selection!.Id);
     }
 
-    private static StudySession CreateReadyDigitalSession()
+    private static StudySession CreateReadyDigitalSession() =>
+        CreateReadySession(StudySessionMode.Digital, 25, 15);
+
+    private static StudySession CreateReadySession(StudySessionMode mode, int? chosenMinutes, int estimateMinutes)
     {
-        StudySession session = StudySession.Create(Guid.NewGuid(), StudySessionMode.Digital).Value;
+        StudySession session = StudySession.Create(Guid.NewGuid(), mode).Value;
         StudyMaterial material = CreateMaterial(session.StudentId);
-        StudyMaterialSection section = StudyMaterialSection.Create(material.Id, "Chapter 1", 15, 1, 10).Value;
+        StudyMaterialSection section = StudyMaterialSection.Create(material.Id, "Chapter 1", estimateMinutes, 1, 10).Value;
         session.SetSubject(StudentSubject.Predefined(StudentSubjectType.Math));
-        session.SetDuration(25);
+        if (chosenMinutes is int duration)
+        {
+            Assert.True(session.SetDuration(duration).IsSuccess);
+        }
         session.SetStudyMaterial(material);
         session.SetSelection(StudySessionSelection.Create(session, material, 1, 5).Value);
         session.SetSelectedSections([section]);

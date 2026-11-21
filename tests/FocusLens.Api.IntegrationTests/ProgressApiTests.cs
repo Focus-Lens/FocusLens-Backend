@@ -21,12 +21,15 @@ public sealed class ProgressApiTests
         StudySession first = CreateHistoricalSession(student, math, At(2026, 9, 1), StudySessionStatus.Paused);
         StudySession second = CreateHistoricalSession(student, math, At(2026, 9, 2), StudySessionStatus.Completed);
         StudySession third = CreateHistoricalSession(student, biology, At(2026, 9, 2), StudySessionStatus.Cancelled);
+        StudySession active = CreateHistoricalSession(student, biology, At(2026, 9, 1), StudySessionStatus.Active);
+        StudySession draft = StudySession.Create(student.Id, StudySessionMode.Digital).Value;
+        StudySession outsideRange = CreateHistoricalSession(student, math, At(2026, 8, 31), StudySessionStatus.Completed);
 
         await factory.SeedAsync(db =>
         {
             db.Users.Add(new ApplicationUser { Id = userId, FirstName = "Test", LastName = "Student" });
             db.Students.Add(student);
-            db.StudySessions.AddRange(first, second, third);
+            db.StudySessions.AddRange(first, second, third, active, draft, outsideRange);
             return Task.CompletedTask;
         });
 
@@ -38,6 +41,8 @@ public sealed class ProgressApiTests
         using JsonDocument document = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
         JsonElement root = document.RootElement;
         Assert.Equal(3, root.GetProperty("sessionCount").GetInt32());
+        Assert.Equal(4, root.GetProperty("startedSessionCount").GetInt32());
+        Assert.Equal(1, root.GetProperty("completedSessionCount").GetInt32());
         Assert.Equal(126, root.GetProperty("actualStudyMinutes").GetInt32());
         Assert.Equal("EnoughData", root.GetProperty("dataStatus").GetString());
         Assert.Equal(0, root.GetProperty("learningPercentage").GetInt32());
@@ -45,6 +50,10 @@ public sealed class ProgressApiTests
         Assert.Equal(2, daily.GetArrayLength());
         Assert.Equal(1, daily[0].GetProperty("sessionCount").GetInt32());
         Assert.Equal(2, daily[1].GetProperty("sessionCount").GetInt32());
+        Assert.Equal(2, daily[0].GetProperty("startedSessionCount").GetInt32());
+        Assert.Equal(2, daily[1].GetProperty("startedSessionCount").GetInt32());
+        Assert.Equal(0, daily[0].GetProperty("completedSessionCount").GetInt32());
+        Assert.Equal(1, daily[1].GetProperty("completedSessionCount").GetInt32());
         JsonElement mathProgress = root.GetProperty("subjects").EnumerateArray()
             .Single(item => item.GetProperty("subjectId").GetGuid() == math.Id);
         Assert.Equal(2, mathProgress.GetProperty("sessionCount").GetInt32());
@@ -205,6 +214,11 @@ public sealed class ProgressApiTests
         Assert.True(session.SetStudyMaterial(material).IsSuccess);
         Assert.True(session.MarkReady().IsSuccess);
         Assert.True(session.Start(startedAt).IsSuccess);
+        if (finalStatus == StudySessionStatus.Active)
+        {
+            return session;
+        }
+
         Result<Success> result = finalStatus switch
         {
             StudySessionStatus.Paused => session.Pause(startedAt.AddMinutes(42)),

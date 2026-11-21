@@ -41,21 +41,26 @@ public sealed class ProgressQueryHandler(
             return null;
         }
 
-        List<StudySession> sessions = (await sessionRepository.GetAllAsync(
+        StudySession[] startedSessions = (await sessionRepository.GetAllAsync(
                 session => session.StudentId == student.Id &&
                            session.StartedAtUtc != null &&
-                           session.Status != StudySessionStatus.Active &&
                            session.Status != StudySessionStatus.Draft &&
                            session.Status != StudySessionStatus.Ready,
                 session => session.Selection!.SelectedSections,
                 session => session.CompletedSections))
             .Where(session => IsWithinRange(session.StartedAtUtc!.Value, range, student))
-            .ToList();
+            .ToArray();
+
+        // Keep the legacy count and metrics unchanged: active sessions count
+        // as started, but were not previously included in progress aggregates.
+        StudySession[] sessions = startedSessions.Where(s => s.Status != StudySessionStatus.Active).ToArray();
+        ILookup<DateOnly, StudySession> startedByDate = startedSessions.ToLookup(
+            session => studentLocalTime!.GetLocalDate(session.StartedAtUtc!.Value, student));
 
         IReadOnlyDictionary<Guid, ReportSessionMetrics> metrics = await metricsCalculator.CalculateAsync(sessions);
         ProgressDailyItemResponse[] daily = Enumerable.Range(0, range.DateTo.DayNumber - range.DateFrom.DayNumber + 1)
             .Select(offset => range.DateFrom.AddDays(offset))
-            .Select(date => CreateDaily(date, sessions, metrics, student))
+            .Select(date => CreateDaily(date, startedByDate[date], metrics))
             .ToArray();
         ProgressSubjectItemResponse[] subjects = sessions
             .GroupBy(session => session.SelectedSubjectId)
@@ -70,12 +75,16 @@ public sealed class ProgressQueryHandler(
         return new ProgressResponse(
             range.DateFrom,
             range.DateTo,
-            sessions.Count,
+            sessions.Length,
             sessions.Sum(session => metrics[session.Id].DurationMinutes),
             CalculatePercentage(correctQuestions, totalQuestions),
-            ToDataStatus(sessions.Count),
+            ToDataStatus(sessions.Length),
             daily,
-            subjects);
+            subjects)
+        {
+            StartedSessionCount = startedSessions.Length,
+            CompletedSessionCount = daily.Sum(item => item.CompletedSessionCount)
+        };
     }
 
     private async Task<Student?> GetAuthorizedStudentAsync(Guid? requestedStudentId)
@@ -141,16 +150,19 @@ public sealed class ProgressQueryHandler(
         return date >= range.DateFrom && date <= range.DateTo;
     }
 
-    private ProgressDailyItemResponse CreateDaily(
+    private static ProgressDailyItemResponse CreateDaily(
         DateOnly date,
-        IEnumerable<StudySession> sessions,
-        IReadOnlyDictionary<Guid, ReportSessionMetrics> metrics,
-        Student student)
+        IEnumerable<StudySession> startedSessions,
+        IReadOnlyDictionary<Guid, ReportSessionMetrics> metrics)
     {
-        StudySession[] matching = sessions.Where(session =>
-            studentLocalTime!.GetLocalDate(session.StartedAtUtc!.Value, student) == date).ToArray();
+        StudySession[] started = startedSessions.ToArray();
+        StudySession[] matching = started.Where(session => session.Status != StudySessionStatus.Active).ToArray();
         return new ProgressDailyItemResponse(date, matching.Length,
-            matching.Sum(session => metrics[session.Id].DurationMinutes));
+            matching.Sum(session => metrics[session.Id].DurationMinutes))
+        {
+            StartedSessionCount = started.Length,
+            CompletedSessionCount = matching.Count(session => session.Status == StudySessionStatus.Completed)
+        };
     }
 
     private static ProgressSubjectItemResponse CreateSubject(

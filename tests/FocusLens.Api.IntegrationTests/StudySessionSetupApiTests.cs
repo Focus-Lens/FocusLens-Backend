@@ -174,7 +174,9 @@ public sealed class StudySessionSetupApiTests
             factory,
             readyToStart: true,
             mode: StudySessionMode.Paper,
-            startedAtUtc: now.AddMinutes(-10));
+            startedAtUtc: now.AddMinutes(-20),
+            focusDurationMinutes: 20,
+            estimatedDurationMinutes: 25);
         using HttpClient client = CreateStudentClient(factory, userId);
 
         using HttpResponseMessage response = await client.PostAsync(
@@ -184,6 +186,9 @@ public sealed class StudySessionSetupApiTests
         using JsonDocument responseDocument = JsonDocument.Parse(
             await response.Content.ReadAsStringAsync());
         Assert.Equal("Active", responseDocument.RootElement.GetProperty("status").GetString());
+        Assert.Equal(0, responseDocument.RootElement.GetProperty("remainingSeconds").GetInt32());
+        Assert.Equal(20, responseDocument.RootElement.GetProperty("focusDurationMinutes").GetInt32());
+        Assert.Equal(25, responseDocument.RootElement.GetProperty("estimatedStudyTimeMinutes").GetInt32());
 
         using IServiceScope scope = factory.Services.CreateScope();
         ApplicationDbContext db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
@@ -237,8 +242,10 @@ public sealed class StudySessionSetupApiTests
         DateTimeOffset now = new(2026, 10, 28, 12, 0, 0, TimeSpan.Zero);
         await using CustomWebApplicationFactory factory = new(now);
         (Guid userId, StudySession session, _) = await SeedSessionAsync(
-            factory, readyToStart: true, startedAtUtc: now.AddMinutes(-10),
-            assessmentCompletedAtUtc: assessmentComplete ? now.AddMinutes(-1) : null);
+            factory, readyToStart: true, startedAtUtc: now.AddMinutes(-20),
+            assessmentCompletedAtUtc: assessmentComplete ? now.AddMinutes(-1) : null,
+            focusDurationMinutes: 20,
+            estimatedDurationMinutes: 25);
         using HttpClient client = CreateStudentClient(factory, userId);
 
         using HttpResponseMessage response = await client.PostAsync(
@@ -265,7 +272,9 @@ public sealed class StudySessionSetupApiTests
         bool readyToStart = false,
         StudySessionMode mode = StudySessionMode.Digital,
         DateTimeOffset? startedAtUtc = null,
-        DateTimeOffset? assessmentCompletedAtUtc = null)
+        DateTimeOffset? assessmentCompletedAtUtc = null,
+        int focusDurationMinutes = 25,
+        int estimatedDurationMinutes = 10)
     {
         Guid userId = Guid.NewGuid();
         StudentSubject subject = StudentSubject.Predefined(StudentSubjectType.Math);
@@ -290,12 +299,12 @@ public sealed class StudySessionSetupApiTests
                 StudyMaterialSection section = StudyMaterialSection.Create(
                     material.Id,
                     "Section",
-                    10,
+                    estimatedDurationMinutes,
                     1,
                     1).Value;
 
                 Assert.True(session.SetSubject(subject).IsSuccess);
-                Assert.True(session.SetDuration(25).IsSuccess);
+                Assert.True(session.SetDuration(focusDurationMinutes).IsSuccess);
                 Assert.True(session.SetStudyMaterial(material).IsSuccess);
 
                 StudySessionSelection selection =

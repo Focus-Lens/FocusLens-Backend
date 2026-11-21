@@ -447,9 +447,7 @@ public sealed class StudySession : AuditableEntity
     public TimeSpan GetRemainingDuration(DateTimeOffset utcNow)
     {
         TimeSpan elapsed = GetElapsedDuration(utcNow);
-        int durationMinutes = (EstimatedStudyTimeMinutes > 0
-            ? EstimatedStudyTimeMinutes
-            : FocusDurationMinutes ?? 0) + ExtendedDurationMinutes;
+        int durationMinutes = GetTimerDurationMinutes();
 
         if (durationMinutes <= 0)
         {
@@ -463,12 +461,13 @@ public sealed class StudySession : AuditableEntity
     public TimeSpan GetOvertimeDuration(DateTimeOffset utcNow)
     {
         TimeSpan elapsed = GetElapsedDuration(utcNow);
-        int durationMinutes = (EstimatedStudyTimeMinutes > 0
-            ? EstimatedStudyTimeMinutes
-            : FocusDurationMinutes ?? 0) + ExtendedDurationMinutes;
+        int durationMinutes = GetTimerDurationMinutes();
         TimeSpan overtime = elapsed - TimeSpan.FromMinutes(durationMinutes);
         return durationMinutes > 0 && overtime > TimeSpan.Zero ? overtime : TimeSpan.Zero;
     }
+
+    private int GetTimerDurationMinutes() =>
+        (FocusDurationMinutes ?? EstimatedStudyTimeMinutes) + ExtendedDurationMinutes;
 
     /// <summary>
     /// Returns the amount of active study time after a section began.  It is

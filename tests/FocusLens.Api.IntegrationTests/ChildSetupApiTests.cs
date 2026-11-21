@@ -73,6 +73,10 @@ public sealed class ChildSetupApiTests
         );
 
         Assert.Equal(HttpStatusCode.OK, activationResponse.StatusCode);
+        using JsonDocument activation = JsonDocument.Parse(await activationResponse.Content.ReadAsStringAsync());
+        Assert.True(activation.RootElement.GetProperty("shareSessionSummariesWithParents").GetBoolean());
+        Assert.True(activation.RootElement.GetProperty("shareSubjectTrendsWithParents").GetBoolean());
+        Assert.True(activation.RootElement.GetProperty("shareDetailedAnswersWithParents").GetBoolean());
 
         using HttpClient parentClient = CreateClient(factory, parentUserId, "Parent");
 
@@ -117,6 +121,24 @@ public sealed class ChildSetupApiTests
         Assert.Equal("Year 13", persistedDraft.CustomGrade);
 
         Assert.Equal(RelationshipStatus.Active, relationship.Status);
+
+        string reportsUrl = $"/api/reports/sessions?studentId={student.Id}";
+        Assert.Equal(HttpStatusCode.OK, (await parentClient.GetAsync(reportsUrl)).StatusCode);
+
+        using StringContent sharing = new(
+            """{"shareSessionSummariesWithParents":false,"shareSubjectTrendsWithParents":false,"shareDetailedAnswersWithParents":false}""",
+            Encoding.UTF8, "application/json");
+        using HttpResponseMessage updated = await studentClient.PatchAsync("/api/students/me/preferences", sharing);
+        Assert.Equal(HttpStatusCode.OK, updated.StatusCode);
+        Assert.Equal(HttpStatusCode.Conflict,
+            (await studentClient.PostAsync("/api/students/me/child-setup/activate", null)).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await parentClient.GetAsync(reportsUrl)).StatusCode);
+
+        using HttpResponseMessage profile = await studentClient.GetAsync("/api/students/me");
+        using JsonDocument savedProfile = JsonDocument.Parse(await profile.Content.ReadAsStringAsync());
+        Assert.False(savedProfile.RootElement.GetProperty("shareSessionSummariesWithParents").GetBoolean());
+        Assert.False(savedProfile.RootElement.GetProperty("shareSubjectTrendsWithParents").GetBoolean());
+        Assert.False(savedProfile.RootElement.GetProperty("shareDetailedAnswersWithParents").GetBoolean());
     }
 
     [Fact]

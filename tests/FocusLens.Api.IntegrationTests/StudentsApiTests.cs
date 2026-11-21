@@ -6,8 +6,10 @@ using FocusLens.Domain;
 using FocusLens.Domain.Common.Constants;
 using FocusLens.Domain.Identity;
 using FocusLens.Domain.Students;
+using FocusLens.Domain.StudySessions;
 using FocusLens.Infrastructure.Data;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace FocusLens.Api.IntegrationTests;
 
@@ -378,6 +380,69 @@ public class StudentsApiTests
         HttpResponseMessage response = await client.GetAsync("/api/students/me");
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task DeleteStudyHistory_RemovesCompletedCancelledAndPausedSessionsAndTheirTelemetry()
+    {
+        Guid userId = Guid.NewGuid();
+        Student student = new(userId);
+        Student otherStudent = new(Guid.NewGuid());
+        StudentSubject subject = StudentSubject.Predefined(StudentSubjectType.Math);
+        StudyMaterial material = StudyMaterial.Create(student.Id, "notes.pdf", 1, 1,
+            "materials/history-notes.pdf", StudyMaterialSource.Upload).Value;
+        StudyMaterial otherMaterial = StudyMaterial.Create(otherStudent.Id, "other.pdf", 1, 1,
+            "materials/other-notes.pdf", StudyMaterialSource.Upload).Value;
+        DateTimeOffset now = new(2026, 10, 28, 12, 0, 0, TimeSpan.Zero);
+        DateTimeOffset start = now.AddMinutes(-25);
+
+        StudySession completed = CreateSession(student, material, start);
+        Assert.True(completed.CompleteSuccessfully(now).IsSuccess);
+        StudySession cancelled = CreateSession(student, material, start);
+        Assert.True(cancelled.End(now).IsSuccess);
+        StudySession paused = CreateSession(student, material, start);
+        Assert.True(paused.Pause(now).IsSuccess);
+        StudySession active = CreateSession(student, material, start);
+        StudySession draft = StudySession.Create(student.Id, StudySessionMode.Paper).Value;
+        StudySession other = CreateSession(otherStudent, otherMaterial, start);
+        Assert.True(other.CompleteSuccessfully(now).IsSuccess);
+
+        await using CustomWebApplicationFactory factory = new(now);
+        await factory.SeedAsync(db =>
+        {
+            SeedStudentIdentity(db, userId);
+            db.Students.AddRange(student, otherStudent);
+            db.StudyMaterials.AddRange(material, otherMaterial);
+            db.StudySessions.AddRange(completed, cancelled, paused, active, draft, other);
+            db.StudySessionBehaviorEvents.AddRange(
+                new[] { completed, cancelled, paused, active, other }.Select(session =>
+                    StudySessionBehaviorEvent.Create(session.Id, null, null,
+                        StudySessionBehaviorEventType.Interaction, start.AddMinutes(1),
+                        null, null, null, 1, null, null).Value));
+            return Task.CompletedTask;
+        });
+
+        using HttpClient client = CreateStudentClient(factory, userId);
+        Assert.Equal(HttpStatusCode.NoContent, (await client.DeleteAsync("/api/students/me/study-history")).StatusCode);
+        Assert.Equal(HttpStatusCode.NoContent, (await client.DeleteAsync("/api/students/me/study-history")).StatusCode);
+
+        using IServiceScope scope = factory.Services.CreateScope();
+        ApplicationDbContext db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        Assert.Equal(new[] { active.Id, draft.Id, other.Id }.Order(), db.StudySessions.Select(s => s.Id).ToArray().Order());
+        Assert.Equal(new[] { active.Id, other.Id }.Order(),
+            db.StudySessionBehaviorEvents.Select(e => e.StudySessionId).ToArray().Order());
+        Assert.True(db.StudyMaterials.Any(item => item.Id == material.Id));
+
+        StudySession CreateSession(Student owner, StudyMaterial pdf, DateTimeOffset startedAt)
+        {
+            StudySession session = StudySession.Create(owner.Id, StudySessionMode.Digital).Value;
+            Assert.True(session.SetSubject(subject).IsSuccess);
+            Assert.True(session.SetStudyMaterial(pdf).IsSuccess);
+            Assert.True(session.SetDuration(25).IsSuccess);
+            Assert.True(session.MarkReady().IsSuccess);
+            Assert.True(session.Start(startedAt).IsSuccess);
+            return session;
+        }
     }
 
     private static HttpClient CreateStudentClient(CustomWebApplicationFactory factory, Guid userId)

@@ -9,7 +9,11 @@ public enum ProgressDataStatus
 public sealed record ProgressDailyItemResponse(
     DateOnly Date,
     int SessionCount,
-    int ActualStudyMinutes);
+    int ActualStudyMinutes)
+{
+    public int StartedSessionCount { get; init; }
+    public int CompletedSessionCount { get; init; }
+}
 
 public sealed record ProgressSubjectItemResponse(
     Guid? SubjectId,
@@ -28,4 +32,8 @@ public sealed record ProgressResponse(
     int LearningPercentage,
     ProgressDataStatus DataStatus,
     IReadOnlyCollection<ProgressDailyItemResponse> Daily,
-    IReadOnlyCollection<ProgressSubjectItemResponse> Subjects);
+    IReadOnlyCollection<ProgressSubjectItemResponse> Subjects)
+{
+    public int StartedSessionCount { get; init; }
+    public int CompletedSessionCount { get; init; }
+}

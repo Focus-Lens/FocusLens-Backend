@@ -10,6 +10,7 @@ namespace FocusLens.Application.Students;
 public sealed class DeleteStudyHistoryCommandHandler(
     IBaseRepository<Student> studentRepository,
     IBaseRepository<StudySession> sessionRepository,
+    IBaseRepository<StudySessionBehaviorEvent> behaviorEventRepository,
     ICurrentUser currentUser,
     IUnitOfWork unitOfWork)
     : IRequestHandler<DeleteStudyHistoryCommand, Result<Success>>
@@ -31,10 +32,22 @@ public sealed class DeleteStudyHistoryCommandHandler(
             return Error.NotFound("Students.NotFound", "The student profile was not found.");
         }
 
-        StudySession[] sessions = (await sessionRepository.GetAllAsync(session => session.StudentId == student.Id &&
-                session.Status == StudySessionStatus.Completed))
+        StudySession[] sessions = (await sessionRepository.GetAllAsync(session =>
+                session.StudentId == student.Id && session.StartedAtUtc != null &&
+                (session.Status == StudySessionStatus.Completed ||
+                 session.Status == StudySessionStatus.Cancelled ||
+                 session.Status == StudySessionStatus.Paused)))
             .ToArray();
+        if (sessions.Length == 0)
+        {
+            return Result.Success;
+        }
 
+        // The telemetry FK does not cascade on SQL Server.
+        Guid[] sessionIds = sessions.Select(session => session.Id).ToArray();
+        IEnumerable<StudySessionBehaviorEvent> behaviorEvents =
+            await behaviorEventRepository.GetAllAsync(item => sessionIds.Contains(item.StudySessionId));
+        behaviorEventRepository.DeleteRange(behaviorEvents);
         sessionRepository.DeleteRange(sessions);
         await unitOfWork.SaveChangesAsync();
         return Result.Success;
