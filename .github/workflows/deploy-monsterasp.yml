@@ -1,0 +1,114 @@
+name: Deploy backend to MonsterASP
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: Build only, preview Web Deploy changes, or deploy to the live site
+        type: choice
+        options:
+          - build-only
+          - preview
+          - deploy
+        default: build-only
+        required: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: monsterasp-focuslens-backend
+  cancel-in-progress: false
+
+jobs:
+  build-and-publish:
+    if: github.ref == 'refs/heads/main'
+    runs-on: windows-2025
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: '11.0.x'
+          dotnet-quality: ga
+
+      - name: Build and test
+        shell: pwsh
+        run: |
+          dotnet --version
+          dotnet test FocusLens.slnx --configuration Release
+
+      - name: Publish backend
+        shell: pwsh
+        run: |
+          dotnet publish src/FocusLens.Api/FocusLens.Api.csproj --configuration Release `
+            --output "$env:RUNNER_TEMP/focuslens-publish" -p:UseAppHost=false
+
+      - name: Sync with MonsterASP Web Deploy
+        if: inputs.mode != 'build-only'
+        shell: pwsh
+        env:
+          DEPLOY_MODE: ${{ inputs.mode }}
+          WEBDEPLOY_SITE: ${{ secrets.WEBDEPLOY_SITE }}
+          WEBDEPLOY_URL: ${{ secrets.WEBDEPLOY_URL }}
+          WEBDEPLOY_USERNAME: ${{ secrets.WEBDEPLOY_USERNAME }}
+          WEBDEPLOY_PASSWORD: ${{ secrets.WEBDEPLOY_PASSWORD }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          foreach ($name in 'WEBDEPLOY_SITE', 'WEBDEPLOY_URL', 'WEBDEPLOY_USERNAME', 'WEBDEPLOY_PASSWORD') {
+            if ([string]::IsNullOrWhiteSpace([Environment]::GetEnvironmentVariable($name))) {
+              throw "Missing repository secret: $name"
+            }
+          }
+
+          $endpoint = [uri] $env:WEBDEPLOY_URL
+          if (-not $endpoint.IsAbsoluteUri -or $endpoint.Scheme -ne 'https' -or
+              $endpoint.AbsolutePath -ne '/msdeploy.axd') {
+            throw 'WEBDEPLOY_URL must be the full HTTPS msdeploy.axd endpoint.'
+          }
+
+          $command = Get-Command msdeploy.exe -ErrorAction SilentlyContinue
+          $msdeploy = if ($command) { $command.Source } else {
+            @(${env:ProgramFiles(x86)}, $env:ProgramFiles) |
+              ForEach-Object { Join-Path $_ 'IIS\Microsoft Web Deploy V3\msdeploy.exe' } |
+              Where-Object { Test-Path $_ } | Select-Object -First 1
+          }
+          if (-not $msdeploy) { throw 'Web Deploy (msdeploy.exe) is not installed on this runner.' }
+
+          $source = '-source:contentPath="{0}/focuslens-publish"' -f $env:RUNNER_TEMP
+          $destination = ('-dest:contentPath="{0}",computerName="{1}",userName="{2}",password="{3}",authType="Basic",includeAcls="False"' -f
+            $env:WEBDEPLOY_SITE, $env:WEBDEPLOY_URL, $env:WEBDEPLOY_USERNAME, $env:WEBDEPLOY_PASSWORD)
+          $options = @(
+            '-verb:sync'
+            $source
+            $destination
+            '-enableRule:DoNotDeleteRule'
+            '-enableRule:AppOffline'
+            '-disableLink:AppPoolExtension'
+            '-disableLink:ContentExtension'
+            '-disableLink:CertificateExtension'
+            '-skip:objectName=filePath,absolutePath=(?i)(^|[\\/])(web\.config|appsettings\.Production\.json)$'
+            '-skip:objectName=dirPath,absolutePath=(?i)(^|[\\/])App_Data([\\/]|$)'
+          )
+          if ($env:DEPLOY_MODE -eq 'preview') { $options += '-whatif' }
+
+          & $msdeploy @options
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Check live health
+        if: inputs.mode == 'deploy'
+        shell: pwsh
+        run: |
+          for ($attempt = 1; $attempt -le 6; $attempt++) {
+            try {
+              $health = Invoke-RestMethod 'https://focuslens.runasp.net/health' -TimeoutSec 15
+              if ($health.status -eq 'Healthy' -and $health.application -eq 'FocusLens.Api') { exit 0 }
+            } catch {
+              Write-Warning "Health check not ready (attempt $attempt)."
+            }
+            Start-Sleep -Seconds 5
+          }
+          throw 'FocusLens did not return Healthy after deployment.'

@@ -88,6 +88,15 @@ dotnet test FocusLens.slnx
 
 Tests cover refresh-token and relationship domain rules, access handlers, and API health/authorization behavior.
 
+## Deploy to the existing MonsterASP site
+
+The [manual GitHub Actions workflow](.github/workflows/deploy-monsterasp.yml) builds and tests with the .NET 11 SDK on GitHub. It does not use MonsterASP's Git Deploy builder and does not run on push.
+
+1. In GitHub, open **Actions → Deploy backend to MonsterASP → Run workflow** on `main` with **build-only** to verify the cloud build without credentials.
+2. In MonsterASP, open the website's **Deploy → Visual Studio access** and enable **WebDeploy**. In GitHub, under **Settings → Secrets and variables → Actions**, add these repository secrets from that card: `WEBDEPLOY_SITE` (Site), `WEBDEPLOY_URL` (the full HTTPS `msdeploy.axd?site=…` endpoint), `WEBDEPLOY_USERNAME` (Login), and `WEBDEPLOY_PASSWORD`. Do not paste their values into the workflow.
+3. Run **preview** to check Web Deploy without applying changes. Before running **deploy**, back up the site and database; the API applies pending database migrations on startup.
+4. Run **deploy** to update the live site and check its health endpoint. The sync preserves the existing `web.config`, `appsettings.Production.json`, and `App_Data`, and does not remove extra destination files. This workflow is for the existing site, which already has a working IIS startup configuration.
+
 ## Project structure
 
 ```text
