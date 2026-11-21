@@ -1,6 +1,7 @@
 ﻿using System.Security.Claims;
 using System.Text;
 using FocusLens.Application.Common.Interfaces;
+using FocusLens.Application.Payments;
 using FocusLens.Domain.Common.Interfaces;
 using FocusLens.Domain.Identity;
 using FocusLens.Domain.Interfaces;
@@ -12,6 +13,7 @@ using FocusLens.Infrastructure.Data.Interceptors;
 using FocusLens.Infrastructure.Identity;
 using FocusLens.Infrastructure.Identity.Seed;
 using FocusLens.Infrastructure.Notifications;
+using FocusLens.Infrastructure.Payments;
 using FocusLens.Infrastructure.ProfileImages;
 using FocusLens.Infrastructure.StudySessions;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -49,6 +51,13 @@ public static class DependencyInjection
         services.AddScoped<ITokenProvider, TokenProvider>();
         services.AddScoped(typeof(IBaseRepository<>), typeof(BaseRepository<>));
         services.AddScoped<IUnitOfWork, UnitOfWork>();
+        services.Configure<PaymobOptions>(configuration.GetSection("Paymob"));
+        services.AddScoped<IPayments, PaymentsService>();
+        services.AddHttpClient<PaymobClient>(client =>
+        {
+            client.BaseAddress = new Uri("https://accept.paymob.com/");
+            client.Timeout = TimeSpan.FromSeconds(15);
+        }).ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AllowAutoRedirect = false });
         services.Configure<StudyMaterialStorageOptions>(
             configuration.GetRequiredSection(StudyMaterialStorageOptions.SectionName));
         services.Configure<StudySessionImageStorageOptions>(

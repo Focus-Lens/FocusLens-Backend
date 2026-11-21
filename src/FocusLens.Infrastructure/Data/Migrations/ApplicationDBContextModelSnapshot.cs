@@ -17,7 +17,7 @@ namespace FocusLens.Infrastructure.Data.Migrations
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "10.0.12")
+                .HasAnnotation("ProductVersion", "10.0.15")
                 .HasAnnotation("Relational:MaxIdentifierLength", 128);
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
@@ -687,6 +687,9 @@ namespace FocusLens.Infrastructure.Data.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<Guid?>("ActiveChildId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.Property<DateTimeOffset>("CreatedAtUtc")
                         .HasColumnType("datetimeoffset");
 
@@ -698,9 +701,6 @@ namespace FocusLens.Infrastructure.Data.Migrations
 
                     b.Property<DateTimeOffset>("LastModifiedUtc")
                         .HasColumnType("datetimeoffset");
-
-                    b.Property<Guid?>("ActiveChildId")
-                        .HasColumnType("uniqueidentifier");
 
                     b.Property<Guid>("UserId")
                         .HasColumnType("uniqueidentifier");
@@ -1610,6 +1610,72 @@ namespace FocusLens.Infrastructure.Data.Migrations
                     b.ToTable("EmailVerificationCodes", (string)null);
                 });
 
+            modelBuilder.Entity("FocusLens.Infrastructure.Payments.PaymentPurchase", b =>
+                {
+                    b.Property<Guid>("BuyerId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<bool>("IsSandbox")
+                        .HasColumnType("bit");
+
+                    b.Property<int>("AmountPiasters")
+                        .HasColumnType("int");
+
+                    b.Property<string>("CheckoutUrl")
+                        .HasMaxLength(2048)
+                        .HasColumnType("nvarchar(2048)");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<int>("IntegrationId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("Method")
+                        .HasColumnType("int");
+
+                    b.Property<DateTimeOffset?>("PaidAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<DateTimeOffset?>("PaidThroughUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<long?>("PaidTransactionId")
+                        .HasColumnType("bigint");
+
+                    b.Property<int>("Plan")
+                        .HasColumnType("int");
+
+                    b.Property<long?>("ProviderOrderId")
+                        .HasColumnType("bigint");
+
+                    b.Property<int>("Status")
+                        .IsConcurrencyToken()
+                        .HasColumnType("int");
+
+                    b.PrimitiveCollection<string>("StudentIds")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("Term")
+                        .HasColumnType("int");
+
+                    b.HasKey("BuyerId", "Id", "IsSandbox");
+
+                    b.HasIndex("IsSandbox", "PaidTransactionId")
+                        .IsUnique()
+                        .HasFilter("[PaidTransactionId] IS NOT NULL");
+
+                    b.HasIndex("IsSandbox", "ProviderOrderId")
+                        .IsUnique()
+                        .HasFilter("[ProviderOrderId] IS NOT NULL");
+
+                    b.ToTable("PaymentPurchases", (string)null);
+                });
+
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRoleClaim<System.Guid>", b =>
                 {
                     b.Property<int>("Id")
@@ -2206,6 +2272,15 @@ namespace FocusLens.Infrastructure.Data.Migrations
                     b.Navigation("LegalDocument");
 
                     b.Navigation("User");
+                });
+
+            modelBuilder.Entity("FocusLens.Infrastructure.Payments.PaymentPurchase", b =>
+                {
+                    b.HasOne("FocusLens.Domain.Identity.ApplicationUser", null)
+                        .WithMany()
+                        .HasForeignKey("BuyerId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRoleClaim<System.Guid>", b =>

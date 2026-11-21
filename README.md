@@ -102,3 +102,24 @@ tests/
   FocusLens.Application.UnitTests/
   FocusLens.Domain.UnitTests/
 ```
+
+## Paymob checkout
+
+Checkout defaults to Paymob Egypt sandbox mode. To accept real payments, use an approved merchant account, add the live settings, and set `Paymob__EnableLiveCheckout=true` on the API server. Configure a Paymob integration that completes the charge in one step. The browser and API clients use the same routes in both modes.
+
+Configure secrets with .NET user secrets or server environment variables. In the names below, replace `{Mode}` with `Sandbox` or `Live`.
+
+| Configuration | Value |
+| --- | --- |
+| `Paymob__{Mode}__SecretKey`, `Paymob__{Mode}__PublicKey`, `Paymob__{Mode}__HmacSecret` | Paymob credentials for this mode |
+| `Paymob__{Mode}__CardIntegrationId` | Paymob card integration ID for this mode |
+| `Paymob__{Mode}__WalletIntegrationId` | Paymob mobile wallet integration ID for this mode |
+| `Paymob__{Mode}__NotificationUrl` | Public HTTPS URL ending in `/api/payments/paymob/webhook/sandbox` or `/api/payments/paymob/webhook/live`, as appropriate |
+| `Paymob__{Mode}__ReturnUrl` | HTTPS page that reads `checkoutId` and fetches the payment outcome from the API |
+
+Apply the payment database migrations before enabling checkout. Use an HTTPS tunnel for local Paymob callbacks. Keep the live credentials and callback URL configured after disabling live checkout so outstanding transactions can still finish. The server mode determines which checkouts buyers can start and view. The `isSandbox` response field identifies the mode of each purchase.
+
+- `POST /api/payments/checkouts` creates a hosted checkout. Send a fresh UUID as `checkoutId`, a `plan` of `Plus` or `Family`, a `term` of `Monthly` or `Yearly`, and a `method` of `Card` or `MobileWallet`. Students can omit `studentIds` for a self-purchase. Parents send one linked student ID for Plus or one to three for Family. Supply `billingPhoneNumber` if the buyer account has no usable phone number.
+- Reuse `checkoutId` when retrying the same request after a network error. Use a new ID for a new payment attempt. Open the returned `checkoutUrl` when present.
+- `GET /api/payments/checkouts/{checkoutId}` returns the order to its buyer. Use it after the redirect or when refreshing payment status. A pending checkout URL is available for up to one hour.
+- The Paymob webhook verifies the signature and checks the provider order, integration, amount, and currency. A successful callback records the paid period once. Checkout collects one prepaid term. Automatic renewals and paid-feature enforcement are future work.
