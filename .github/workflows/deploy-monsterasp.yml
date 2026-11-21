@@ -23,7 +23,7 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  build-and-publish:
+  build-and-test:
     if: github.ref == 'refs/heads/main'
     runs-on: windows-2025
     timeout-minutes: 30
@@ -49,68 +49,57 @@ jobs:
           dotnet publish src/FocusLens.Api/FocusLens.Api.csproj --configuration Release `
             --output "$env:RUNNER_TEMP/focuslens-publish" -p:UseAppHost=false
 
-      - name: Sync with MonsterASP Web Deploy
-        if: github.event_name == 'push' || inputs.mode == 'preview' || inputs.mode == 'deploy'
+      - name: Preview MonsterASP Web Deploy
+        if: github.event_name == 'workflow_dispatch' && inputs.mode == 'preview'
         shell: pwsh
         env:
-          DEPLOY_MODE: ${{ github.event_name == 'push' && 'deploy' || inputs.mode }}
+          DEPLOY_MODE: preview
           WEBDEPLOY_SITE: ${{ secrets.WEBDEPLOY_SITE }}
           WEBDEPLOY_URL: ${{ secrets.WEBDEPLOY_URL }}
           WEBDEPLOY_USERNAME: ${{ secrets.WEBDEPLOY_USERNAME }}
           WEBDEPLOY_PASSWORD: ${{ secrets.WEBDEPLOY_PASSWORD }}
-        run: |
-          $ErrorActionPreference = 'Stop'
-          foreach ($name in 'WEBDEPLOY_SITE', 'WEBDEPLOY_URL', 'WEBDEPLOY_USERNAME', 'WEBDEPLOY_PASSWORD') {
-            $value = [Environment]::GetEnvironmentVariable($name)
-            if ([string]::IsNullOrWhiteSpace($value)) {
-              throw "Missing repository secret: $name"
-            }
-            if ($value -match '["\r\n]|\\$') {
-              throw "Repository secret contains unsupported command-line quoting characters: $name"
-            }
-          }
+        run: ./.github/scripts/sync-monsterasp.ps1
 
-          $endpoint = [uri] $env:WEBDEPLOY_URL
-          if (-not $endpoint.IsAbsoluteUri -or $endpoint.Scheme -ne 'https' -or
-              $endpoint.AbsolutePath -ne '/msdeploy.axd') {
-            throw 'WEBDEPLOY_URL must be the full HTTPS msdeploy.axd endpoint.'
-          }
+      - name: Save tested publish output
+        if: github.event_name == 'push' || inputs.mode == 'deploy'
+        uses: actions/upload-artifact@v7
+        with:
+          name: focuslens-backend
+          path: ${{ runner.temp }}/focuslens-publish
+          retention-days: 1
+          if-no-files-found: error
+          overwrite: true
 
-          $command = Get-Command msdeploy.exe -ErrorAction SilentlyContinue
-          $msdeploy = if ($command) { $command.Source } else {
-            @(${env:ProgramFiles(x86)}, $env:ProgramFiles) |
-              ForEach-Object { Join-Path $_ 'IIS\Microsoft Web Deploy V3\msdeploy.exe' } |
-              Where-Object { Test-Path $_ } | Select-Object -First 1
-          }
-          if (-not $msdeploy) { throw 'Web Deploy (msdeploy.exe) is not installed on this runner.' }
+  deploy-production:
+    name: Deploy to MonsterASP production
+    needs: build-and-test
+    if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || inputs.mode == 'deploy')
+    runs-on: windows-2025
+    timeout-minutes: 15
+    environment:
+      name: monsterasp-production
+      url: https://focuslens.runasp.net
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
 
-          $source = '-source:contentPath="{0}/focuslens-publish"' -f $env:RUNNER_TEMP
-          $destination = ('-dest:contentPath="{0}",computerName="{1}",userName="{2}",password="{3}",authType="Basic",includeAcls="False"' -f
-            $env:WEBDEPLOY_SITE, $env:WEBDEPLOY_URL, $env:WEBDEPLOY_USERNAME, $env:WEBDEPLOY_PASSWORD)
-          $options = @(
-            '-verb:sync'
-            $source
-            $destination
-            '-enableRule:DoNotDeleteRule'
-            '-disableLink:AppPoolExtension'
-            '-disableLink:ContentExtension'
-            '-disableLink:CertificateExtension'
-            '-skip:objectName=filePath,absolutePath=(?i)(^|[\\/])(web\.config|appsettings\.Production\.json)$'
-            '-skip:objectName=dirPath,absolutePath=(?i)(^|[\\/])App_Data([\\/]|$)'
-          )
-          switch ($env:DEPLOY_MODE) {
-            'preview' { $options += '-whatif' }
-            'deploy' { $options += '-enableRule:AppOffline' }
-            default { throw 'Expected preview or deploy mode.' }
-          }
+      - uses: actions/download-artifact@v8
+        with:
+          name: focuslens-backend
+          path: ${{ runner.temp }}/focuslens-publish
 
-          # Pass a single Windows command line: PowerShell's native invocation
-          # escapes the embedded provider-value quotes that MSDeploy expects.
-          $process = Start-Process -FilePath $msdeploy -ArgumentList ($options -join ' ') -NoNewWindow -Wait -PassThru
-          if ($process.ExitCode -ne 0) { exit $process.ExitCode }
+      - name: Sync with MonsterASP Web Deploy
+        shell: pwsh
+        env:
+          DEPLOY_MODE: deploy
+          WEBDEPLOY_SITE: ${{ secrets.WEBDEPLOY_SITE }}
+          WEBDEPLOY_URL: ${{ secrets.WEBDEPLOY_URL }}
+          WEBDEPLOY_USERNAME: ${{ secrets.WEBDEPLOY_USERNAME }}
+          WEBDEPLOY_PASSWORD: ${{ secrets.WEBDEPLOY_PASSWORD }}
+        run: ./.github/scripts/sync-monsterasp.ps1
 
       - name: Check live health
-        if: github.event_name == 'push' || inputs.mode == 'deploy'
         shell: pwsh
         run: |
           for ($attempt = 1; $attempt -le 6; $attempt++) {

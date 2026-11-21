@@ -1,0 +1,49 @@
+$ErrorActionPreference = 'Stop'
+foreach ($name in 'WEBDEPLOY_SITE', 'WEBDEPLOY_URL', 'WEBDEPLOY_USERNAME', 'WEBDEPLOY_PASSWORD') {
+  $value = [Environment]::GetEnvironmentVariable($name)
+  if ([string]::IsNullOrWhiteSpace($value)) {
+    throw "Missing repository secret: $name"
+  }
+  if ($value -match '["\r\n]|\\$') {
+    throw "Repository secret contains unsupported command-line quoting characters: $name"
+  }
+}
+
+$endpoint = [uri] $env:WEBDEPLOY_URL
+if (-not $endpoint.IsAbsoluteUri -or $endpoint.Scheme -ne 'https' -or
+    $endpoint.AbsolutePath -ne '/msdeploy.axd') {
+  throw 'WEBDEPLOY_URL must be the full HTTPS msdeploy.axd endpoint.'
+}
+
+$command = Get-Command msdeploy.exe -ErrorAction SilentlyContinue
+$msdeploy = if ($command) { $command.Source } else {
+  @(${env:ProgramFiles(x86)}, $env:ProgramFiles) |
+    ForEach-Object { Join-Path $_ 'IIS\Microsoft Web Deploy V3\msdeploy.exe' } |
+    Where-Object { Test-Path $_ } | Select-Object -First 1
+}
+if (-not $msdeploy) { throw 'Web Deploy (msdeploy.exe) is not installed on this runner.' }
+
+$source = '-source:contentPath="{0}/focuslens-publish"' -f $env:RUNNER_TEMP
+$destination = ('-dest:contentPath="{0}",computerName="{1}",userName="{2}",password="{3}",authType="Basic",includeAcls="False"' -f
+  $env:WEBDEPLOY_SITE, $env:WEBDEPLOY_URL, $env:WEBDEPLOY_USERNAME, $env:WEBDEPLOY_PASSWORD)
+$options = @(
+  '-verb:sync'
+  $source
+  $destination
+  '-enableRule:DoNotDeleteRule'
+  '-disableLink:AppPoolExtension'
+  '-disableLink:ContentExtension'
+  '-disableLink:CertificateExtension'
+  '-skip:objectName=filePath,absolutePath=(?i)(^|[\\/])(web\.config|appsettings\.Production\.json)$'
+  '-skip:objectName=dirPath,absolutePath=(?i)(^|[\\/])App_Data([\\/]|$)'
+)
+switch ($env:DEPLOY_MODE) {
+  'preview' { $options += '-whatif' }
+  'deploy' { $options += '-enableRule:AppOffline' }
+  default { throw 'Expected preview or deploy mode.' }
+}
+
+# Pass a single Windows command line: PowerShell's native invocation
+# escapes the embedded provider-value quotes that MSDeploy expects.
+$process = Start-Process -FilePath $msdeploy -ArgumentList ($options -join ' ') -NoNewWindow -Wait -PassThru
+if ($process.ExitCode -ne 0) { exit $process.ExitCode }

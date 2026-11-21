@@ -97,6 +97,8 @@ The [GitHub Actions workflow](.github/workflows/deploy-monsterasp.yml) builds an
 3. Run **preview** to check Web Deploy without applying changes. Before running **deploy**, back up the site and database; the API applies pending database migrations on startup.
 4. Run **deploy** to update the live site and check its health endpoint. The sync preserves the existing `web.config`, `appsettings.Production.json`, and `App_Data`, and does not remove extra destination files. This workflow is for the existing site, which already has a working IIS startup configuration.
 
+Live deployments are recorded under GitHub **Deployments → monsterasp-production**. Build-only and preview runs appear only under **Actions**.
+
 ## Project structure
 
 ```text
