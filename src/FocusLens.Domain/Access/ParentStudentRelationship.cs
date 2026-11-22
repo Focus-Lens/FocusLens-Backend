@@ -101,12 +101,28 @@ public class ParentStudentRelationship : AuditableEntity
         RevokedAtUtc = DateTimeOffset.UtcNow;
     }
 
+    public void PauseForBilling()
+    {
+        if (Status == RelationshipStatus.Active)
+        {
+            Status = RelationshipStatus.PausedForBilling;
+        }
+    }
+
+    public void RestoreAfterBilling()
+    {
+        if (Status == RelationshipStatus.PausedForBilling)
+        {
+            Status = RelationshipStatus.Active;
+        }
+    }
+
     public void Revoke()
     {
-        if (Status != RelationshipStatus.Active)
+        if (Status is not (RelationshipStatus.Active or RelationshipStatus.PausedForBilling))
         {
             throw new InvalidOperationException(
-                "Only an active relationship can be revoked.");
+                "Only an active or paused relationship can be revoked.");
         }
 
         Status = RelationshipStatus.Revoked;

@@ -61,7 +61,9 @@ internal sealed class PaymentsService(
             }
 
             int linkedCount = await db.ParentStudentRelationships
-                .Where(link => link.Parent.UserId == buyerId && link.Status == RelationshipStatus.Active &&
+                .Where(link => link.Parent.UserId == buyerId &&
+                               (link.Status == RelationshipStatus.Active ||
+                                (request.Plan == PaidPlan.Family && link.Status == RelationshipStatus.PausedForBilling)) &&
                                requestedStudents.Contains(link.StudentId) && !link.Student.User.IsDisabled)
                 .Select(link => link.StudentId).Distinct().CountAsync(cancellationToken);
             if (linkedCount != requestedStudents.Length)
@@ -142,8 +144,10 @@ internal sealed class PaymentsService(
 
         try
         {
+            BillingContact? contact = await db.Set<BillingContact>().AsNoTracking()
+                .SingleOrDefaultAsync(item => item.BuyerId == buyerId, cancellationToken);
             (purchase.ProviderOrderId, purchase.CheckoutUrl) =
-                await paymob.CreateIntentionAsync(purchase, buyer, phone, cancellationToken);
+                await paymob.CreateIntentionAsync(purchase, buyer, contact, phone, cancellationToken);
         }
         catch (Exception exception) when (exception is HttpRequestException or JsonException or OperationCanceledException)
         {
@@ -238,7 +242,52 @@ internal sealed class PaymentsService(
             }
             else
             {
-                purchase.RecordPayment(transactionId, clock.GetUtcNow());
+                string? brand = null;
+                string? lastFour = null;
+                if (purchase.Method == PaymentMethod.Card)
+                {
+                    JsonElement source = transaction.GetProperty("source_data");
+                    string? subtype = ReadString(source, "sub_type");
+                    brand = subtype?.ToUpperInvariant() switch
+                    {
+                        "VISA" => "Visa",
+                        "MASTERCARD" => "Mastercard",
+                        "MEEZA" => "Meeza",
+                        "AMEX" => "Amex",
+                        _ => null
+                    };
+                    string? pan = ReadString(source, "pan");
+                    if (pan is { Length: >= 4 } &&
+                        (pan.Length == 4 || pan.Contains('*') || pan.Contains("x", StringComparison.OrdinalIgnoreCase)) &&
+                        pan[^4..].All(char.IsAsciiDigit))
+                    {
+                        lastFour = pan[^4..];
+                    }
+                }
+
+                purchase.RecordPayment(transactionId, clock.GetUtcNow(), brand, lastFour);
+
+                List<PaymentPurchase> superseded = await db.Set<PaymentPurchase>()
+                    .Where(item => item.BuyerId == purchase.BuyerId && item.IsSandbox == isSandbox &&
+                        item.Id != purchase.Id && item.CancellationRequestedAtUtc != null && !item.CancellationApplied)
+                    .ToListAsync(cancellationToken);
+                foreach (PaymentPurchase item in superseded)
+                {
+                    item.CancellationApplied = true;
+                }
+
+                if (!isSandbox && purchase.Plan == PaidPlan.Family)
+                {
+                    List<ParentStudentRelationship> links = await db.ParentStudentRelationships
+                        .Where(link => link.Parent.UserId == purchase.BuyerId &&
+                            link.Status == RelationshipStatus.PausedForBilling &&
+                            purchase.StudentIds.Contains(link.StudentId) && !link.Student.User.IsDisabled)
+                        .ToListAsync(cancellationToken);
+                    foreach (ParentStudentRelationship link in links)
+                    {
+                        link.RestoreAfterBilling();
+                    }
+                }
             }
 
             try
@@ -248,16 +297,25 @@ internal sealed class PaymentsService(
             }
             catch (DbUpdateConcurrencyException)
             {
-                await db.Entry(purchase).ReloadAsync(cancellationToken);
-                if (db.Entry(purchase).State == EntityState.Detached)
+                db.ChangeTracker.Clear();
+                PaymentPurchase? payment = await db.Set<PaymentPurchase>().SingleOrDefaultAsync(
+                    item => item.IsSandbox == isSandbox && item.ProviderOrderId == orderId, cancellationToken);
+                if (payment is null)
                 {
                     break;
                 }
+
+                purchase = payment;
             }
         }
 
         return true;
     }
+
+    private static string? ReadString(JsonElement obj, string name) =>
+        obj.TryGetProperty(name, out JsonElement value) && value.ValueKind == JsonValueKind.String
+            ? value.GetString()
+            : null;
 
     private Task<PaymentPurchase?> FindAsync(Guid buyerId, Guid checkoutId, bool isSandbox,
         CancellationToken cancellationToken) =>

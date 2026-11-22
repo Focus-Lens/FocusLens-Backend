@@ -4,5 +4,6 @@ public enum RelationshipStatus
 {
     Pending,
     Active,
-    Revoked
+    Revoked,
+    PausedForBilling
 }

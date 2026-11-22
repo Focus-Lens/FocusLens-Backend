@@ -53,6 +53,8 @@ public static class DependencyInjection
         services.AddScoped<IUnitOfWork, UnitOfWork>();
         services.Configure<PaymobOptions>(configuration.GetSection("Paymob"));
         services.AddScoped<IPayments, PaymentsService>();
+        services.AddScoped<IBilling, BillingService>();
+        services.AddHostedService<BillingCancellationWorker>();
         services.AddHttpClient<PaymobClient>(client =>
         {
             client.BaseAddress = new Uri("https://accept.paymob.com/");

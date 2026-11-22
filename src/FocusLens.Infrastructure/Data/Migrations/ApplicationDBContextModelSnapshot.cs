@@ -60,6 +60,7 @@ namespace FocusLens.Infrastructure.Data.Migrations
                         .HasColumnType("date");
 
                     b.Property<int>("Status")
+                        .IsConcurrencyToken()
                         .HasColumnType("int");
 
                     b.Property<Guid>("StudentId")
@@ -1610,6 +1611,38 @@ namespace FocusLens.Infrastructure.Data.Migrations
                     b.ToTable("EmailVerificationCodes", (string)null);
                 });
 
+            modelBuilder.Entity("FocusLens.Infrastructure.Payments.BillingContact", b =>
+                {
+                    b.Property<Guid>("BuyerId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Address")
+                        .HasMaxLength(300)
+                        .HasColumnType("nvarchar(300)");
+
+                    b.Property<string>("City")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("Country")
+                        .HasMaxLength(2)
+                        .HasColumnType("nvarchar(2)");
+
+                    b.Property<string>("Email")
+                        .IsRequired()
+                        .HasMaxLength(254)
+                        .HasColumnType("nvarchar(254)");
+
+                    b.Property<string>("FullName")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("nvarchar(150)");
+
+                    b.HasKey("BuyerId");
+
+                    b.ToTable("BillingContacts", (string)null);
+                });
+
             modelBuilder.Entity("FocusLens.Infrastructure.Payments.PaymentPurchase", b =>
                 {
                     b.Property<Guid>("BuyerId")
@@ -1624,6 +1657,22 @@ namespace FocusLens.Infrastructure.Data.Migrations
                     b.Property<int>("AmountPiasters")
                         .HasColumnType("int");
 
+                    b.Property<bool>("CancellationApplied")
+                        .IsConcurrencyToken()
+                        .HasColumnType("bit");
+
+                    b.Property<DateTimeOffset?>("CancellationRequestedAtUtc")
+                        .IsConcurrencyToken()
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("CardBrand")
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<string>("CardLastFour")
+                        .HasMaxLength(4)
+                        .HasColumnType("nvarchar(4)");
+
                     b.Property<string>("CheckoutUrl")
                         .HasMaxLength(2048)
                         .HasColumnType("nvarchar(2048)");
@@ -1633,6 +1682,10 @@ namespace FocusLens.Infrastructure.Data.Migrations
 
                     b.Property<int>("IntegrationId")
                         .HasColumnType("int");
+
+                    b.Property<Guid?>("KeepStudentId")
+                        .IsConcurrencyToken()
+                        .HasColumnType("uniqueidentifier");
 
                     b.Property<int>("Method")
                         .HasColumnType("int");
@@ -1665,6 +1718,9 @@ namespace FocusLens.Infrastructure.Data.Migrations
 
                     b.HasKey("BuyerId", "Id", "IsSandbox");
 
+                    b.HasIndex("CancellationApplied", "PaidThroughUtc")
+                        .HasFilter("[CancellationRequestedAtUtc] IS NOT NULL");
+
                     b.HasIndex("IsSandbox", "PaidTransactionId")
                         .IsUnique()
                         .HasFilter("[PaidTransactionId] IS NOT NULL");
@@ -1672,6 +1728,8 @@ namespace FocusLens.Infrastructure.Data.Migrations
                     b.HasIndex("IsSandbox", "ProviderOrderId")
                         .IsUnique()
                         .HasFilter("[ProviderOrderId] IS NOT NULL");
+
+                    b.HasIndex("BuyerId", "IsSandbox", "Status", "PaidAtUtc");
 
                     b.ToTable("PaymentPurchases", (string)null);
                 });
@@ -2272,6 +2330,15 @@ namespace FocusLens.Infrastructure.Data.Migrations
                     b.Navigation("LegalDocument");
 
                     b.Navigation("User");
+                });
+
+            modelBuilder.Entity("FocusLens.Infrastructure.Payments.BillingContact", b =>
+                {
+                    b.HasOne("FocusLens.Domain.Identity.ApplicationUser", null)
+                        .WithOne()
+                        .HasForeignKey("FocusLens.Infrastructure.Payments.BillingContact", "BuyerId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("FocusLens.Infrastructure.Payments.PaymentPurchase", b =>

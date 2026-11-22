@@ -189,8 +189,100 @@ public sealed class PaymentsApiTests
         Assert.NotNull(paid.PaidThroughUtc);
     }
 
+    [Fact]
+    public async Task ParentBilling_UsesVerifiedPaymentAndSupportsScheduledCancellationAndResume()
+    {
+        DateTimeOffset now = new(2026, 11, 21, 10, 0, 0, TimeSpan.Zero);
+        TestClock clock = new(now);
+        await using CustomWebApplicationFactory root = new(now);
+        PaymobStub paymob = new();
+        await using WebApplicationFactory<Program> factory = Configure(root, paymob, clock: clock);
+        ApplicationUser buyer = NewUser();
+        ApplicationUser firstUser = NewUser();
+        ApplicationUser secondUser = NewUser();
+        Parent parent = new(buyer.Id);
+        Student first = new(firstUser.Id);
+        Student second = new(secondUser.Id);
+        ParentStudentRelationship firstLink = new(parent.Id, first.Id);
+        ParentStudentRelationship secondLink = new(parent.Id, second.Id);
+        firstLink.Accept(now);
+        secondLink.Accept(now);
+        await SeedAsync(factory, db =>
+        {
+            db.Users.AddRange(buyer, firstUser, secondUser);
+            db.Parents.Add(parent);
+            db.Students.AddRange(first, second);
+            db.ParentStudentRelationships.AddRange(firstLink, secondLink);
+        });
+
+        const string billingUrl = "/api/payments/billing";
+        using HttpClient client = CreateClient(factory, buyer.Id, "Parent");
+        using HttpClient studentClient = CreateClient(factory, firstUser.Id, "Student");
+        Assert.Equal(HttpStatusCode.Forbidden, (await studentClient.GetAsync(billingUrl)).StatusCode);
+        Assert.Equal(BillingStatus.Free, (await ReadBilling()).Status);
+        UpdateBillingContactRequest contact = new("Billing Parent", "billing@example.test", "Cairo", "EG", null);
+        using HttpResponseMessage saved = await client.PutAsJsonAsync(billingUrl + "/contact", contact, JsonOptions);
+        Assert.Equal(HttpStatusCode.OK, saved.StatusCode);
+
+        Guid id = Guid.NewGuid();
+        StartCheckoutRequest request = new(id, PaidPlan.Family, BillingTerm.Monthly, PaymentMethod.Card,
+            [first.Id, second.Id], null);
+        Assert.Equal(HttpStatusCode.OK, (await client.PostAsJsonAsync(Checkouts, request, JsonOptions)).StatusCode);
+        Assert.Equal("billing@example.test", paymob.Body.GetProperty("billing_data").GetProperty("email").GetString());
+
+        BillingOverview pending = await ReadBilling();
+        Assert.Null(pending.LastPayment);
+        Assert.Equal(PaymentStatus.Pending, pending.OpenCheckout?.Status);
+        using HttpClient webhook = factory.CreateClient();
+        Assert.Equal(HttpStatusCode.NoContent, (await SendCallback(webhook, 29900, paid: false)).StatusCode);
+        Assert.Equal(BillingStatus.PaymentFailed, (await ReadBilling()).Status);
+        Assert.Equal(HttpStatusCode.NoContent, (await SendCallback(webhook, 29900, paid: true)).StatusCode);
+
+        BillingOverview active = await ReadBilling();
+        Assert.Equal(BillingStatus.Active, active.Status);
+        Assert.Equal("2346", active.LastPayment?.CardLastFour);
+        Assert.Equal("Mastercard", active.LastPayment?.CardBrand);
+        Assert.Equal(now.AddMonths(1), active.LastPayment?.PaidThroughUtc);
+        Assert.Equal("billing@example.test", active.Contact.Email);
+        Assert.Equal(2, active.BeneficiaryIds.Length);
+
+        string cancelUrl = billingUrl + "/cancellation";
+        Assert.Equal(HttpStatusCode.BadRequest, (await client.PutAsJsonAsync(cancelUrl,
+            new ScheduleCancellationRequest(id, Guid.NewGuid()), JsonOptions)).StatusCode);
+        ScheduleCancellationRequest cancellation = new(id, first.Id);
+        Assert.Equal(HttpStatusCode.OK, (await client.PutAsJsonAsync(cancelUrl, cancellation, JsonOptions)).StatusCode);
+        BillingOverview scheduled = await ReadBilling();
+        Assert.Equal(BillingStatus.CancellationScheduled, scheduled.Status);
+        Assert.Equal(first.Id, scheduled.KeepStudentId);
+        Assert.Equal(now.AddMonths(1), scheduled.CancellationEffectiveAtUtc);
+        Assert.All(scheduled.Children, child => Assert.False(child.IsPaused));
+
+        Assert.Equal(HttpStatusCode.OK, (await client.DeleteAsync($"{cancelUrl}/{id}")).StatusCode);
+        Assert.Equal(BillingStatus.Active, (await ReadBilling()).Status);
+        Assert.Equal(HttpStatusCode.OK, (await client.PutAsJsonAsync(cancelUrl, cancellation, JsonOptions)).StatusCode);
+
+        clock.Now = now.AddMonths(1).AddMinutes(1);
+        BillingOverview ended = await ReadBilling();
+        Assert.Equal(BillingStatus.Free, ended.Status);
+        Assert.False(ended.Children.Single(child => child.StudentId == first.Id).IsPaused);
+        Assert.True(ended.Children.Single(child => child.StudentId == second.Id).IsPaused);
+        Assert.Equal(HttpStatusCode.Conflict, (await client.DeleteAsync($"{cancelUrl}/{id}")).StatusCode);
+        using JsonDocument connected = JsonDocument.Parse(await client.GetStringAsync("/api/access/students"));
+        Assert.Equal(2, connected.RootElement.GetArrayLength());
+
+        async Task<BillingOverview> ReadBilling() =>
+            (await client.GetFromJsonAsync<BillingOverview>(billingUrl, JsonOptions))!;
+    }
+
+    private sealed class TestClock(DateTimeOffset now) : TimeProvider
+    {
+        public DateTimeOffset Now { get; set; } = now;
+        public override DateTimeOffset GetUtcNow() => Now;
+    }
+
     private static WebApplicationFactory<Program> Configure(
-        CustomWebApplicationFactory root, PaymobStub paymob, bool enableLive = false, bool useTestKeysForLive = false) =>
+        CustomWebApplicationFactory root, PaymobStub paymob, bool enableLive = false, bool useTestKeysForLive = false,
+        TimeProvider? clock = null) =>
         root.WithWebHostBuilder(builder =>
         {
             builder.UseSetting("Paymob:Sandbox:SecretKey", "sk_test_example");
@@ -207,8 +299,15 @@ public sealed class PaymentsApiTests
             builder.UseSetting("Paymob:Live:CardIntegrationId", "201");
             builder.UseSetting("Paymob:Live:NotificationUrl", "https://api.focuslens.test" + Callback + "/live");
             builder.UseSetting("Paymob:Live:ReturnUrl", "https://focuslens.test/live-checkout");
-            builder.ConfigureServices(services => services.AddHttpClient("PaymobClient")
-                .ConfigurePrimaryHttpMessageHandler(() => paymob));
+            builder.ConfigureServices(services =>
+            {
+                if (clock is not null)
+                {
+                    services.AddSingleton(clock);
+                }
+
+                services.AddHttpClient("PaymobClient").ConfigurePrimaryHttpMessageHandler(() => paymob);
+            });
         });
 
     private static async Task SeedAsync(WebApplicationFactory<Program> factory,

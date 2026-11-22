@@ -54,11 +54,11 @@ public sealed class RevokeRelationshipCommandHandler(
                 "You are not allowed to revoke this relationship.");
         }
 
-        if (relationship.Status != RelationshipStatus.Active)
+        if (relationship.Status is not (RelationshipStatus.Active or RelationshipStatus.PausedForBilling))
         {
             return Error.Conflict(
                 "Access.InvalidRelationshipState",
-                "Only an active relationship can be revoked.");
+                "Only an active or paused relationship can be revoked.");
         }
 
         relationship.Revoke();

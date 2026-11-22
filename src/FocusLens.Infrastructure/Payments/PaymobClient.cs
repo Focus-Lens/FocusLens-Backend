@@ -21,10 +21,12 @@ internal sealed class PaymobClient(HttpClient httpClient, IOptions<PaymobOptions
     ];
 
     public async Task<(long OrderId, string CheckoutUrl)> CreateIntentionAsync(
-        PaymentPurchase purchase, ApplicationUser buyer, string phone, CancellationToken cancellationToken)
+        PaymentPurchase purchase, ApplicationUser buyer, BillingContact? contact, string phone,
+        CancellationToken cancellationToken)
     {
         PaymobAccountOptions settings = options.Value.ForMode(purchase.IsSandbox);
         string name = $"FocusLens {purchase.Plan} ({purchase.Term})";
+        string[] billingName = contact?.FullName.Split(' ', 2, StringSplitOptions.RemoveEmptyEntries) ?? [];
         using HttpRequestMessage request = new(HttpMethod.Post, "v1/intention/")
         {
             Content = JsonContent.Create(new
@@ -35,18 +37,18 @@ internal sealed class PaymobClient(HttpClient httpClient, IOptions<PaymobOptions
                 items = new[] { new { name, amount = purchase.AmountPiasters, quantity = 1 } },
                 billing_data = new
                 {
-                    first_name = buyer.FirstName,
-                    last_name = buyer.LastName,
-                    email = buyer.Email,
+                    first_name = billingName.FirstOrDefault() ?? buyer.FirstName,
+                    last_name = billingName.Skip(1).FirstOrDefault() ?? buyer.LastName,
+                    email = contact?.Email ?? buyer.Email,
                     phone_number = phone,
-                    country = "EGY",
+                    country = contact?.Country is null or "EG" ? "EGY" : contact.Country,
                     apartment = "NA",
                     floor = "NA",
-                    street = "NA",
+                    street = contact?.Address ?? "NA",
                     building = "NA",
                     shipping_method = "NA",
                     postal_code = "NA",
-                    city = "NA",
+                    city = contact?.City ?? "NA",
                     state = "NA"
                 },
                 special_reference = $"{(purchase.IsSandbox ? "test" : "live")}-{purchase.BuyerId:N}-{purchase.Id:N}",

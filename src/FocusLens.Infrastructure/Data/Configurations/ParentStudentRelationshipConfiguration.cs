@@ -17,7 +17,7 @@ public class ParentStudentRelationshipConfiguration
 
         builder.Property(relationship => relationship.StudentId).IsRequired();
 
-        builder.Property(relationship => relationship.Status).IsRequired();
+        builder.Property(relationship => relationship.Status).IsRequired().IsConcurrencyToken();
 
         builder.Property(relationship => relationship.InitiatedBy).IsRequired();
 

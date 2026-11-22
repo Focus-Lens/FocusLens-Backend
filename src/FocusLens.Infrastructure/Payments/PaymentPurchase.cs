@@ -24,12 +24,23 @@ internal sealed class PaymentPurchase
     public DateTimeOffset? PaidAtUtc { get; private set; }
     public DateTimeOffset? PaidThroughUtc { get; private set; }
 
-    public void RecordPayment(long transactionId, DateTimeOffset paidAt)
+    public string? CardBrand { get; private set; }
+    public string? CardLastFour { get; private set; }
+    public DateTimeOffset? CancellationRequestedAtUtc { get; set; }
+    public Guid? KeepStudentId { get; set; }
+    public bool CancellationApplied { get; set; }
+
+    public BillingPayment ToBillingPayment() =>
+        new(Id, Plan, Term, Method, AmountPiasters, Currency, Status, PaidAtUtc, PaidThroughUtc, CardBrand, CardLastFour, StudentIds);
+
+    public void RecordPayment(long transactionId, DateTimeOffset paidAt, string? cardBrand, string? cardLastFour)
     {
         Status = PaymentStatus.Paid;
         PaidTransactionId = transactionId;
         PaidAtUtc = paidAt;
         PaidThroughUtc = Term == BillingTerm.Monthly ? paidAt.AddMonths(1) : paidAt.AddYears(1);
+        CardBrand = cardBrand;
+        CardLastFour = cardLastFour;
         CheckoutUrl = null;
     }
 
