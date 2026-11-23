@@ -1,4 +1,5 @@
 using FocusLens.Application;
+using FocusLens.API.Infrastructure;
 using FocusLens.Infrastructure;
 using FocusLens.Infrastructure.Data;
 using Scalar.AspNetCore;
@@ -74,6 +75,8 @@ public class Program
                 );
             };
         });
+
+        app.UseMiddleware<StudyChatbotTimeoutMiddleware>();
 
         app.UseCors("AllowAll");
 

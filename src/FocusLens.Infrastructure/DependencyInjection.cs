@@ -16,6 +16,8 @@ using FocusLens.Infrastructure.Notifications;
 using FocusLens.Infrastructure.Payments;
 using FocusLens.Infrastructure.ProfileImages;
 using FocusLens.Infrastructure.StudySessions;
+using FocusLens.Infrastructure.StudyChat;
+using FocusLens.Application.StudyChat;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
@@ -24,6 +26,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
+using StackExchange.Redis;
 
 namespace FocusLens.Infrastructure;
 
@@ -41,6 +44,17 @@ public static class DependencyInjection
             );
 
         services.AddSingleton(TimeProvider.System);
+        // Kept lazy so deployments that have not enabled chat yet do not break unrelated API routes.
+        services.Configure<StudyChatbotOptions>(configuration.GetSection(StudyChatbotOptions.SectionName));
+        services.Configure<ChatOptions>(configuration.GetSection(ChatOptions.SectionName));
+        services.AddSingleton<IConnectionMultiplexer>(_ => ConnectionMultiplexer.Connect(configuration["Redis:ConnectionString"] ?? throw new InvalidOperationException("Redis:ConnectionString is required for temporary chat storage.")));
+        services.AddSingleton<ITemporaryChatStore, RedisTemporaryChatStore>();
+        services.AddScoped<IStudyChatService, StudyChatService>();
+        services.AddHttpClient<IStudyChatbotClient, StudyChatbotClient>((sp, client) =>
+        {
+            StudyChatbotOptions chatOptions = sp.GetRequiredService<IOptions<StudyChatbotOptions>>().Value;
+            client.Timeout = TimeSpan.FromSeconds(Math.Max(1, chatOptions.TimeoutSeconds));
+        });
         services.AddHttpContextAccessor();
         services.AddScoped<ISaveChangesInterceptor, AuditableEntityInterceptor>();
         services.AddScoped<ApplicationDbContextInitialiser>();

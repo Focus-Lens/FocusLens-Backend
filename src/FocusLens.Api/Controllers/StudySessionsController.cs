@@ -1,4 +1,6 @@
 using FocusLens.Application.StudySessions;
+using FocusLens.Application.StudyChat;
+using FocusLens.Contracts.Chat;
 using FocusLens.Contracts.BehavioralIntelligence;
 using FocusLens.Contracts.StudySessions;
 using FocusLens.Domain.Common.Results;
@@ -11,8 +13,30 @@ namespace FocusLens.API.Controllers;
 [ApiController]
 [Route("api/study-sessions")]
 [Authorize(Roles = "Student")]
-public sealed class StudySessionsController(ISender sender) : ApiController
+public sealed class StudySessionsController(ISender sender, IStudyChatService chats) : ApiController
 {
+    [HttpPost("{sessionId:guid}/chat/start")]
+    [ProducesResponseType(typeof(InsideStudyChatResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status504GatewayTimeout)]
+    public async Task<IActionResult> StartChat(Guid sessionId, CancellationToken cancellationToken) => Ok(ToInsideChatResponse(await chats.StartInsideAsync(sessionId, cancellationToken)));
+
+    [HttpGet("{sessionId:guid}/chat")]
+    [ProducesResponseType(typeof(InsideStudyChatResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    public async Task<IActionResult> GetChat(Guid sessionId, CancellationToken cancellationToken)
+    {
+        TemporaryChat? chat = await chats.GetInsideAsync(sessionId, cancellationToken);
+        return chat is null ? NoContent() : Ok(ToInsideChatResponse(chat));
+    }
+
+    [HttpPost("{sessionId:guid}/chat/messages")]
+    [ProducesResponseType(typeof(ChatMessageResponseBody), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status504GatewayTimeout)]
+    public async Task<IActionResult> SendChatMessage(Guid sessionId, [FromBody] SendChatMessageRequest request, CancellationToken cancellationToken) => Ok(ChatController.ToMessageResponse(await chats.SendInsideAsync(sessionId, request.Message, cancellationToken)));
+
+    [HttpPost("{sessionId:guid}/chat/end")]
+    public async Task<IActionResult> EndChat(Guid sessionId, CancellationToken cancellationToken) { await chats.EndInsideAsync(sessionId, cancellationToken); return NoContent(); }
+
     [HttpPost]
     public async Task<IActionResult> Create(
         [FromBody] CreateStudySessionRequest request,
@@ -251,8 +275,19 @@ public sealed class StudySessionsController(ISender sender) : ApiController
     }
 
     [HttpPost("{sessionId:guid}/end")]
-    public async Task<IActionResult> End(Guid sessionId, CancellationToken cancellationToken) =>
-        ToActionResult(await sender.Send(new EndStudySessionCommand(sessionId), cancellationToken));
+    public async Task<IActionResult> End(Guid sessionId, CancellationToken cancellationToken)
+    {
+        Result<StudySessionResponse> result = await sender.Send(
+            new EndStudySessionCommand(sessionId),
+            cancellationToken);
+        if (!result.IsError)
+        {
+            // Temporary chat state has no bearing on session completion, so a Redis/Python failure
+            // must never turn a successfully ended study session into a failed request.
+            try { await chats.EndInsideAsync(sessionId, cancellationToken); } catch { }
+        }
+        return ToActionResult(result);
+    }
 
     [HttpPost("{sessionId:guid}/reuse")]
     public async Task<IActionResult> Reuse(Guid sessionId, CancellationToken cancellationToken) =>
@@ -341,6 +376,19 @@ public sealed class StudySessionsController(ISender sender) : ApiController
         using MemoryStream buffer = new();
         await input.CopyToAsync(buffer, cancellationToken);
         return buffer.ToArray();
+    }
+
+    private static InsideStudyChatResponse ToInsideChatResponse(TemporaryChat chat)
+    {
+        TemporaryStudyMaterial material = chat.StudyMaterial
+            ?? throw new InvalidOperationException("Study material is unavailable for this chat.");
+        return new InsideStudyChatResponse(
+            chat.ChatId,
+            chat.CreatedAt,
+            chat.LastActivityAt,
+            chat.ExpiresAt,
+            chat.History.Select(ChatController.ToMessage).ToArray(),
+            new InsideStudyMaterialResponse(material.FileName, material.ContentType));
     }
 
     private ActionResult ToActionResult<TResponse>(Result<TResponse> result) =>
