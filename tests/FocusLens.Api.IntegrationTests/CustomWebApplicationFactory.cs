@@ -1,6 +1,7 @@
 using FocusLens.API;
 using FocusLens.API.Infrastructure;
 using FocusLens.Application.Common.Interfaces;
+using FocusLens.Application.StudyChat;
 using FocusLens.Contracts.BehavioralIntelligence;
 using FocusLens.Infrastructure.Data;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -63,6 +64,11 @@ public sealed class CustomWebApplicationFactory
                         warnings.Ignore(InMemoryEventId.TransactionIgnoredWarning)));
             services.AddScoped<IEmailSender, LoggingEmailSender>();
 
+            // Chat state is Redis-backed in production. Integration tests replace it so
+            // unrelated controller activation never requires a live Redis server.
+            services.RemoveAll<ITemporaryChatStore>();
+            services.AddSingleton<ITemporaryChatStore, TestTemporaryChatStore>();
+
             // Keep API integration tests deterministic and independent of a live Python service.
             services.RemoveAll<IBehavioralIntelligenceClient>();
             services.AddSingleton<IBehavioralIntelligenceClient, TestBehavioralIntelligenceClient>();
@@ -96,6 +102,82 @@ public sealed class CustomWebApplicationFactory
     private sealed class FixedTimeProvider(DateTimeOffset utcNow) : TimeProvider
     {
         public override DateTimeOffset GetUtcNow() => utcNow;
+    }
+
+    private sealed class TestTemporaryChatStore : ITemporaryChatStore
+    {
+        private readonly Dictionary<string, TemporaryChat> _chats = new();
+        private readonly object _gate = new();
+
+        public Task<TemporaryChat?> GetAsync(string chatId, CancellationToken cancellationToken)
+        {
+            lock (_gate)
+            {
+                _chats.TryGetValue(chatId, out TemporaryChat? chat);
+                return Task.FromResult(chat);
+            }
+        }
+
+        public Task<TemporaryChat?> GetInsideAsync(
+            Guid studentId,
+            Guid studySessionId,
+            CancellationToken cancellationToken) =>
+            FindAsync(chat => chat.Type == TemporaryChatType.Inside
+                              && chat.StudentId == studentId
+                              && chat.StudySessionId == studySessionId);
+
+        public Task<TemporaryChat?> GetOutsideAsync(Guid studentId, CancellationToken cancellationToken) =>
+            FindAsync(chat => chat.Type == TemporaryChatType.Outside && chat.StudentId == studentId);
+
+        public Task<bool> CreateAsync(TemporaryChat chat, CancellationToken cancellationToken)
+        {
+            lock (_gate)
+            {
+                if (_chats.ContainsKey(chat.ChatId))
+                {
+                    return Task.FromResult(false);
+                }
+
+                _chats.Add(chat.ChatId, chat);
+                return Task.FromResult(true);
+            }
+        }
+
+        public Task<bool> SaveAsync(TemporaryChat chat, CancellationToken cancellationToken)
+        {
+            lock (_gate)
+            {
+                _chats[chat.ChatId] = chat;
+                return Task.FromResult(true);
+            }
+        }
+
+        public Task DeleteAsync(TemporaryChat chat, CancellationToken cancellationToken)
+        {
+            lock (_gate)
+            {
+                _chats.Remove(chat.ChatId);
+                return Task.CompletedTask;
+            }
+        }
+
+        public Task<IAsyncDisposable?> TryLockAsync(string resource, CancellationToken cancellationToken) =>
+            Task.FromResult<IAsyncDisposable?>(NoopLock.Instance);
+
+        private Task<TemporaryChat?> FindAsync(Func<TemporaryChat, bool> predicate)
+        {
+            lock (_gate)
+            {
+                return Task.FromResult(_chats.Values.FirstOrDefault(predicate));
+            }
+        }
+
+        private sealed class NoopLock : IAsyncDisposable
+        {
+            public static readonly NoopLock Instance = new();
+
+            public ValueTask DisposeAsync() => ValueTask.CompletedTask;
+        }
     }
 
     private sealed class TestBehavioralIntelligenceClient : IBehavioralIntelligenceClient
