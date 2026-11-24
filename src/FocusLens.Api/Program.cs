@@ -76,6 +76,7 @@ public class Program
             };
         });
 
+        app.UseExceptionHandler();
         app.UseMiddleware<StudyChatbotTimeoutMiddleware>();
 
         app.UseCors("AllowAll");

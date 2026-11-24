@@ -2,7 +2,7 @@ using FocusLens.Infrastructure.StudyChat;
 
 namespace FocusLens.API.Infrastructure;
 
-public sealed class StudyChatbotTimeoutMiddleware(RequestDelegate next)
+public sealed class StudyChatbotTimeoutMiddleware(RequestDelegate next, ILogger<StudyChatbotTimeoutMiddleware> logger)
 {
     public async Task InvokeAsync(HttpContext context)
     {
@@ -10,12 +10,14 @@ public sealed class StudyChatbotTimeoutMiddleware(RequestDelegate next)
         {
             await next(context);
         }
-        catch (StudyChatTimeoutException) when (!context.RequestAborted.IsCancellationRequested)
+        catch (StudyChatTimeoutException ex) when (!context.RequestAborted.IsCancellationRequested)
         {
             if (context.Response.HasStarted)
             {
                 throw;
             }
+
+            logger.LogError(ex, "Study chatbot timeout. TraceId: {TraceId}", context.TraceIdentifier);
 
             await Results.Problem(
                 statusCode: StatusCodes.Status504GatewayTimeout,

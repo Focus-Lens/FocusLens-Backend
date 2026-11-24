@@ -47,7 +47,9 @@ public sealed class StudyChatService(IBaseRepository<Student> students, IBaseRep
     public async Task<TemporaryChat> AddAttachmentAsync(string id, ChatAttachmentUpload file, CancellationToken ct)
     {
         ValidateFile(file); TemporaryChat chat = await OwnedOutsideAsync(id, ct); await using IAsyncDisposable guard = await LockAsync($"chat:{id}", ct); chat = await OwnedOutsideAsync(id, ct);
-        string text = (await chatbot.ExtractTextAsync(file.ContentType, file.Content, ct)).Trim(); if (text.Length == 0) throw new StudyChatException(422, "No readable text was found in the attachment.");
+        string? extractedText = await chatbot.ExtractTextAsync(file.ContentType, file.Content, ct);
+        if (string.IsNullOrWhiteSpace(extractedText)) throw new StudyChatException(422, "No readable text was found in the attachment.");
+        string text = extractedText.Trim();
         string ai = Guid.NewGuid().ToString("N"); await chatbot.StartSessionAsync(new(ai, text), ct);
         TemporaryChat updated = Touch(chat with { AiSessionId = ai, MaterialText = text, Attachment = new(file.FileName, file.ContentType) });
         try { await store.SaveAsync(updated, ct); }
@@ -83,7 +85,9 @@ public sealed class StudyChatService(IBaseRepository<Student> students, IBaseRep
     private static string GetInsideMaterialForPython(StudySession session)
     {
         StudySessionSelection selection = session.Selection ?? throw new StudyChatException(409, "Study material has not been extracted yet.");
-        string text = selection.AiExtractedText?.Trim() ?? throw new StudyChatException(409, "Study material has not been extracted yet.");
+        string? extractedText = selection.AiExtractedText;
+        if (string.IsNullOrWhiteSpace(extractedText)) throw new StudyChatException(409, "Study material has not been extracted yet.");
+        string text = extractedText.Trim();
         return DerivedPageMarker.Replace(text, match =>
         {
             if (!int.TryParse(match.Groups[1].Value, NumberStyles.None, CultureInfo.InvariantCulture, out int derivedPage)) return match.Value;

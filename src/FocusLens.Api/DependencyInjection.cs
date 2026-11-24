@@ -22,6 +22,9 @@ public static class DependencyInjection
                 options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
             });
 
+        services.AddProblemDetails();
+        services.AddExceptionHandler<GlobalExceptionHandler>();
+
         services.AddHttpContextAccessor();
         services.AddDataProtection();
         services.AddRateLimiter(options =>

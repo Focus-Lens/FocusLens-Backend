@@ -36,10 +36,10 @@ public sealed class StudyChatbotClientTests
         using var httpClient = new HttpClient(new RecordingHandler());
         var client = new StudyChatbotClient(httpClient, Options.Create(new StudyChatbotOptions()));
 
-        InvalidOperationException error = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+        StudyChatConfigurationException error = await Assert.ThrowsAsync<StudyChatConfigurationException>(() =>
             client.StartSessionAsync(new("session-1", "material"), CancellationToken.None));
 
-        Assert.Equal("StudyChatbot:BaseUrl and StudyChatbot:ServiceKey must be configured before using chat.", error.Message);
+        Assert.Equal("Study chatbot configuration is unavailable.", error.Message);
     }
 
     [Fact]

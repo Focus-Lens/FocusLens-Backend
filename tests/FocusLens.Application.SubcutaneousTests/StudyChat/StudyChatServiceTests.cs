@@ -1,4 +1,5 @@
 using System.Linq.Expressions;
+using System.Reflection;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using FocusLens.Application.Common.Interfaces;
@@ -108,6 +109,30 @@ public sealed class StudyChatServiceTests
 
         Assert.Equal([10, 12], exchange.AssistantMessage.Pages);
         Assert.Equal(exchange.AssistantMessage.Pages, persisted.History[^1].Pages);
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("   \t\r\n")]
+    public async Task Inside_chat_rejects_missing_empty_or_whitespace_only_extracted_material(string? extractedText)
+    {
+        var fixture = new Fixture(withInsideSession: true);
+        SetPersistedExtractedText(fixture.Session!.Selection!, extractedText);
+
+        StudyChatException error = await Assert.ThrowsAsync<StudyChatException>(() =>
+            fixture.Service.StartInsideAsync(fixture.SessionId, CancellationToken.None));
+
+        Assert.Equal(409, error.StatusCode);
+        Assert.Empty(fixture.Client.StartRequests);
+    }
+
+    // Domain methods correctly reject this data. This simulates a legacy/corrupt value hydrated
+    // from persistence, so the service's defensive check is tested without weakening invariants.
+    private static void SetPersistedExtractedText(StudySessionSelection selection, string? extractedText)
+    {
+        PropertyInfo property = typeof(StudySessionSelection).GetProperty(nameof(StudySessionSelection.AiExtractedText))!;
+        property.SetValue(selection, extractedText);
     }
 
     [Theory]
